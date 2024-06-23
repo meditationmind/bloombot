@@ -4,7 +4,7 @@ use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
 use anyhow::Result;
-use poise::serenity_prelude::{self as serenity, builder::*, ChannelId};
+use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, MessageId};
 use poise::CreateReply;
 
 /// Commands for erasing and erase logs
@@ -38,14 +38,14 @@ pub async fn message(
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let channel_id = message.channel_id;
-  let message_id = message.id;
+  let channel_id: ChannelId = message.channel_id;
+  let message_id: MessageId = message.id;
   let reason = reason.unwrap_or("No reason provided.".to_string());
   let audit_log_reason: Option<&str> = Some(reason.as_str());
 
   ctx
     .http()
-    .delete_message(channel_id.into(), message_id.into(), audit_log_reason)
+    .delete_message(channel_id, message_id, audit_log_reason)
     .await?;
 
   let occurred_at = chrono::Utc::now();
