@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{self, BloomBotEmbed, CHANNELS};
 use crate::database::DatabaseHandler;
@@ -31,14 +33,14 @@ pub async fn erase(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 pub async fn message(
   ctx: Context<'_>,
-  #[description = "The message ID of the message to delete"] message: u64, // serenity::Message,
+  #[description = "The message ID of the message to delete"] message: String, // serenity::Message,
   #[max_length = 512] // Max length for audit log reason
   #[description = "The reason for deleting the message"]
   reason: Option<String>,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let message_id = MessageId::new(message);
+  let message_id = MessageId::from_str(message.as_str()).unwrap();
   let channel_id = ctx.channel_id();
   let message = channel_id.message(ctx, message_id).await?;
 
