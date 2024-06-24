@@ -31,7 +31,7 @@ pub async fn erase(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 pub async fn message(
   ctx: Context<'_>,
-  #[description = "The message ID of the message to delete"] message: serenity::Message,
+  #[description = "The message to delete"] message: serenity::Message,
   #[max_length = 512] // Max length for audit log reason
   #[description = "The reason for deleting the message"]
   reason: Option<String>,
@@ -42,6 +42,9 @@ pub async fn message(
   let message_id: MessageId = message.id;
   let reason = reason.unwrap_or("No reason provided.".to_string());
   let audit_log_reason: Option<&str> = Some(reason.as_str());
+
+  // Remove reactions to prevent delete_message from failing
+  message.delete_reactions(ctx).await?;
 
   ctx
     .http()
