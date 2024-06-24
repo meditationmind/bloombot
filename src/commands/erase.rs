@@ -31,19 +31,15 @@ pub async fn erase(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 pub async fn message(
   ctx: Context<'_>,
-  #[description = "The message ID of the message to delete"] message: String, // serenity::Message,
+  #[description = "The message ID of the message to delete"] message: serenity::Message,
   #[max_length = 512] // Max length for audit log reason
   #[description = "The reason for deleting the message"]
   reason: Option<String>,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let message_id = MessageId::new(message.parse::<u64>().unwrap());
-  let channel_id = ctx.channel_id();
-  let message = channel_id.message(ctx, message_id).await?;
-
-  // let channel_id: ChannelId = message.channel_id;
-  // let message_id: MessageId = message.id;
+  let channel_id: ChannelId = message.channel_id;
+  let message_id: MessageId = message.id;
   let reason = reason.unwrap_or("No reason provided.".to_string());
   let audit_log_reason: Option<&str> = Some(reason.as_str());
 
