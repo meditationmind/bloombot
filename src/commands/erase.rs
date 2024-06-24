@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{self, BloomBotEmbed, CHANNELS};
 use crate::database::DatabaseHandler;
@@ -40,7 +38,7 @@ pub async fn message(
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let message_id = MessageId::from_str(message.as_str()).unwrap();
+  let message_id = MessageId::new(message.parse::<u64>().unwrap());
   let channel_id = ctx.channel_id();
   let message = channel_id.message(ctx, message_id).await?;
 
