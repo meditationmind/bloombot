@@ -2,6 +2,9 @@ name: Force Redeployment
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - discord-staff-trigger
 
 env:
   CPLN_ORG: ${{ secrets.CPLN_ORG }}
