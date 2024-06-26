@@ -1,0 +1,29 @@
+name: Force Redeployment
+
+on:
+  workflow_dispatch:
+
+env:
+  CPLN_ORG: ${{ secrets.CPLN_ORG }}
+  CPLN_GVC: ${{ secrets.CPLN_GVC }}
+  CPLN_WORKLOAD: ${{ secrets.CPLN_WORKLOAD }}
+  CPLN_TOKEN: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+
+jobs:
+
+  force-redeployment:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Control Plane CLI
+        shell: bash
+        run: |
+          sudo npm install -g @controlplane/cli
+          cpln --version
+
+      - name: Force Redeployment
+        shell: bash
+        run: |
+          cpln profile update default --token ${CPLN_TOKEN}
+          cpln workload force-redeployment ${CPLN_WORKLOAD} --org ${CPLN_ORG} --gvc ${CPLN_GVC}
