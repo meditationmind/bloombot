@@ -47,6 +47,7 @@ struct EditQuoteModal {
   //hide_in_help,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn quotes(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
   Ok(())
 }
@@ -60,39 +61,36 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
 
   let quote_data = AddQuoteModal::execute(ctx).await?;
 
-  match quote_data {
-    Some(quote_data) => {
-      let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+  if let Some(quote_data) = quote_data {
+    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-      // We unwrap here, because we know that the command is guild-only.
-      let guild_id = ctx.guild_id().unwrap();
+    // We unwrap here, because we know that the command is guild-only.
+    let guild_id = ctx.guild_id().unwrap();
 
-      DatabaseHandler::add_quote(
-        &mut transaction,
-        &guild_id,
-        quote_data.quote.as_str(),
-        quote_data.author.as_deref(),
+    DatabaseHandler::add_quote(
+      &mut transaction,
+      &guild_id,
+      quote_data.quote.as_str(),
+      quote_data.author.as_deref(),
+    )
+    .await?;
+
+    commit_and_say(
+      poise::Context::Application(ctx),
+      transaction,
+      MessageType::TextOnly(":white_check_mark: Quote has been added.".to_string()),
+      true,
+    )
+    .await?;
+  } else {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(":x: No data was provided.")
+          .ephemeral(true),
       )
       .await?;
-
-      commit_and_say(
-        poise::Context::Application(ctx),
-        transaction,
-        MessageType::TextOnly(format!(":white_check_mark: Quote has been added.")),
-        true,
-      )
-      .await?;
-    }
-    None => {
-      ctx
-        .send(
-          CreateReply::default()
-            .content(":x: No data was provided.")
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
+    return Ok(());
   }
 
   Ok(())
@@ -134,36 +132,33 @@ pub async fn edit(
 
   let quote_data = EditQuoteModal::execute_with_defaults(ctx, defaults).await?;
 
-  match quote_data {
-    Some(quote_data) => {
-      let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+  if let Some(quote_data) = quote_data {
+    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-      DatabaseHandler::edit_quote(
-        &mut transaction,
-        &existing_quote.id,
-        quote_data.quote.as_str(),
-        quote_data.author.as_deref(),
+    DatabaseHandler::edit_quote(
+      &mut transaction,
+      &existing_quote.id,
+      quote_data.quote.as_str(),
+      quote_data.author.as_deref(),
+    )
+    .await?;
+
+    commit_and_say(
+      poise::Context::Application(ctx),
+      transaction,
+      MessageType::TextOnly(":white_check_mark: Quote has been edited.".to_string()),
+      true,
+    )
+    .await?;
+  } else {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(":x: No data was provided.")
+          .ephemeral(true),
       )
       .await?;
-
-      commit_and_say(
-        poise::Context::Application(ctx),
-        transaction,
-        MessageType::TextOnly(format!(":white_check_mark: Quote has been edited.")),
-        true,
-      )
-      .await?;
-    }
-    None => {
-      ctx
-        .send(
-          CreateReply::default()
-            .content(":x: No data was provided.")
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
+    return Ok(());
   }
 
   Ok(())
@@ -199,7 +194,7 @@ pub async fn remove(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(format!(":white_check_mark: Quote has been removed.")),
+    MessageType::TextOnly(":white_check_mark: Quote has been removed.".to_string()),
     true,
   )
   .await?;
@@ -224,14 +219,10 @@ pub async fn list(
 
   // Define some unique identifiers for the navigation buttons
   let ctx_id = ctx.id();
-  let prev_button_id = format!("{}prev", ctx_id);
-  let next_button_id = format!("{}next", ctx_id);
+  let prev_button_id = format!("{ctx_id}prev");
+  let next_button_id = format!("{ctx_id}next");
 
-  let mut current_page = page.unwrap_or(0);
-
-  if current_page > 0 {
-    current_page = current_page - 1
-  }
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let quotes = DatabaseHandler::get_all_quotes(&mut transaction, &guild_id).await?;
   let quotes: Vec<PageRowRef> = quotes.iter().map(|quote| quote as PageRowRef).collect();
@@ -251,7 +242,7 @@ pub async fn list(
         f = f.components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(&prev_button_id).label("Previous"),
           CreateButton::new(&next_button_id).label("Next"),
-        ])])
+        ])]);
       }
       f.embeds = vec![first_page];
       f.ephemeral(true)

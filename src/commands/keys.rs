@@ -20,6 +20,7 @@ use poise::CreateReply;
   //hide_in_help,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn keys(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -41,14 +42,10 @@ pub async fn list_keys(
 
   // Define some unique identifiers for the navigation buttons
   let ctx_id = ctx.id();
-  let prev_button_id = format!("{}prev", ctx_id);
-  let next_button_id = format!("{}next", ctx_id);
+  let prev_button_id = format!("{ctx_id}prev");
+  let next_button_id = format!("{ctx_id}next");
 
-  let mut current_page = page.unwrap_or(0);
-
-  if current_page > 0 {
-    current_page = current_page - 1
-  }
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let keys = DatabaseHandler::get_all_steam_keys(&mut transaction, &guild_id).await?;
   let keys: Vec<PageRowRef> = keys.iter().map(|key| key as PageRowRef).collect();
@@ -68,7 +65,7 @@ pub async fn list_keys(
         f = f.components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(&prev_button_id).label("Previous"),
           CreateButton::new(&next_button_id).label("Next"),
-        ])])
+        ])]);
       }
       f.embeds = vec![first_page];
       f.ephemeral(true)
@@ -176,7 +173,7 @@ pub async fn remove_key(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(format!(":white_check_mark: Key has been removed.")),
+    MessageType::TextOnly(":white_check_mark: Key has been removed.".to_string()),
     true,
   )
   .await?;
@@ -215,8 +212,7 @@ pub async fn use_key(ctx: Context<'_>) -> Result<()> {
     .send(
       CreateReply::default()
         .content(format!(
-          ":white_check_mark: Key retrieved and marked used: `{}`",
-          key
+          ":white_check_mark: Key retrieved and marked used: `{key}`"
         ))
         .ephemeral(true),
     )
@@ -229,6 +225,7 @@ pub async fn use_key(ctx: Context<'_>) -> Result<()> {
 ///
 /// Commands to list or manage entries in the Playne key recipients database.
 #[poise::command(slash_command, subcommands("list_recipients", "update_recipient"))]
+#[allow(clippy::unused_async)]
 pub async fn recipients(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -250,14 +247,10 @@ pub async fn list_recipients(
 
   // Define some unique identifiers for the navigation buttons
   let ctx_id = ctx.id();
-  let prev_button_id = format!("{}prev", ctx_id);
-  let next_button_id = format!("{}next", ctx_id);
+  let prev_button_id = format!("{ctx_id}prev");
+  let next_button_id = format!("{ctx_id}next");
 
-  let mut current_page = page.unwrap_or(0);
-
-  if current_page > 0 {
-    current_page = current_page - 1
-  }
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let recipients = DatabaseHandler::get_steamkey_recipients(&mut transaction, &guild_id).await?;
   let recipients: Vec<PageRowRef> = recipients
@@ -280,7 +273,7 @@ pub async fn list_recipients(
         f = f.components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(&prev_button_id).label("Previous"),
           CreateButton::new(&next_button_id).label("Next"),
-        ])])
+        ])]);
       }
       f.embeds = vec![first_page];
       f.ephemeral(true)
@@ -365,37 +358,34 @@ pub async fn update_recipient(
     DatabaseHandler::get_steamkey_recipient(&mut transaction, &guild_id, &recipient.id).await?;
 
   if steamkey_recipient.is_none() {
-    match total_keys {
-      Some(total_keys) => {
-        DatabaseHandler::add_steamkey_recipient(
-          &mut transaction,
-          &guild_id,
-          &recipient.id,
-          challenge_prize,
-          donator_perk,
-          total_keys,
-        )
-        .await?;
+    if let Some(total_keys) = total_keys {
+      DatabaseHandler::add_steamkey_recipient(
+        &mut transaction,
+        &guild_id,
+        &recipient.id,
+        challenge_prize,
+        donator_perk,
+        total_keys,
+      )
+      .await?;
 
-        commit_and_say(
-          ctx,
-          transaction,
-          MessageType::TextOnly(
-            ":white_check_mark: Recipient has been added to the database.".to_string(),
-          ),
-          true,
-        )
-        .await?;
-        return Ok(());
-      }
-      None => {
-        ctx
-          .send(CreateReply::default().content(":x: No existing record for recipient. Please specify a number of keys to create a new record.").ephemeral(true))
-          .await?;
-        DatabaseHandler::rollback_transaction(transaction).await?;
-        return Ok(());
-      }
+      commit_and_say(
+        ctx,
+        transaction,
+        MessageType::TextOnly(
+          ":white_check_mark: Recipient has been added to the database.".to_string(),
+        ),
+        true,
+      )
+      .await?;
+      return Ok(());
     }
+
+    ctx
+      .send(CreateReply::default().content(":x: No existing record for recipient. Please specify a number of keys to create a new record.").ephemeral(true))
+      .await?;
+    DatabaseHandler::rollback_transaction(transaction).await?;
+    return Ok(());
   }
 
   if total_keys.is_some() && total_keys.unwrap() == 0 {
@@ -403,8 +393,8 @@ pub async fn update_recipient(
 
     let ctx_id = ctx.id();
 
-    let confirm_id = format!("{}confirm", ctx_id);
-    let cancel_id = format!("{}cancel", ctx_id);
+    let confirm_id = format!("{ctx_id}confirm");
+    let cancel_id = format!("{ctx_id}cancel");
 
     ctx
       .send(
@@ -455,7 +445,7 @@ pub async fn update_recipient(
           )
           .await
         {
-          Ok(_) => {
+          Ok(()) => {
             DatabaseHandler::commit_transaction(transaction).await?;
             return Ok(());
           }
@@ -469,18 +459,18 @@ pub async fn update_recipient(
             ));
           }
         }
-      } else {
-        press
-          .create_response(
-            ctx,
-            CreateInteractionResponse::UpdateMessage(
-              CreateInteractionResponseMessage::new()
-                .content("Cancelled.")
-                .components(Vec::new()),
-            ),
-          )
-          .await?;
       }
+
+      press
+        .create_response(
+          ctx,
+          CreateInteractionResponse::UpdateMessage(
+            CreateInteractionResponseMessage::new()
+              .content("Cancelled.")
+              .components(Vec::new()),
+          ),
+        )
+        .await?;
     }
     // This happens when the user didn't press any button for 60 seconds
     return Ok(());

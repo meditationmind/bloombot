@@ -123,6 +123,7 @@ pub enum OnOff {
   //hide_in_help,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn customize(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -201,23 +202,11 @@ pub async fn show(ctx: Context<'_>) -> Result<()> {
           //"**UTC Offset**: {}\n**Anonymous Tracking**: {}\n**Streak Reporting**: {}\n**Streak Visibility**: {}\n**Stats Visibility**: {}",
           "```UTC Offset:           {}\nAnonymous Tracking:   {}\nStreak Reporting:     {}\nStreak Visibility:    {}\nStats Visibility:     {}```",
           //Only show the offset (no time zone abbreviations)
-          utc_offset.split_whitespace().next().unwrap().to_string(),
-          match tracking_profile.anonymous_tracking {
-            true => "On",
-            false => "Off"
-          },
-          match tracking_profile.streaks_active {
-            true => "On",
-            false => "Off"
-          },
-          match tracking_profile.streaks_private {
-            true => "Private",
-            false => "Public"
-          },
-          match tracking_profile.stats_private {
-            true => "Private",
-            false => "Public"
-          },
+          utc_offset.split_whitespace().next().unwrap(),
+          if tracking_profile.anonymous_tracking { "On" } else { "Off" },
+          if tracking_profile.streaks_active { "On" } else { "Off" },
+          if tracking_profile.streaks_private { "Private" } else { "Public" },
+          if tracking_profile.stats_private { "Private" } else { "Public" },
         ))
     )
     .ephemeral(true))
@@ -303,9 +292,10 @@ pub async fn offset(
     ctx
       .send(
         CreateReply::default()
-          .content(format!(
+          .content(
             "Cannot specify multiple time zones. Please try again with only one offset."
-          ))
+              .to_string(),
+          )
           .ephemeral(true),
       )
       .await?;
@@ -318,53 +308,53 @@ pub async fn offset(
     plus_offset
   };
 
-  match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
-    Some(tracking_profile) => {
-      let existing_profile = tracking_profile;
+  if let Some(tracking_profile) =
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?
+  {
+    let existing_profile = tracking_profile;
 
-      if utc_offset == existing_profile.utc_offset {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(format!(
-                "Your current UTC offset already matches the specified offset. No changes made."
-              ))
-              .ephemeral(true),
-          )
-          .await?;
+    if utc_offset == existing_profile.utc_offset {
+      ctx
+        .send(
+          CreateReply::default()
+            .content(
+              "Your current UTC offset already matches the specified offset. No changes made."
+                .to_string(),
+            )
+            .ephemeral(true),
+        )
+        .await?;
 
-        return Ok(());
-      }
-
-      DatabaseHandler::update_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        utc_offset,
-        existing_profile.anonymous_tracking,
-        existing_profile.streaks_active,
-        existing_profile.streaks_private,
-        existing_profile.stats_private,
-      )
-      .await?;
+      return Ok(());
     }
-    None => {
-      let default = TrackingProfile {
-        ..Default::default()
-      };
 
-      DatabaseHandler::create_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        utc_offset,
-        default.anonymous_tracking,
-        default.streaks_active,
-        default.streaks_private,
-        default.stats_private,
-      )
-      .await?;
-    }
+    DatabaseHandler::update_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      utc_offset,
+      existing_profile.anonymous_tracking,
+      existing_profile.streaks_active,
+      existing_profile.streaks_private,
+      existing_profile.stats_private,
+    )
+    .await?;
+  } else {
+    let default = TrackingProfile {
+      ..Default::default()
+    };
+
+    DatabaseHandler::create_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      utc_offset,
+      default.anonymous_tracking,
+      default.streaks_active,
+      default.streaks_private,
+      default.stats_private,
+    )
+    .await?;
   }
 
   commit_and_say(
@@ -401,54 +391,53 @@ pub async fn tracking(
     OnOff::Off => false,
   };
 
-  match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
-    Some(tracking_profile) => {
-      let existing_profile = tracking_profile;
+  if let Some(tracking_profile) =
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?
+  {
+    let existing_profile = tracking_profile;
 
-      if anonymous_tracking == existing_profile.anonymous_tracking {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(format!(
-                "Anonymous tracking already turned **{}**. No changes made.",
-                anonymous.name()
-              ))
-              .ephemeral(true),
-          )
-          .await?;
+    if anonymous_tracking == existing_profile.anonymous_tracking {
+      ctx
+        .send(
+          CreateReply::default()
+            .content(format!(
+              "Anonymous tracking already turned **{}**. No changes made.",
+              anonymous.name()
+            ))
+            .ephemeral(true),
+        )
+        .await?;
 
-        return Ok(());
-      }
-
-      DatabaseHandler::update_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        existing_profile.utc_offset,
-        anonymous_tracking,
-        existing_profile.streaks_active,
-        existing_profile.streaks_private,
-        existing_profile.stats_private,
-      )
-      .await?;
+      return Ok(());
     }
-    None => {
-      let default = TrackingProfile {
-        ..Default::default()
-      };
 
-      DatabaseHandler::create_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        default.utc_offset,
-        anonymous_tracking,
-        default.streaks_active,
-        default.streaks_private,
-        default.stats_private,
-      )
-      .await?;
-    }
+    DatabaseHandler::update_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      existing_profile.utc_offset,
+      anonymous_tracking,
+      existing_profile.streaks_active,
+      existing_profile.streaks_private,
+      existing_profile.stats_private,
+    )
+    .await?;
+  } else {
+    let default = TrackingProfile {
+      ..Default::default()
+    };
+
+    DatabaseHandler::create_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      default.utc_offset,
+      anonymous_tracking,
+      default.streaks_active,
+      default.streaks_private,
+      default.stats_private,
+    )
+    .await?;
   }
 
   commit_and_say(
@@ -486,178 +475,175 @@ pub async fn streak(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
-    Some(tracking_profile) => {
-      let existing_profile = tracking_profile;
+  if let Some(tracking_profile) =
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?
+  {
+    let existing_profile = tracking_profile;
 
-      let streaks_active = match reporting {
-        Some(reporting) => match reporting {
-          OnOff::On => true,
-          OnOff::Off => false,
-        },
-        None => existing_profile.streaks_active,
-      };
+    let streaks_active = match reporting {
+      Some(reporting) => match reporting {
+        OnOff::On => true,
+        OnOff::Off => false,
+      },
+      None => existing_profile.streaks_active,
+    };
 
-      let streaks_private = match privacy {
-        Some(privacy) => match privacy {
-          Privacy::Private => true,
-          Privacy::Public => false,
-        },
-        None => existing_profile.streaks_private,
-      };
+    let streaks_private = match privacy {
+      Some(privacy) => match privacy {
+        Privacy::Private => true,
+        Privacy::Public => false,
+      },
+      None => existing_profile.streaks_private,
+    };
 
-      if (streaks_active == existing_profile.streaks_active)
-        && (streaks_private == existing_profile.streaks_private)
-      {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(format!(
-                "Current settings already match specified settings. No changes made."
-              ))
-              .ephemeral(true),
-          )
-          .await?;
+    if (streaks_active == existing_profile.streaks_active)
+      && (streaks_private == existing_profile.streaks_private)
+    {
+      ctx
+        .send(
+          CreateReply::default()
+            .content(
+              "Current settings already match specified settings. No changes made.".to_string(),
+            )
+            .ephemeral(true),
+        )
+        .await?;
 
-        return Ok(());
-      }
+      return Ok(());
+    }
 
-      DatabaseHandler::update_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        existing_profile.utc_offset,
-        existing_profile.anonymous_tracking,
-        streaks_active,
-        streaks_private,
-        existing_profile.stats_private,
-      )
-      .await?;
+    DatabaseHandler::update_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      existing_profile.utc_offset,
+      existing_profile.anonymous_tracking,
+      streaks_active,
+      streaks_private,
+      existing_profile.stats_private,
+    )
+    .await?;
 
-      if existing_profile.streaks_active && !streaks_active {
-        let guild = ctx.guild().unwrap().clone();
-        let member = guild.member(ctx, user_id).await?;
+    if existing_profile.streaks_active && !streaks_active {
+      let guild = ctx.guild().unwrap().clone();
+      let member = guild.member(ctx, user_id).await?;
 
-        let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
 
-        for role in current_streak_roles {
-          match member.remove_role(ctx, role).await {
-            Ok(_) => {}
-            Err(err) => {
-              error!("Error removing role: {}", err);
+      for role in current_streak_roles {
+        match member.remove_role(ctx, role).await {
+          Ok(()) => {}
+          Err(err) => {
+            error!("Error removing role: {err}");
 
-              ctx.send(CreateReply::default()
-                .content(":x: An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
-                .allowed_mentions(serenity::CreateAllowedMentions::new())
-                .ephemeral(true)).await?;
-            }
+            ctx.send(CreateReply::default()
+              .content(":x: An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+              .allowed_mentions(serenity::CreateAllowedMentions::new())
+              .ephemeral(true)).await?;
           }
         }
       }
+    }
 
-      if !existing_profile.streaks_active && streaks_active {
-        let user_streak =
-          DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
+    if !existing_profile.streaks_active && streaks_active {
+      let user_streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
-        let guild = ctx.guild().unwrap().clone();
-        let member = guild.member(ctx, user_id).await?;
+      let guild = ctx.guild().unwrap().clone();
+      let member = guild.member(ctx, user_id).await?;
 
-        let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
-        let earned_streak_role = StreakRoles::from_streak(user_streak);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let earned_streak_role = StreakRoles::from_streak(user_streak);
 
-        if let Some(earned_streak_role) = earned_streak_role {
-          if !current_streak_roles.contains(&earned_streak_role.to_role_id()) {
-            match member.add_role(ctx, earned_streak_role.to_role_id()).await {
-              Ok(_) => {}
-              Err(err) => {
-                error!("Error adding role: {}", err);
+      if let Some(earned_streak_role) = earned_streak_role {
+        if !current_streak_roles.contains(&earned_streak_role.to_role_id()) {
+          match member.add_role(ctx, earned_streak_role.to_role_id()).await {
+            Ok(()) => {}
+            Err(err) => {
+              error!("Error adding role: {err}");
 
-                ctx.send(CreateReply::default()
-                  .content(":x: An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
-                  .allowed_mentions(serenity::CreateAllowedMentions::new())
-                  .ephemeral(true)).await?;
-              }
+              ctx.send(CreateReply::default()
+                .content(":x: An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+                .allowed_mentions(serenity::CreateAllowedMentions::new())
+                .ephemeral(true)).await?;
             }
           }
         }
       }
     }
-    None => {
-      let default = TrackingProfile {
-        ..Default::default()
-      };
+  } else {
+    let default = TrackingProfile {
+      ..Default::default()
+    };
 
-      let streaks_active = match reporting {
-        Some(reporting) => match reporting {
-          OnOff::On => true,
-          OnOff::Off => false,
-        },
-        None => default.streaks_active,
-      };
+    let streaks_active = match reporting {
+      Some(reporting) => match reporting {
+        OnOff::On => true,
+        OnOff::Off => false,
+      },
+      None => default.streaks_active,
+    };
 
-      let streaks_private = match privacy {
-        Some(privacy) => match privacy {
-          Privacy::Private => true,
-          Privacy::Public => false,
-        },
-        None => default.streaks_private,
-      };
+    let streaks_private = match privacy {
+      Some(privacy) => match privacy {
+        Privacy::Private => true,
+        Privacy::Public => false,
+      },
+      None => default.streaks_private,
+    };
 
-      DatabaseHandler::create_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        default.utc_offset,
-        default.anonymous_tracking,
-        streaks_active,
-        streaks_private,
-        default.stats_private,
-      )
-      .await?;
+    DatabaseHandler::create_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      default.utc_offset,
+      default.anonymous_tracking,
+      streaks_active,
+      streaks_private,
+      default.stats_private,
+    )
+    .await?;
 
-      if default.streaks_active && !streaks_active {
-        let guild = ctx.guild().unwrap().clone();
-        let member = guild.member(ctx, user_id).await?;
+    if default.streaks_active && !streaks_active {
+      let guild = ctx.guild().unwrap().clone();
+      let member = guild.member(ctx, user_id).await?;
 
-        let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
 
-        for role in current_streak_roles {
-          match member.remove_role(ctx, role).await {
-            Ok(_) => {}
-            Err(err) => {
-              error!("Error removing role: {}", err);
+      for role in current_streak_roles {
+        match member.remove_role(ctx, role).await {
+          Ok(()) => {}
+          Err(err) => {
+            error!("Error removing role: {err}");
 
-              ctx.send(CreateReply::default()
-                .content(":x: An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
-                .allowed_mentions(serenity::CreateAllowedMentions::new())
-                .ephemeral(true)).await?;
-            }
+            ctx.send(CreateReply::default()
+              .content(":x: An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+              .allowed_mentions(serenity::CreateAllowedMentions::new())
+              .ephemeral(true)).await?;
           }
         }
       }
+    }
 
-      if !default.streaks_active && streaks_active {
-        let user_streak =
-          DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
+    if !default.streaks_active && streaks_active {
+      let user_streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
-        let guild = ctx.guild().unwrap().clone();
-        let member = guild.member(ctx, user_id).await?;
+      let guild = ctx.guild().unwrap().clone();
+      let member = guild.member(ctx, user_id).await?;
 
-        let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
-        let earned_streak_role = StreakRoles::from_streak(user_streak);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let earned_streak_role = StreakRoles::from_streak(user_streak);
 
-        if let Some(earned_streak_role) = earned_streak_role {
-          if !current_streak_roles.contains(&earned_streak_role.to_role_id()) {
-            match member.add_role(ctx, earned_streak_role.to_role_id()).await {
-              Ok(_) => {}
-              Err(err) => {
-                error!("Error adding role: {}", err);
+      if let Some(earned_streak_role) = earned_streak_role {
+        if !current_streak_roles.contains(&earned_streak_role.to_role_id()) {
+          match member.add_role(ctx, earned_streak_role.to_role_id()).await {
+            Ok(()) => {}
+            Err(err) => {
+              error!("Error adding role: {err}");
 
-                ctx.send(CreateReply::default()
-                  .content(":x: An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
-                  .allowed_mentions(serenity::CreateAllowedMentions::new())
-                  .ephemeral(true)).await?;
-              }
+              ctx.send(CreateReply::default()
+                .content(":x: An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+                .allowed_mentions(serenity::CreateAllowedMentions::new())
+                .ephemeral(true)).await?;
             }
           }
         }
@@ -699,54 +685,53 @@ pub async fn stats(
     Privacy::Public => false,
   };
 
-  match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
-    Some(tracking_profile) => {
-      let existing_profile = tracking_profile;
+  if let Some(tracking_profile) =
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?
+  {
+    let existing_profile = tracking_profile;
 
-      if stats_private == existing_profile.stats_private {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(format!(
-                "Stats already set to **{}**. No changes made.",
-                privacy.name()
-              ))
-              .ephemeral(true),
-          )
-          .await?;
+    if stats_private == existing_profile.stats_private {
+      ctx
+        .send(
+          CreateReply::default()
+            .content(format!(
+              "Stats already set to **{}**. No changes made.",
+              privacy.name()
+            ))
+            .ephemeral(true),
+        )
+        .await?;
 
-        return Ok(());
-      }
-
-      DatabaseHandler::update_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        existing_profile.utc_offset,
-        existing_profile.anonymous_tracking,
-        existing_profile.streaks_active,
-        existing_profile.streaks_private,
-        stats_private,
-      )
-      .await?;
+      return Ok(());
     }
-    None => {
-      let default = TrackingProfile {
-        ..Default::default()
-      };
 
-      DatabaseHandler::create_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &user_id,
-        default.utc_offset,
-        default.anonymous_tracking,
-        default.streaks_active,
-        default.streaks_private,
-        stats_private,
-      )
-      .await?;
-    }
+    DatabaseHandler::update_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      existing_profile.utc_offset,
+      existing_profile.anonymous_tracking,
+      existing_profile.streaks_active,
+      existing_profile.streaks_private,
+      stats_private,
+    )
+    .await?;
+  } else {
+    let default = TrackingProfile {
+      ..Default::default()
+    };
+
+    DatabaseHandler::create_tracking_profile(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      default.utc_offset,
+      default.anonymous_tracking,
+      default.streaks_active,
+      default.streaks_private,
+      stats_private,
+    )
+    .await?;
   }
 
   commit_and_say(

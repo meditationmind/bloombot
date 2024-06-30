@@ -205,9 +205,10 @@ pub async fn add(
     ctx
       .send(
         CreateReply::default()
-          .content(format!(
+          .content(
             "Cannot specify multiple time zones. Please try again with only one offset."
-          ))
+              .to_string(),
+          )
           .ephemeral(true),
       )
       .await?;
@@ -293,15 +294,14 @@ pub async fn add(
   if minutes > 300 {
     let ctx_id = ctx.id();
 
-    let confirm_id = format!("{}confirm", ctx_id);
-    let cancel_id = format!("{}cancel", ctx_id);
+    let confirm_id = format!("{ctx_id}confirm");
+    let cancel_id = format!("{ctx_id}cancel");
 
     let check = ctx
       .send(
         CreateReply::default()
           .content(format!(
-            "Are you sure you want to add **{}** minutes to your meditation time?",
-            minutes
+            "Are you sure you want to add **{minutes}** minutes to your meditation time?"
           ))
           .ephemeral(privacy)
           .components(vec![CreateActionRow::Buttons(vec![
@@ -337,17 +337,14 @@ pub async fn add(
         .create_response(ctx, CreateInteractionResponse::UpdateMessage(
           {
               if confirm {
-                match privacy {
-                  true => {
-                    CreateInteractionResponseMessage::new().content(format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"))
+                if privacy {
+                  CreateInteractionResponseMessage::new().content(format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"))
                     .ephemeral(privacy)
                     .components(Vec::new())
-                  },
-                  false => {
-                    CreateInteractionResponseMessage::new().content(&response)
+                } else {
+                  CreateInteractionResponseMessage::new().content(&response)
                     .ephemeral(privacy)
                     .components(Vec::new())
-                  }
                 }
               } else {
                 CreateInteractionResponseMessage::new().content("Cancelled.")
@@ -358,15 +355,15 @@ pub async fn add(
     )
         .await
       {
-        Ok(_) => {
+        Ok(()) => {
           if confirm {
             match DatabaseHandler::commit_transaction(transaction).await {
-              Ok(_) => {}
+              Ok(()) => {}
               Err(e) => {
                 check.edit(ctx, CreateReply::default()
-                  .content(":bangbang: A fatal error occured while trying to save your changes. Nothing has been saved.")
+                  .content("<:mminfo:1194141918133768234> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
                   .ephemeral(privacy)).await?;
-                return Err(anyhow::anyhow!("Could not send message: {}", e));
+                return Err(anyhow::anyhow!("Could not send message: {e}"));
               }
             }
           }
@@ -374,11 +371,11 @@ pub async fn add(
         Err(e) => {
           check
             .edit(ctx, CreateReply::default()
-              .content(":x: An error occured. Nothing has been saved.")
+              .content("<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
                 .ephemeral(privacy)
             )
             .await?;
-          return Err(anyhow::anyhow!("Could not send message: {}", e));
+          return Err(anyhow::anyhow!("Could not send message: {e}"));
         }
       }
 
@@ -402,7 +399,7 @@ pub async fn add(
             CreateEmbedFooter::new(format!("Added by {}", ctx.author()))
               .icon_url(ctx.author().avatar_url().unwrap_or_default()),
           )
-          .to_owned();
+          .clone();
 
         let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 
@@ -440,7 +437,7 @@ pub async fn add(
   if guild_count % 10 == 0 {
     let time_in_hours = guild_sum / 60;
 
-    ctx.say(format!("Awesome sauce! This server has collectively generated {} hours of realmbreaking meditation!", time_in_hours)).await?;
+    ctx.say(format!("Awesome sauce! This server has collectively generated {time_in_hours} hours of realmbreaking meditation!")).await?;
   }
 
   let guild = ctx.guild().unwrap().clone();
@@ -453,9 +450,9 @@ pub async fn add(
     if !current_time_roles.contains(&updated_time_role.to_role_id()) {
       for role in current_time_roles {
         match member.remove_role(ctx, role).await {
-          Ok(_) => {}
+          Ok(()) => {}
           Err(err) => {
-            error!("Error removing role: {}", err);
+            error!("Error removing role: {err}");
             ctx.send(CreateReply::default()
               .content(":x: An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")
               .allowed_mentions(serenity::CreateAllowedMentions::new())
@@ -467,9 +464,9 @@ pub async fn add(
       }
 
       match member.add_role(ctx, updated_time_role.to_role_id()).await {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(err) => {
-          error!("Error adding role: {}", err);
+          error!("Error adding role: {err}");
           ctx.send(CreateReply::default()
             .content(":x: An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")
             .allowed_mentions(serenity::CreateAllowedMentions::new())
@@ -494,9 +491,9 @@ pub async fn add(
       if !current_streak_roles.contains(&updated_streak_role.to_role_id()) {
         for role in current_streak_roles {
           match member.remove_role(ctx, role).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(err) => {
-              error!("Error removing role: {}", err);
+              error!("Error removing role: {err}");
 
               ctx.send(CreateReply::default()
                 .content(":x: An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")
@@ -509,9 +506,9 @@ pub async fn add(
         }
 
         match member.add_role(ctx, updated_streak_role.to_role_id()).await {
-          Ok(_) => {}
+          Ok(()) => {}
           Err(err) => {
-            error!("Error adding role: {}", err);
+            error!("Error adding role: {err}");
 
             ctx.send(CreateReply::default()
               .content(":x: An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")

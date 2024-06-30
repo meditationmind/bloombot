@@ -31,6 +31,7 @@ pub mod suggest;
 pub mod terms;
 pub mod whatis;
 
+#[allow(clippy::large_enum_variant)]
 enum MessageType {
   TextOnly(String),
   EmbedOnly(serenity::CreateEmbed),
@@ -66,11 +67,7 @@ async fn commit_and_say(
     }
     MessageType::EmbedOnly(message) => {
       ctx
-        .send({
-          let mut f = CreateReply::default().ephemeral(ephemeral);
-          f.embeds = vec![message];
-          f
-        })
+        .send(CreateReply { embeds: vec![message], ..Default::default() }.ephemeral(ephemeral))
         .await
     }
   };
@@ -78,12 +75,12 @@ async fn commit_and_say(
   match response {
     Ok(sent_message) => {
       match DatabaseHandler::commit_transaction(transaction).await {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(e) => {
           let _ = sent_message.edit(ctx, CreateReply::default()
             .content("<:mminfo:1194141918133768234> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
-            .ephemeral(true));
-          return Err(anyhow::anyhow!("Could not send message: {}", e));
+            .ephemeral(true)).await;
+          return Err(anyhow::anyhow!("Could not send message: {e}"));
         }
       };
     }
@@ -113,7 +110,7 @@ async fn commit_and_say(
         }
       };
 
-      return Err(anyhow::anyhow!("Could not send message: {}", e));
+      return Err(anyhow::anyhow!("Could not send message: {e}"));
     }
   };
 

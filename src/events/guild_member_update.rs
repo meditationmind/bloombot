@@ -30,14 +30,8 @@ pub async fn guild_member_update(
   old_if_available: &Option<Member>,
   new: &Option<Member>,
 ) -> Result<()> {
-  let old = match old_if_available {
-    Some(old) => old,
-    None => return Ok(()),
-  };
-  let new = match new {
-    Some(new) => new,
-    None => return Ok(()),
-  };
+  let Some(old) = old_if_available else { return Ok(()) };
+  let Some(new) = new else { return Ok(()) };
 
   if let Some(update_type) = UpdateType::get_type(old, new) {
     match update_type {

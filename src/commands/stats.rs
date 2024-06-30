@@ -1,3 +1,5 @@
+#![allow(clippy::unused_async)]
+
 use crate::config::{BloomBotEmbed, ROLES};
 use crate::database::Timeframe;
 use crate::database::{DatabaseHandler, TrackingProfile};
@@ -106,8 +108,7 @@ pub async fn user(
       .send(
         poise::CreateReply::default()
           .content(format!(
-            "Sorry, {}'s stats are set to private.",
-            user_nick_or_name
+            "Sorry, {user_nick_or_name}'s stats are set to private."
           ))
           .ephemeral(true)
           .allowed_mentions(serenity::CreateAllowedMentions::new()),
@@ -132,8 +133,8 @@ pub async fn user(
 
   let mut embed = BloomBotEmbed::new();
   embed = embed
-    .title(format!("Stats for {}", user_nick_or_name))
-    .author(CreateEmbedAuthor::new(format!("{}'s Stats", user_nick_or_name)).icon_url(user.face()));
+    .title(format!("Stats for {user_nick_or_name}"))
+    .author(CreateEmbedAuthor::new(format!("{user_nick_or_name}'s Stats")).icon_url(user.face()));
 
   match stats_type {
     StatsType::MeditationMinutes => {
@@ -144,7 +145,7 @@ pub async fn user(
           true,
         )
         .field(
-          format!("Minutes The Past 12 {}", timeframe_header),
+          format!("Minutes The Past 12 {timeframe_header}"),
           format!("```{}```", stats.timeframe_stats.sum.unwrap_or(0)),
           true,
         );
@@ -157,7 +158,7 @@ pub async fn user(
           true,
         )
         .field(
-          format!("Sessions The Past 12 {}", timeframe_header),
+          format!("Sessions The Past 12 {timeframe_header}"),
           format!("```{}```", stats.timeframe_stats.count.unwrap_or(0)),
           true,
         );
@@ -168,7 +169,7 @@ pub async fn user(
   let bar_color = if user.has_role(&ctx, guild_id, config::ROLES.patreon).await?
     || user.has_role(&ctx, guild_id, config::ROLES.kofi).await?
   {
-    match guild_id.member(&ctx, user.id).await?.colour(&ctx) {
+    match guild_id.member(&ctx, user.id).await?.colour(ctx) {
       Some(color) => (color.r(), color.g(), color.b(), 1.0),
       None => (253, 172, 46, 1.0),
     }
@@ -233,7 +234,7 @@ pub async fn user(
     .send({
       let mut f =
         poise::CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
-      f.embeds = vec![embed.to_owned()];
+      f.embeds = vec![embed.clone()];
 
       f
     })
@@ -280,8 +281,8 @@ pub async fn server(
   let stats = DatabaseHandler::get_guild_stats(&mut transaction, &guild_id, &timeframe).await?;
 
   let mut embed = BloomBotEmbed::new();
-  embed = embed.title(format!("Stats for {}", guild_name)).author(
-    CreateEmbedAuthor::new(format!("{}'s Stats", guild_name))
+  embed = embed.title(format!("Stats for {guild_name}")).author(
+    CreateEmbedAuthor::new(format!("{guild_name}'s Stats"))
       .icon_url(ctx.guild().unwrap().icon_url().unwrap_or_default()),
   );
 
@@ -294,7 +295,7 @@ pub async fn server(
           true,
         )
         .field(
-          format!("Minutes The Past 12 {}", timeframe_header),
+          format!("Minutes The Past 12 {timeframe_header}"),
           format!("```{}```", stats.timeframe_stats.sum.unwrap_or(0)),
           true,
         );
@@ -307,7 +308,7 @@ pub async fn server(
           true,
         )
         .field(
-          format!("Sessions The Past 12 {}", timeframe_header),
+          format!("Sessions The Past 12 {timeframe_header}"),
           format!("```{}```", stats.timeframe_stats.count.unwrap_or(0)),
           true,
         );
@@ -337,7 +338,7 @@ pub async fn server(
     .send({
       let mut f =
         poise::CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
-      f.embeds = vec![embed.to_owned()];
+      f.embeds = vec![embed.clone()];
 
       f
     })

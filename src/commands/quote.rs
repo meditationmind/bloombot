@@ -30,13 +30,12 @@ pub async fn quote(ctx: Context<'_>) -> Result<()> {
           quote.quote.as_str(),
           quote.author.unwrap_or("Anonymous".to_string())
         ))
-        .to_owned();
+        .clone();
 
       ctx
-        .send({
-          let mut f = poise::CreateReply::default();
-          f.embeds = vec![embed];
-          f
+        .send(poise::CreateReply {
+          embeds: vec![embed],
+          ..Default::default()
         })
         .await?;
     }

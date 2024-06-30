@@ -21,6 +21,7 @@ use poise::CreateReply;
   subcommand_required,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn glossary(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -47,12 +48,12 @@ pub async fn list(ctx: Context<'_>) -> Result<()> {
       term_list.push_str(" (");
       let alias_count = aliases.len();
       for (i, alias) in aliases.iter().enumerate() {
-        term_list.push_str(&alias);
+        term_list.push_str(alias);
         if i < (alias_count - 1) {
           term_list.push_str(", ");
         }
       }
-      term_list.push_str(")");
+      term_list.push(')');
     }
     if i < (term_count - 1) {
       term_list.push_str(", ");
@@ -64,11 +65,10 @@ pub async fn list(ctx: Context<'_>) -> Result<()> {
       .embed(BloomBotEmbed::new()
           .title("List of Glossary Terms")
           .description(format!(
-            "Use `/glossary info` with any of the following terms to read the full entry. Terms in parentheses are aliases for the preceding term.\n```{}```",
-            term_list
+            "Use `/glossary info` with any of the following terms to read the full entry. Terms in parentheses are aliases for the preceding term.\n```{term_list}```",
           ))
           // Will not reach char limit for a while. Can add pagination later.
-          .footer(CreateEmbedFooter::new(format!("Showing {} of {} terms.", term_count, term_count)))
+          .footer(CreateEmbedFooter::new(format!("Showing {term_count} of {term_count} terms.")))
       )
     )
     .await?;
@@ -177,19 +177,74 @@ pub async fn info(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  let term_info = DatabaseHandler::get_term(&mut transaction, &guild_id, &term.as_str()).await?;
+  let term_info = DatabaseHandler::get_term(&mut transaction, &guild_id, term.as_str()).await?;
   let mut embed = BloomBotEmbed::new();
 
-  match term_info {
-    Some(term_info) => {
+  if let Some(term_info) = term_info {
+    embed = embed
+      .title(term_info.name)
+      .description(term_info.meaning);
+    let usage = term_info.usage.unwrap_or(String::new());
+    if !usage.is_empty() {
+      embed = embed.field("Example of Usage:", usage, false);
+    }
+    let links = term_info.links.unwrap_or(Vec::new());
+    if !links.is_empty() {
+      embed = embed.field(
+        "Related Resources:",
+        {
+          let mut field = String::new();
+          let mut count = 1;
+
+          for link in links {
+            field.push_str(&format!("{count}. {link}\n"));
+            count += 1;
+          }
+
+          field
+        },
+        false,
+      );
+    }
+    let aliases = term_info.aliases.clone().unwrap_or(Vec::new());
+    if !aliases.is_empty() {
+      embed = embed.field(
+        "Aliases:",
+        {
+          let mut field = String::new();
+          let alias_count = aliases.len();
+
+          for (i, alias) in aliases.iter().enumerate() {
+            field.push_str(alias);
+            if i < (alias_count - 1) {
+              field.push_str(", ");
+            }
+          }
+
+          field
+        },
+        false,
+      );
+    }
+    let category = term_info.category.unwrap_or(String::new());
+    if !category.is_empty() {
+      embed = embed.footer(CreateEmbedFooter::new(format!("Categories: {category}")));
+    }
+  } else {
+    let possible_terms =
+      DatabaseHandler::get_possible_terms(&mut transaction, &guild_id, term.as_str(), 0.7).await?;
+
+    if possible_terms.len() == 1 {
+      let possible_term = possible_terms.first().unwrap();
+
       embed = embed
-        .title(term_info.term_name)
-        .description(term_info.meaning);
-      let usage = term_info.usage.unwrap_or(String::new());
+        .title(&possible_term.name)
+        .description(&possible_term.meaning);
+      let usage = possible_term.usage.clone().unwrap_or(String::new());
       if !usage.is_empty() {
         embed = embed.field("Example of Usage:", usage, false);
       }
-      let links = term_info.links.unwrap_or(Vec::new());
+      let links = possible_term.links.clone().unwrap_or(Vec::new());
       if !links.is_empty() {
         embed = embed.field(
           "Related Resources:",
@@ -198,7 +253,7 @@ pub async fn info(
             let mut count = 1;
 
             for link in links {
-              field.push_str(&format!("{}. {}\n", count, link));
+              field.push_str(&format!("{count}. {link}\n"));
               count += 1;
             }
 
@@ -207,7 +262,7 @@ pub async fn info(
           false,
         );
       }
-      let aliases = term_info.aliases.clone().unwrap_or(Vec::new());
+      let aliases = possible_term.aliases.clone().unwrap_or(Vec::new());
       if !aliases.is_empty() {
         embed = embed.field(
           "Aliases:",
@@ -216,7 +271,7 @@ pub async fn info(
             let alias_count = aliases.len();
 
             for (i, alias) in aliases.iter().enumerate() {
-              field.push_str(&alias);
+              field.push_str(alias);
               if i < (alias_count - 1) {
                 field.push_str(", ");
               }
@@ -227,112 +282,49 @@ pub async fn info(
           false,
         );
       }
-      let category = term_info.category.unwrap_or(String::new());
-      if !category.is_empty() {
-        embed = embed.footer(CreateEmbedFooter::new(format!("Categories: {}", category)));
-      }
-    }
-    None => {
-      let possible_terms =
-        DatabaseHandler::get_possible_terms(&mut transaction, &guild_id, &term.as_str(), 0.7)
-          .await?;
-
-      if possible_terms.len() == 1 {
-        let possible_term = possible_terms.first().unwrap();
-
-        embed = embed
-          .title(&possible_term.term_name)
-          .description(&possible_term.meaning);
-        let usage = possible_term.usage.clone().unwrap_or(String::new());
-        if !usage.is_empty() {
-          embed = embed.field("Example of Usage:", usage, false);
-        }
-        let links = possible_term.links.clone().unwrap_or(Vec::new());
-        if !links.is_empty() {
-          embed = embed.field(
-            "Related Resources:",
-            {
-              let mut field = String::new();
-              let mut count = 1;
-
-              for link in links {
-                field.push_str(&format!("{}. {}\n", count, link));
-                count += 1;
-              }
-
-              field
-            },
-            false,
-          );
-        }
-        let aliases = possible_term.aliases.clone().unwrap_or(Vec::new());
-        if !aliases.is_empty() {
-          embed = embed.field(
-            "Aliases:",
-            {
-              let mut field = String::new();
-              let alias_count = aliases.len();
-
-              for (i, alias) in aliases.iter().enumerate() {
-                field.push_str(&alias);
-                if i < (alias_count - 1) {
-                  field.push_str(", ");
-                }
-              }
-
-              field
-            },
-            false,
-          );
-        }
-        let category = possible_term.category.clone().unwrap_or(String::new());
-        if !category.is_empty() {
-          embed = embed.footer(CreateEmbedFooter::new(format!(
-            "Categories: {}\n\n*You searched for '{}'. The closest term available was '{}'.",
-            category, term, possible_term.term_name
-          )));
-        } else {
-          embed = embed.footer(CreateEmbedFooter::new(format!(
-            "*You searched for '{}'. The closest term available was '{}'.",
-            term, possible_term.term_name
-          )));
-        }
-      } else if possible_terms.is_empty() {
-        embed = embed.title("Term not found").description(format!(
-          "The term `{}` was not found in the glossary.",
-          term
-        ));
+      let category = possible_term.category.clone().unwrap_or(String::new());
+      if category.is_empty() {
+        embed = embed.footer(CreateEmbedFooter::new(format!(
+          "*You searched for '{}'. The closest term available was '{}'.",
+          term, possible_term.name
+        )));
       } else {
-        embed = embed.title("Term not found").description(format!(
-          "The term `{}` was not found in the glossary.",
-          term
-        ));
+        embed = embed.footer(CreateEmbedFooter::new(format!(
+          "Categories: {}\n\n*You searched for '{}'. The closest term available was '{}'.",
+          category, term, possible_term.name
+        )));
+      }
+    } else if possible_terms.is_empty() {
+      embed = embed
+        .title("Term not found")
+        .description(format!("The term `{term}` was not found in the glossary."));
+    } else {
+      embed = embed
+        .title("Term not found")
+        .description(format!("The term `{term}` was not found in the glossary."));
 
-        embed = embed.field(
+      embed = embed.field(
           "Did you mean one of these?",
           {
             let mut field = String::new();
 
             for possible_term in possible_terms.iter().take(3) {
-              field.push_str(&format!("`{}`\n", possible_term.term_name));
+              field.push_str(&format!("`{}`\n", possible_term.name));
             }
 
-            field.push_str(&format!("\n\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search.*"));
+            field.push_str("\n\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search.*");
 
             field
           },
           false,
         );
-      }
     }
   }
 
   ctx
-    .send({
-      let mut f = CreateReply::default();
-      f.embeds = vec![embed];
-
-      f
+    .send(poise::CreateReply {
+      embeds: vec![embed],
+      ..Default::default()
     })
     .await?;
 
@@ -368,7 +360,7 @@ pub async fn search(
 
   let mut embed = BloomBotEmbed::new();
   let mut terms_returned = 0;
-  embed = embed.title(format!("Search results for `{}`", search));
+  embed = embed.title(format!("Search results for `{search}`"));
 
   if possible_terms.is_empty() {
     embed =
@@ -381,18 +373,18 @@ pub async fn search(
       }
       let relevance_description = match possible_term.distance_score {
         Some(score) => {
-          let similarity_score = ((1.0 - score) * 100.0) as i32;
+          let similarity_score = (1.0 - score) * 100.0;
           info!(
             "Term {} has a similarity score of {}",
             index + 1,
             similarity_score
           );
-          match similarity_score {
-            100..=i32::MAX => "Exact match",
+          match similarity_score.round() {
+            100.0..=f64::MAX => "Exact match",
             // Adjust for cosine similarity
-            90..=99 => "High",
-            80..=89 => "Medium",
-            70..=79 => "Low",
+            90.0..=99.0 => "High",
+            80.0..=89.0 => "Medium",
+            70.0..=79.0 => "Low",
             // 80..=99 => "Very similar",
             // 60..=79 => "Similar",
             // 40..=59 => "Somewhat similar",
@@ -409,9 +401,8 @@ pub async fn search(
       embed = embed.field(
         format!("Term {}: `{}`", index + 1, &possible_term.term_name),
         format!(
-          // "```{}```\n> Estimated relevance: *{}*",
-          "{}\n```Estimated relevance: {}```\n** **",
-          meaning, relevance_description
+          // "```{meaning}```\n> Estimated relevance: *{relevance_description}*"
+          "{meaning}\n```Estimated relevance: {relevance_description}```\n** **"
         ),
         false,
       );
@@ -431,11 +422,9 @@ pub async fn search(
   }
 
   ctx
-    .send({
-      let mut f = CreateReply::default();
-      f.embeds = vec![embed];
-
-      f
+    .send(poise::CreateReply {
+      embeds: vec![embed],
+      ..Default::default()
     })
     .await?;
 
@@ -452,7 +441,7 @@ pub async fn suggest(
 ) -> Result<()> {
   let log_embed = BloomBotEmbed::new()
     .title("Term Suggestion")
-    .description(format!("**Suggestion**: {}", suggestion))
+    .description(format!("**Suggestion**: {suggestion}"))
     .footer(
       CreateEmbedFooter::new(format!(
         "Suggested by {} ({})",
@@ -461,7 +450,7 @@ pub async fn suggest(
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     )
-    .to_owned();
+    .clone();
 
   let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 

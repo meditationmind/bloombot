@@ -1,3 +1,10 @@
+#![allow(
+  clippy::needless_raw_string_hashes,
+  clippy::fn_params_excessive_bools,
+  clippy::struct_excessive_bools,
+  clippy::too_many_arguments
+)]
+
 use crate::pagination::PageRow;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -36,15 +43,15 @@ pub struct TrackingProfile {
 //Default values for tracking customization
 impl Default for TrackingProfile {
   fn default() -> Self {
-      Self {
-          user_id: serenity::UserId::default(),
-          guild_id: serenity::GuildId::default(),
-          utc_offset: 0,
-          anonymous_tracking: false,
-          streaks_active: true,
-          streaks_private: false,
-          stats_private: false,
-      }
+    Self {
+      user_id: serenity::UserId::default(),
+      guild_id: serenity::GuildId::default(),
+      utc_offset: 0,
+      anonymous_tracking: false,
+      streaks_active: true,
+      streaks_private: false,
+      stats_private: false,
+    }
   }
 }
 
@@ -116,17 +123,17 @@ impl PageRow for MeditationData {
     let now = chrono::Utc::now();
 
     if now - self.occurred_at < chrono::Duration::days(1) {
-      return format!(
+      format!(
         "Date: {}\nID: `{}`",
         chrono_humanize::HumanTime::from(self.occurred_at),
         self.id
-      );
+      )
     } else {
-      return format!(
+      format!(
         "Date: `{}`\nID: `{}`",
         self.occurred_at.format("%Y-%m-%d %H:%M"),
         self.id
-      );
+      )
     }
   }
 }
@@ -166,10 +173,7 @@ impl PageRow for SteamKeyData {
   fn body(&self) -> String {
     format!(
       "Used: {}\nReserved for: {}",
-      match self.used {
-        true => "Yes",
-        false => "No",
-      },
+      if self.used { "Yes" } else { "No" },
       match self.reserved {
         Some(reserved) => reserved.mention().to_string(),
         None => "Nobody".to_string(),
@@ -194,19 +198,23 @@ impl PageRow for SteamKeyRecipientData {
   fn body(&self) -> String {
     format!(
       "Name: {}\nDonator Perk: {}\nChallenge Prize: {}\nTotal Keys: {}",
-      self.user_id.mention().to_string(),
+      self.user_id.mention(),
       match self.donator_perk {
-        Some(value) => match value {
-          true => "Yes",
-          false => "No",
-        },
+        Some(value) =>
+          if value {
+            "Yes"
+          } else {
+            "No"
+          },
         None => "No",
       },
       match self.challenge_prize {
-        Some(value) => match value {
-          true => "Yes",
-          false => "No",
-        },
+        Some(value) =>
+          if value {
+            "Yes"
+          } else {
+            "No"
+          },
         None => "No",
       },
       self.total_keys,
@@ -244,7 +252,7 @@ pub struct ExtendedCourseData {
 #[derive(Debug)]
 pub struct Term {
   pub id: String,
-  pub term_name: String,
+  pub name: String,
   pub meaning: String,
   pub usage: Option<String>,
   pub links: Option<Vec<String>>,
@@ -254,7 +262,7 @@ pub struct Term {
 
 impl PageRow for Term {
   fn title(&self) -> String {
-    format!("__{}__", self.term_name.clone())
+    format!("__{}__", self.name.clone())
   }
 
   fn body(&self) -> String {
@@ -291,6 +299,7 @@ pub struct TermNames {
   pub aliases: Option<Vec<String>>,
 }
 
+#[allow(clippy::struct_field_names)]
 pub struct StarMessage {
   pub record_id: String,
   pub starred_message_id: serenity::MessageId,
@@ -314,19 +323,19 @@ impl DatabaseHandler {
             return Err(e.into());
           }
 
-          // Check if the error is a sqlx::Error
-          if let Some(sqlx_error) = Some(&e) {
-            // Now we can handle the sqlx::Error specifically
-            if let sqlx::Error::Io(io_error) = sqlx_error {
-              if io_error.kind() == std::io::ErrorKind::ConnectionReset {
-                attempts += 1;
-                // Log warning
-                warn!("Error establishing a database connection: retry attempt {} of {}", attempts, max_retries);
-                // Wait before retrying
-                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                continue;
-              }
-            }
+          // Retry if error is sqlx::Error::Io
+          if let sqlx::Error::Io(io_error) = e {
+            attempts += 1;
+            // Log warning
+            warn!(
+              "Error establishing a database connection ({}): retry attempt {} of {}",
+              io_error.kind(),
+              attempts,
+              max_retries
+            );
+            // Wait before retrying
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            continue;
           }
 
           // If it's a different kind of error, we might want to return it immediately
@@ -335,9 +344,9 @@ impl DatabaseHandler {
       };
 
       sqlx::migrate!("./migrations").run(&pool).await?;
-  
+
       info!("Successfully applied migrations.");
-  
+
       return Ok(Self { pool });
     }
   }
@@ -360,16 +369,14 @@ impl DatabaseHandler {
             return Err(e);
           }
 
-          // Check if the error is a sqlx::Error
-          if let Some(sqlx_error) = e.downcast_ref::<sqlx::Error>() {
-            // Now we can handle the sqlx::Error specifically
-            if let sqlx::Error::Io(io_error) = sqlx_error {
-              if io_error.kind() == std::io::ErrorKind::ConnectionReset {
-                attempts += 1;
-                // Wait for a moment before retrying
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                continue;
-              }
+          // Check if error is sqlx::Error::Io
+          if let Some(sqlx::Error::Io(io_error)) = e.downcast_ref::<sqlx::Error>() {
+            // Retry if connection was reset
+            if io_error.kind() == std::io::ErrorKind::ConnectionReset {
+              attempts += 1;
+              // Wait for a moment before retrying
+              tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+              continue;
             }
           }
 
@@ -398,16 +405,14 @@ impl DatabaseHandler {
             return Err(e);
           }
 
-          // Check if the error is a sqlx::Error
-          if let Some(sqlx_error) = e.downcast_ref::<sqlx::Error>() {
-            // Now we can handle the sqlx::Error specifically
-            if let sqlx::Error::Io(io_error) = sqlx_error {
-              if io_error.kind() == std::io::ErrorKind::ConnectionReset {
-                attempts += 1;
-                // Wait for a moment before retrying
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                continue;
-              }
+          // Check if error is sqlx::Error::Io
+          if let Some(sqlx::Error::Io(io_error)) = e.downcast_ref::<sqlx::Error>() {
+            // Retry if connection was reset
+            if io_error.kind() == std::io::ErrorKind::ConnectionReset {
+              attempts += 1;
+              // Wait for a moment before retrying
+              tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+              continue;
             }
           }
 
@@ -729,7 +734,7 @@ impl DatabaseHandler {
         )
         .execute(&mut **connection)
         .await?;
-      },
+      }
       None => {
         sqlx::query!(
           r#"
@@ -791,7 +796,7 @@ impl DatabaseHandler {
         id: row.record_id,
         user_id: serenity::UserId::new(row.user_id.parse::<u64>().unwrap()),
         message_link: row.message_link.unwrap_or(String::from("None")),
-        occurred_at: row.occurred_at.unwrap_or(chrono::DateTime::<Utc>::default()),
+        occurred_at: row.occurred_at.unwrap_or_default(),
       })
       .collect();
 
@@ -989,15 +994,13 @@ impl DatabaseHandler {
       guild_id.to_string(),
     ).fetch(&mut **conn);
 
-    let user_id_stream = rows_stream.map(|row| {
+    rows_stream.map(|row| {
       let row = row?;
 
       let user_id = serenity::UserId::new(row.user_id.parse::<u64>().unwrap());
 
       Ok(user_id)
-    });
-
-    user_id_stream
+    })
   }
 
   pub async fn get_winner_candidate_meditation_sum(
@@ -1240,6 +1243,8 @@ impl DatabaseHandler {
     let mut streak = 0;
 
     if let Some(first) = row.try_next().await? {
+      // date_part 'day' can only be 1-31
+      #[allow(clippy::cast_possible_truncation)]
       let days_ago = first.days_ago.unwrap() as i32;
 
       if days_ago > 2 {
@@ -1251,6 +1256,8 @@ impl DatabaseHandler {
     }
 
     while let Some(row) = row.try_next().await? {
+      // date_part 'day' can only be 1-31
+      #[allow(clippy::cast_possible_truncation)]
       let days_ago = row.days_ago.unwrap() as i32;
 
       if days_ago != last + 1 {
@@ -1380,10 +1387,9 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| SteamKeyData {
         steam_key: row.steam_key,
-        reserved: match row.reserved {
-          Some(reserved) => Some(serenity::UserId::new(reserved.parse::<u64>().unwrap())),
-          None => None,
-        },
+        reserved: row
+          .reserved
+          .map(|reserved| serenity::UserId::new(reserved.parse::<u64>().unwrap())),
         used: row.used,
         guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>().unwrap()),
       })
@@ -1453,6 +1459,8 @@ impl DatabaseHandler {
     // I'm sorry for what you are about to see.
     // let pgvector_format = format!("{:?}", search_vector);
 
+    // limit will always be a small integer
+    #[allow(clippy::cast_possible_wrap)]
     let terms: Vec<TermSearchResult> = sqlx::query_as(
       r#"
         SELECT term_name, meaning, embedding <=> $1 AS distance_score
@@ -1492,7 +1500,7 @@ impl DatabaseHandler {
     let term = match row {
       Some(row) => Some(Term {
         id: row.record_id,
-        term_name: row.term_name,
+        name: row.term_name,
         meaning: row.meaning,
         usage: row.usage,
         links: row.links,
@@ -1645,7 +1653,13 @@ impl DatabaseHandler {
         course_name: row.course_name,
         participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>()?),
         graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>()?),
-        guild_id: serenity::GuildId::new(row.guild_id.expect("guild_id should not be empty in course database").parse::<u64>().unwrap()),
+        guild_id: serenity::GuildId::new(
+          row
+            .guild_id
+            .expect("guild_id should not be empty in course database")
+            .parse::<u64>()
+            .unwrap(),
+        ),
       }),
       None => None,
     };
@@ -1713,7 +1727,7 @@ impl DatabaseHandler {
         .into_iter()
         .map(|row| Term {
           id: row.record_id,
-          term_name: row.term_name,
+          name: row.term_name,
           meaning: row.meaning,
           usage: row.usage,
           links: row.links,
@@ -1789,7 +1803,7 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| Term {
         id: row.record_id,
-        term_name: row.term_name,
+        name: row.term_name,
         meaning: row.meaning,
         usage: None,
         links: None,
@@ -2146,10 +2160,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-            FROM "weekly_data"
-            WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          FROM "weekly_data"
+          WHERE "times_ago" <= 12
+          GROUP BY "times_ago";"#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -2161,10 +2175,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-            FROM "monthly_data"
-            WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          FROM "monthly_data"
+          WHERE "times_ago" <= 12
+          GROUP BY "times_ago";"#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -2176,10 +2190,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-            FROM "yearly_data"
-            WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          FROM "yearly_data"
+          WHERE "times_ago" <= 12
+          GROUP BY "times_ago";"#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -2188,7 +2202,11 @@ impl DatabaseHandler {
 
     let stats: Vec<TimeframeStats> = (0..12)
       .map(|i| {
-        let row = rows.iter().find(|row| row.times_ago.unwrap() == i as f64);
+        // Comparison is safe since floor produces integer
+        #[allow(clippy::float_cmp)]
+        let row = rows
+          .iter()
+          .find(|row| row.times_ago.unwrap() == f64::from(i));
 
         let meditation_minutes = match row {
           Some(row) => row.meditation_minutes.unwrap_or(0),
@@ -2202,7 +2220,7 @@ impl DatabaseHandler {
 
         TimeframeStats {
           sum: Some(meditation_minutes),
-          count: meditation_count.try_into().unwrap(),
+          count: Some(meditation_count),
         }
       })
       .rev()
@@ -2239,10 +2257,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-            FROM "weekly_data"
-            WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          FROM "weekly_data"
+          WHERE "times_ago" <= 12
+          GROUP BY "times_ago";"#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
@@ -2253,10 +2271,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-            FROM "monthly_data"
-            WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          FROM "monthly_data"
+          WHERE "times_ago" <= 12
+          GROUP BY "times_ago";"#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
@@ -2267,10 +2285,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-            FROM "yearly_data"
-            WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          FROM "yearly_data"
+          WHERE "times_ago" <= 12
+          GROUP BY "times_ago";"#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
@@ -2278,7 +2296,11 @@ impl DatabaseHandler {
 
     let stats: Vec<TimeframeStats> = (0..12)
       .map(|i| {
-        let row = rows.iter().find(|row| row.times_ago.unwrap() == i as f64);
+        // Comparison is safe since floor produces integer
+        #[allow(clippy::float_cmp)]
+        let row = rows
+          .iter()
+          .find(|row| row.times_ago.unwrap() == f64::from(i));
 
         let meditation_minutes = match row {
           Some(row) => row.meditation_minutes.unwrap_or(0),
@@ -2292,7 +2314,7 @@ impl DatabaseHandler {
 
         TimeframeStats {
           sum: Some(meditation_minutes),
-          count: meditation_count.try_into().unwrap(),
+          count: Some(meditation_count),
         }
       })
       .rev()
@@ -2319,9 +2341,13 @@ impl DatabaseHandler {
     let star_message = match row {
       Some(row) => Some(StarMessage {
         record_id: row.record_id,
-        starred_message_id: serenity::MessageId::new(row.starred_message_id.parse::<u64>().unwrap()),
+        starred_message_id: serenity::MessageId::new(
+          row.starred_message_id.parse::<u64>().unwrap(),
+        ),
         board_message_id: serenity::MessageId::new(row.board_message_id.parse::<u64>().unwrap()),
-        starred_channel_id: serenity::ChannelId::new(row.starred_channel_id.parse::<u64>().unwrap()),
+        starred_channel_id: serenity::ChannelId::new(
+          row.starred_channel_id.parse::<u64>().unwrap(),
+        ),
       }),
       None => None,
     };

@@ -24,12 +24,13 @@ pub async fn report_message(
   let message_user = message.author;
   let message_channel_name = message.channel_id.name(ctx).await?;
 
-  let message_content = match message.content.is_empty() {
-    true => match message.attachments.first() {
+  let message_content = if message.content.is_empty() {
+    match message.attachments.first() {
       Some(attachment) => format!("**Attachment**\n{}", attachment.url.clone()),
       None => message.content.clone(),
-    },
-    false => message.content.clone(),
+    }
+  } else {
+    message.content.clone()
   };
 
   report_channel_id
@@ -39,12 +40,9 @@ pub async fn report_message(
         .content(format!("<@&{}> Message Reported", ROLES.staff))
         .embed(
           BloomBotEmbed::new()
-            .author(
-              CreateEmbedAuthor::new(format!("{}", &message_user.name))
-                .icon_url(message_user.face()),
-            )
+            .author(CreateEmbedAuthor::new(&message_user.name.to_string()).icon_url(message_user.face()))
             .description(message_content)
-            .field("Link", format!("[Go to message]({})", message_link), false)
+            .field("Link", format!("[Go to message]({message_link})"), false)
             .footer(CreateEmbedFooter::new(format!(
               "Author ID: {}\nReported via context menu in #{} by {} ({})",
               &message_user.id, message_channel_name, reporting_user.name, reporting_user.id

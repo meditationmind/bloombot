@@ -68,22 +68,7 @@ pub async fn streak(
           .send(
             poise::CreateReply::default()
               .content(format!(
-                "{}'s current **private** meditation streak is {} days.",
-                user_nick_or_name, streak
-              ))
-              .ephemeral(true)
-              .allowed_mentions(serenity::CreateAllowedMentions::new()),
-          )
-          .await?;
-
-        return Ok(());
-      } else {
-        ctx
-          .send(
-            poise::CreateReply::default()
-              .content(format!(
-                "Sorry, {}'s meditation streak is set to private.",
-                user_nick_or_name
+                "{user_nick_or_name}'s current **private** meditation streak is {streak} days."
               ))
               .ephemeral(true)
               .allowed_mentions(serenity::CreateAllowedMentions::new()),
@@ -92,33 +77,42 @@ pub async fn streak(
 
         return Ok(());
       }
-    } else {
+
       ctx
         .send(
           poise::CreateReply::default()
             .content(format!(
-              "{}'s current meditation streak is {} days.",
-              user_nick_or_name, streak
+              "Sorry, {user_nick_or_name}'s meditation streak is set to private."
             ))
-            .ephemeral(privacy)
+            .ephemeral(true)
             .allowed_mentions(serenity::CreateAllowedMentions::new()),
         )
         .await?;
 
       return Ok(());
     }
-  } else {
+
     ctx
       .send(
         poise::CreateReply::default()
           .content(format!(
-            "Your current meditation streak is {} days.",
-            streak
+            "{user_nick_or_name}'s current meditation streak is {streak} days."
           ))
-          .ephemeral(privacy),
+          .ephemeral(privacy)
+          .allowed_mentions(serenity::CreateAllowedMentions::new()),
       )
       .await?;
 
     return Ok(());
   }
+
+  ctx
+    .send(
+      poise::CreateReply::default()
+        .content(format!("Your current meditation streak is {streak} days."))
+        .ephemeral(privacy),
+    )
+    .await?;
+
+  Ok(())
 }

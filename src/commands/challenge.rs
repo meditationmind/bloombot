@@ -21,6 +21,7 @@ pub enum ChallengeChoices {
   subcommands("join", "leave"),
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn challenge(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -38,8 +39,8 @@ pub async fn join(
   let guild_id = ctx.guild_id().unwrap();
   let member = guild_id.member(ctx, ctx.author().id).await?;
 
-  match challenge {
-    Some(challenge) => match challenge {
+  if let Some(challenge) = challenge {
+    match challenge {
       ChallengeChoices::Monthly => {
         if ctx
           .author()
@@ -55,17 +56,17 @@ pub async fn join(
             .await?;
 
           return Ok(());
-        } else {
-          member.add_role(ctx, ROLES.meditation_challenger).await?;
-
-          ctx.say(format!(
-            "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
-            member.user.id,
-            chrono::Utc::now().format("%B"),
-          )).await?;
-
-          return Ok(());
         }
+
+        member.add_role(ctx, ROLES.meditation_challenger).await?;
+
+        ctx.say(format!(
+    "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
+    member.user.id,
+    chrono::Utc::now().format("%B"),
+    )).await?;
+
+        return Ok(());
       }
       ChallengeChoices::YearRound => {
         if ctx
@@ -82,49 +83,48 @@ pub async fn join(
             .await?;
 
           return Ok(());
-        } else {
-          member
-            .add_role(ctx, ROLES.meditation_challenger_365)
-            .await?;
-
-          ctx.say(format!(
-            "Awesome, <@{}>! You have successfully joined the 365-day challenge <:pepeglow:1174181400249901076>",
-            member.user.id,
-          )).await?;
-
-          return Ok(());
         }
-      }
-    },
-    None => {
-      // Defaults to monthly
-      if ctx
-        .author()
-        .has_role(ctx, guild_id, ROLES.meditation_challenger)
-        .await?
-      {
-        ctx
-          .send(
-            CreateReply::default()
-              .content("You've already joined the monthly challenge. Awesome!")
-              .ephemeral(true),
-          )
+
+        member
+          .add_role(ctx, ROLES.meditation_challenger_365)
           .await?;
 
-        return Ok(());
-      } else {
-        member.add_role(ctx, ROLES.meditation_challenger).await?;
-
         ctx.say(format!(
-          "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
-          member.user.id,
-          chrono::Utc::now().format("%B"),
-        )).await?;
+    "Awesome, <@{}>! You have successfully joined the 365-day challenge <:pepeglow:1174181400249901076>",
+    member.user.id,
+    )).await?;
 
         return Ok(());
       }
     }
   }
+
+  // Defaults to monthly
+  if ctx
+    .author()
+    .has_role(ctx, guild_id, ROLES.meditation_challenger)
+    .await?
+  {
+    ctx
+      .send(
+        CreateReply::default()
+          .content("You've already joined the monthly challenge. Awesome!")
+          .ephemeral(true),
+      )
+      .await?;
+
+    return Ok(());
+  }
+
+  member.add_role(ctx, ROLES.meditation_challenger).await?;
+
+  ctx.say(format!(
+    "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
+    member.user.id,
+    chrono::Utc::now().format("%B"),
+    )).await?;
+
+  Ok(())
 }
 
 /// Leave a meditation challenge
@@ -140,23 +140,14 @@ pub async fn leave(
   let guild_id = ctx.guild_id().unwrap();
   let member = guild_id.member(ctx, ctx.author().id).await?;
 
-  match challenge {
-    Some(challenge) => match challenge {
+  if let Some(challenge) = challenge {
+    match challenge {
       ChallengeChoices::Monthly => {
-        if !ctx
+        if ctx
           .author()
           .has_role(ctx, guild_id, ROLES.meditation_challenger)
           .await?
         {
-          ctx
-          .send(CreateReply::default()
-            .content("You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.")
-            .ephemeral(true)
-          )
-          .await?;
-
-          return Ok(());
-        } else {
           member.remove_role(ctx, ROLES.meditation_challenger).await?;
 
           ctx
@@ -168,22 +159,22 @@ pub async fn leave(
 
           return Ok(());
         }
+
+        ctx
+          .send(CreateReply::default()
+          .content("You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.")
+          .ephemeral(true)
+          )
+          .await?;
+
+        return Ok(());
       }
       ChallengeChoices::YearRound => {
-        if !ctx
+        if ctx
           .author()
           .has_role(ctx, guild_id, ROLES.meditation_challenger_365)
           .await?
         {
-          ctx
-          .send(CreateReply::default()
-            .content("You're not currently participating in the 365-day challenge. If you want to join, use `/challenge join`.")
-            .ephemeral(true)
-          )
-          .await?;
-
-          return Ok(());
-        } else {
           member
             .remove_role(ctx, ROLES.meditation_challenger_365)
             .await?;
@@ -197,35 +188,43 @@ pub async fn leave(
 
           return Ok(());
         }
-      }
-    },
-    None => {
-      // Defaults to monthly
-      if !ctx
-        .author()
-        .has_role(ctx, guild_id, ROLES.meditation_challenger)
-        .await?
-      {
+
         ctx
-        .send(CreateReply::default()
-          .content("You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.")
+          .send(CreateReply::default()
+          .content("You're not currently participating in the 365-day challenge. If you want to join, use `/challenge join`.")
           .ephemeral(true)
-        )
-        .await?;
-
-        return Ok(());
-      } else {
-        member.remove_role(ctx, ROLES.meditation_challenger).await?;
-
-        ctx
-          .say(format!(
-            "You have successfully opted out of the monthly challenge, <@{}>.",
-            member.user.id,
-          ))
+          )
           .await?;
 
         return Ok(());
       }
     }
   }
+
+  // Defaults to monthly
+  if ctx
+    .author()
+    .has_role(ctx, guild_id, ROLES.meditation_challenger)
+    .await?
+  {
+    member.remove_role(ctx, ROLES.meditation_challenger).await?;
+
+    ctx
+      .say(format!(
+        "You have successfully opted out of the monthly challenge, <@{}>.",
+        member.user.id,
+      ))
+      .await?;
+
+    return Ok(());
+  }
+
+  ctx
+    .send(CreateReply::default()
+    .content("You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.")
+    .ephemeral(true)
+    )
+    .await?;
+
+  Ok(())
 }

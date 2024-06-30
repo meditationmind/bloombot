@@ -1,3 +1,11 @@
+#![allow(
+  clippy::cast_possible_truncation,
+  clippy::cast_possible_wrap,
+  clippy::cast_precision_loss,
+  clippy::cast_sign_loss,
+  clippy::unused_async
+)]
+
 use crate::config::{BloomBotEmbed, TERMS_PER_PAGE};
 use anyhow::Result;
 use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateEmbedFooter};
@@ -20,22 +28,26 @@ impl<'a> Pagination<'a> {
     title: impl ToString,
     entries: Vec<&'a (dyn PageRow + Send + Sync)>,
   ) -> Result<Pagination<'_>> {
-    let terms_per_page = if title.to_string() == "Glossary" { 1 } else { TERMS_PER_PAGE };
+    let terms_per_page = if title.to_string() == "Glossary" {
+      1
+    } else {
+      TERMS_PER_PAGE
+    };
     let entries_count = entries.len();
-    let page_count = match entries_count == 0 {
-      true => 1,
-      false => (entries_count as f64 / terms_per_page as f64).ceil() as usize,
+    let page_count = if entries_count == 0 {
+      1
+    } else {
+      (entries_count as f64 / terms_per_page as f64).ceil() as usize
     };
 
-    let page_data = match entries_count == 0 {
-      true => {
-        vec![PaginationPage {
-          entries: vec![],
-          page_number: 0,
-          page_count: 1,
-        }]
-      }
-      false => entries
+    let page_data = if entries_count == 0 {
+      vec![PaginationPage {
+        entries: vec![],
+        page_number: 0,
+        page_count: 1,
+      }]
+    } else {
+      entries
         .chunks(terms_per_page)
         .enumerate()
         .map(|(page_number, entries)| PaginationPage {
@@ -43,7 +55,7 @@ impl<'a> Pagination<'a> {
           page_number,
           page_count,
         })
-        .collect(),
+        .collect()
     };
 
     Ok(Self {
@@ -82,28 +94,25 @@ impl<'a> Pagination<'a> {
     let mut embed = BloomBotEmbed::new();
     let page = self.get_page(page);
 
-    match page {
-      Some(page) => {
-        // If it is a valid page that is empty, it must be page 0
-        // This implies that there are no terms in the glossary
-        if page.is_empty() {
-          embed = embed
-            .title(self.title.to_string())
-            .description("No entries have been added yet.");
-
-          embed
-        } else {
-          page.to_embed(self.title.as_str()).clone()
-        }
-      }
-      // This should never happen unless we have a bug in our pagination code
-      None => {
+    if let Some(page) = page {
+      // If it is a valid page that is empty, it must be page 0
+      // This implies that there are no terms in the glossary
+      if page.is_empty() {
         embed = embed
           .title(self.title.to_string())
-          .description("This page does not exist.");
+          .description("No entries have been added yet.");
 
         embed
+      } else {
+        page.to_embed(self.title.as_str()).clone()
       }
+    } else {
+      // This should never happen unless we have a bug in our pagination code
+      embed = embed
+        .title(self.title.to_string())
+        .description("This page does not exist.");
+
+      embed
     }
   }
 }
@@ -119,19 +128,21 @@ impl PaginationPage<'_> {
     self.entries.is_empty()
   }
 
-  pub fn to_embed<'embed_lifetime>(
-    &'embed_lifetime self,
+  pub fn to_embed(
+    &self,
     //embed: &'embed_lifetime mut CreateEmbed,
     title: &str,
   ) -> serenity::CreateEmbed {
-    let terms_per_page = if title == "Glossary" { 1 } else { TERMS_PER_PAGE };
-    let mut embed = BloomBotEmbed::new()
-      .title(title)
-      .description(format!(
-        "Showing entries {} to {}.",
-        (self.page_number * terms_per_page) + 1,
-        (self.page_number * terms_per_page) + self.entries.len()
-      ));
+    let terms_per_page = if title == "Glossary" {
+      1
+    } else {
+      TERMS_PER_PAGE
+    };
+    let mut embed = BloomBotEmbed::new().title(title).description(format!(
+      "Showing entries {} to {}.",
+      (self.page_number * terms_per_page) + 1,
+      (self.page_number * terms_per_page) + self.entries.len()
+    ));
 
     let fields: Vec<(String, String, bool)> = self
       .entries
@@ -141,11 +152,10 @@ impl PaginationPage<'_> {
     embed = embed.fields(fields);
 
     embed = embed.footer(CreateEmbedFooter::new(format!(
-        "Page {} of {}",
-        self.page_number + 1,
-        self.page_count
-      ))
-    );
+      "Page {} of {}",
+      self.page_number + 1,
+      self.page_count
+    )));
 
     embed
   }

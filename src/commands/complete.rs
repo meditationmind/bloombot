@@ -24,36 +24,30 @@ pub async fn complete(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  let course =
-    match DatabaseHandler::get_course_in_dm(&mut transaction, course_name.as_str()).await? {
-      Some(course) => course,
-      None => {
-        ctx
-          .say(format!(
-            ":x: Course not found. Please contact server staff for assistance."
-          ))
-          .await?;
-        return Ok(());
-      }
-    };
+  let Some(course) =
+    DatabaseHandler::get_course_in_dm(&mut transaction, course_name.as_str()).await?
+  else {
+    ctx
+      .say(":x: Course not found. Please contact server staff for assistance.".to_string())
+      .await?;
+    return Ok(());
+  };
 
   let guild_id = course.guild_id;
 
   if ctx.cache().guild(guild_id).is_none() {
     ctx
-      .say(format!(
+      .say(
         ":x: Can't retrieve server information. Please contact server staff for assistance."
-      ))
+          .to_string(),
+      )
       .await?;
     return Ok(());
   }
 
-  let member = match guild_id.member(ctx, ctx.author().id).await {
-    Ok(member) => member,
-    Err(_) => {
-      ctx.say(format!(":x: You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.")).await?;
-      return Ok(());
-    }
+  let Ok(member) = guild_id.member(ctx, ctx.author().id).await else {
+    ctx.say(":x: You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.".to_string()).await?;
+    return Ok(());
   };
 
   if !member
@@ -62,10 +56,7 @@ pub async fn complete(
     .await?
   {
     ctx
-      .say(format!(
-        ":x: You are not in the course: **{}**.",
-        course_name
-      ))
+      .say(format!(":x: You are not in the course: **{course_name}**."))
       .await?;
     return Ok(());
   }
@@ -77,8 +68,7 @@ pub async fn complete(
   {
     ctx
       .say(format!(
-        ":x: You have already claimed the graduate role for course: **{}**.",
-        course_name
+        ":x: You have already claimed the graduate role for course: **{course_name}**."
       ))
       .await?;
     return Ok(());
@@ -89,8 +79,7 @@ pub async fn complete(
 
   ctx
     .say(format!(
-      ":tada: Congrats! You are now a graduate of the course: **{}**!",
-      course_name
+      ":tada: Congrats! You are now a graduate of the course: **{course_name}**!"
     ))
     .await?;
 
@@ -101,7 +90,7 @@ pub async fn complete(
       "**User**: <@{}>\n**Course**: {}",
       member.user.id, course_name
     ))
-    .to_owned();
+    .clone();
 
   let log_channel = serenity::ChannelId::new(CHANNELS.logs);
 

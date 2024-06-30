@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+
 use crate::commands::stats::StatsType;
 use crate::database::{Timeframe, TimeframeStats};
 use anyhow::{Context, Result};
@@ -35,9 +37,10 @@ impl ChartDrawer {
     Ok(Self { file })
   }
 
+  #[allow(clippy::unused_async)]
   pub async fn draw(
     self,
-    stats: &Vec<TimeframeStats>,
+    stats: &[TimeframeStats],
     timeframe: &Timeframe,
     stats_type: &StatsType,
     bar_color: (u8, u8, u8, f64),
@@ -45,15 +48,9 @@ impl ChartDrawer {
   ) -> Result<Chart> {
     let path = self.file.path().to_path_buf();
 
-    let text_color = match light_mode {
-      true => &BLACK,
-      false => &WHITE,
-    };
+    let text_color = if light_mode { &BLACK } else { &WHITE };
 
-    let background_color = match light_mode {
-      true => &WHITE,
-      false => &BLACK,
-    };
+    let background_color = if light_mode { &WHITE } else { &BLACK };
 
     let root = BitMapBackend::new(&path, (640, 480)).into_drawing_area();
     //root.fill(&WHITE).unwrap();
@@ -95,7 +92,7 @@ impl ChartDrawer {
       .y_label_style(("sans-serif", 25).into_font().color(text_color))
       .x_label_formatter(&|x| {
         // Dates
-        let x: i64 = (*x).try_into().unwrap();
+        let x: i64 = <i64>::from(*x);
         match timeframe {
           Timeframe::Daily => {
             let date = now - chrono::Duration::days(12 - x);
@@ -118,7 +115,7 @@ impl ChartDrawer {
       .y_label_formatter(&|y| {
         let mut index: usize = 0;
         let base: f64 = 1000.0;
-        let mut value: f64 = (*y).try_into().unwrap();
+        let mut value: f64 = <f64>::from(*y);
 
         loop {
           if value < base {
@@ -136,7 +133,7 @@ impl ChartDrawer {
           _ => "",
         };
 
-        let y_label = format!("{}{}", value, unit);
+        let y_label = format!("{value}{unit}");
 
         y_label
       })

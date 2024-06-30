@@ -10,9 +10,8 @@ pub async fn reaction_add(
   database: &DatabaseHandler,
   add_reaction: &Reaction,
 ) -> Result<()> {
-  let user = match add_reaction.user_id {
-    Some(user) => user,
-    None => return Ok(()),
+  let Some(user) = add_reaction.user_id else {
+    return Ok(());
   };
 
   check_report(ctx, &user, add_reaction).await?;
@@ -22,69 +21,68 @@ pub async fn reaction_add(
 }
 
 async fn check_report(ctx: &Context, user: &UserId, reaction: &Reaction) -> Result<()> {
-  match reaction.emoji {
-    ReactionType::Custom {
-      animated: _,
-      id,
-      name: _,
-    } => {
-      if id == EMOTES.report {
-        // Remove reaction from message
-        reaction
-          .delete(&ctx)
-          .await
-          .expect("Failed to remove reaction");
+  if let ReactionType::Custom {
+    animated: _,
+    id,
+    name: _,
+  } = reaction.emoji
+  {
+    if id == EMOTES.report {
+      // Remove reaction from message
+      reaction
+        .delete(&ctx)
+        .await
+        .expect("Failed to remove reaction");
 
-        let report_channel_id = ChannelId::new(CHANNELS.reportchannel);
-        let message = reaction.message(&ctx).await?;
-        let message_link = message.link().clone();
-        let message_user = message.author;
-        let message_channel_name = message.channel_id.name(ctx).await?;
-        let reporting_user = reaction.user(&ctx).await?;
+      let report_channel_id = ChannelId::new(CHANNELS.reportchannel);
+      let message = reaction.message(&ctx).await?;
+      let message_link = message.link().clone();
+      let message_user = message.author;
+      let message_channel_name = message.channel_id.name(ctx).await?;
+      let reporting_user = reaction.user(&ctx).await?;
 
-        let message_content = match message.content.is_empty() {
-          true => match message.attachments.first() {
-            Some(attachment) => format!("**Attachment**\n{}", attachment.url.clone()),
-            None => message.content.clone(),
-          },
-          false => message.content.clone(),
-        };
+      let message_content = if message.content.is_empty() {
+        match message.attachments.first() {
+          Some(attachment) => format!("**Attachment**\n{}", attachment.url.clone()),
+          None => message.content.clone(),
+        }
+      } else {
+        message.content.clone()
+      };
 
-        report_channel_id
-          .send_message(
-            &ctx,
-            CreateMessage::new()
-              .content(format!("<@&{}> Message Reported", ROLES.staff))
-              .embed(
-                config::BloomBotEmbed::new()
-                  .author(
-                    CreateEmbedAuthor::new(format!("{}", &message_user.name))
-                      .icon_url(message_user.face()),
-                  )
-                  .description(message_content)
-                  .field("Link", format!("[Go to message]({})", message_link), false)
-                  .footer(CreateEmbedFooter::new(format!(
-                    "Author ID: {}\nReported via reaction in #{} by {} ({})",
-                    &message_user.id, message_channel_name, reporting_user.name, user
-                  )))
-                  .timestamp(message.timestamp),
-              ),
-          )
-          .await?;
-
-        reporting_user
-          .dm(
-            &ctx,
-            CreateMessage::new().embed(
+      report_channel_id
+        .send_message(
+          &ctx,
+          CreateMessage::new()
+            .content(format!("<@&{}> Message Reported", ROLES.staff))
+            .embed(
               config::BloomBotEmbed::new()
-                .title("Report")
-                .description("Your report has been sent to the moderation team."),
+                .author(
+                  CreateEmbedAuthor::new(&message_user.name.to_string())
+                    .icon_url(message_user.face()),
+                )
+                .description(message_content)
+                .field("Link", format!("[Go to message]({message_link})"), false)
+                .footer(CreateEmbedFooter::new(format!(
+                  "Author ID: {}\nReported via reaction in #{} by {} ({})",
+                  &message_user.id, message_channel_name, reporting_user.name, user
+                )))
+                .timestamp(message.timestamp),
             ),
-          )
-          .await?;
-      }
+        )
+        .await?;
+
+      reporting_user
+        .dm(
+          &ctx,
+          CreateMessage::new().embed(
+            config::BloomBotEmbed::new()
+              .title("Report")
+              .description("Your report has been sent to the moderation team."),
+          ),
+        )
+        .await?;
     }
-    _ => {}
   }
 
   Ok(())
@@ -100,54 +98,49 @@ async fn add_star(ctx: &Context, database: &DatabaseHandler, reaction: &Reaction
         .reactions
         .iter()
         .find(|r| r.reaction_type == ReactionType::Unicode(EMOTES.star.to_string()))
-        .map(|r| r.count)
-        .unwrap_or(0);
+        .map_or(0, |r| r.count);
 
       let mut transaction = database.start_transaction().await?;
       let star_message =
         DatabaseHandler::get_star_message_by_message_id(&mut transaction, &reaction.message_id)
           .await?;
 
-      match star_message {
-        Some(star_message) => {
-          // Already exists, find the starboard channel
-          let starboard_channel = ChannelId::new(config::CHANNELS.starchannel);
+      if let Some(star_message) = star_message {
+        // Already exists, find the starboard channel
+        let starboard_channel = ChannelId::new(config::CHANNELS.starchannel);
 
-          // Get the starboard message
-          let mut starboard_message = starboard_channel
-            .message(&ctx, star_message.board_message_id)
-            .await?;
+        // Get the starboard message
+        let mut starboard_message = starboard_channel
+          .message(&ctx, star_message.board_message_id)
+          .await?;
 
-          let existing_embed = starboard_message.embeds.get(0).with_context(|| {
-            format!(
-              "Failed to get embed from starboard message {}",
-              starboard_message.id
-            )
-          })?;
+        let existing_embed = starboard_message.embeds.first().with_context(|| {
+          format!(
+            "Failed to get embed from starboard message {}",
+            starboard_message.id
+          )
+        })?;
 
-          let updated_embed = CreateEmbed::from(existing_embed.clone()).footer(
-            CreateEmbedFooter::new(format!("⭐ Times starred: {}", star_count)),
-          );
+        let updated_embed = CreateEmbed::from(existing_embed.clone()).footer(
+          CreateEmbedFooter::new(format!("⭐ Times starred: {star_count}")),
+        );
 
-          match starboard_message
+        // Check to see if message was created by previous bot
+        if starboard_message.author.id == ctx.cache.current_user().id {
+          starboard_message
             .edit(ctx, EditMessage::new().embed(updated_embed))
-            .await
-          {
-            Ok(_) => (),
-            Err(_) => {
-              let _ = starboard_channel
-                .delete_message(&ctx, starboard_message.id)
-                .await;
+            .await?;
+        } else {
+          let _ = starboard_channel
+            .delete_message(&ctx, starboard_message.id)
+            .await;
 
-              create_star_message(ctx, &mut transaction, reaction, star_count).await?;
-              transaction.commit().await?;
-            }
-          }
-        }
-        None => {
           create_star_message(ctx, &mut transaction, reaction, star_count).await?;
           transaction.commit().await?;
         }
+      } else {
+        create_star_message(ctx, &mut transaction, reaction, star_count).await?;
+        transaction.commit().await?;
       }
     }
   }
@@ -183,7 +176,7 @@ async fn create_star_message(
     };
 
     let mut embed = match starred_message.embeds.first() {
-      Some(embed) => config::BloomBotEmbed::from(embed.clone().to_owned()),
+      Some(embed) => config::BloomBotEmbed::from(embed.clone()),
       None => config::BloomBotEmbed::new().description(starred_message.content.clone()),
     };
 
@@ -201,21 +194,20 @@ async fn create_star_message(
         false,
       )
       .footer(CreateEmbedFooter::new(format!(
-        "⭐ Times starred: {}",
-        star_count
+        "⭐ Times starred: {star_count}"
       )))
-      .to_owned();
+      .clone();
 
     if let Some(sticker) = &starred_message.sticker_items.first() {
       if let Some(sticker_url) = sticker.image_url() {
-        embed = embed.image(sticker_url.clone()).to_owned();
+        embed = embed.image(sticker_url.clone()).clone();
       }
     }
 
     if let Some(attachment) = &starred_message.attachments.first() {
       if let Some(content_type) = &attachment.content_type {
         if content_type.starts_with("image") {
-          embed = embed.image(attachment.url.clone()).to_owned();
+          embed = embed.image(attachment.url.clone()).clone();
         }
       }
     }

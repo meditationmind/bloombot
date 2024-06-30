@@ -21,6 +21,7 @@ use poise::CreateReply;
   //hide_in_help,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn erase(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -62,7 +63,7 @@ pub async fn message(
   let erase_count_message = if erase_count == 1 {
     "1 erase recorded".to_string()
   } else {
-    format!("{} erases recorded", erase_count)
+    format!("{erase_count} erases recorded")
   };
 
   let mut log_embed = BloomBotEmbed::new();
@@ -74,7 +75,7 @@ pub async fn message(
   ));
   dm_embed = dm_embed
     .title("A message you sent has been deleted.")
-    .description(format!("**Reason**: {}", reason));
+    .description(format!("**Reason**: {reason}"));
 
   if let Some(attachment) = message.attachments.first() {
     log_embed = log_embed.field("Attachment", attachment.url.clone(), false);
@@ -83,16 +84,17 @@ pub async fn message(
 
   if !message.content.is_empty() {
     // If longer than 1024 - 6 characters for the embed, truncate to 1024 - 3 for "..."
-    let content = match message.content.len() > 1018 {
-      true => format!(
+    let content = if message.content.len() > 1018 {
+      format!(
         "{}...",
         message.content.chars().take(1015).collect::<String>()
-      ),
-      false => message.content.clone(),
+      )
+    } else {
+      message.content.clone()
     };
 
-    log_embed = log_embed.field("Message Content", format!("```{}```", content), false);
-    dm_embed = dm_embed.field("Message Content", format!("```{}```", content), false);
+    log_embed = log_embed.field("Message Content", format!("```{content}```"), false);
+    dm_embed = dm_embed.field("Message Content", format!("```{content}```"), false);
   }
 
   log_embed = log_embed.footer(
@@ -127,81 +129,62 @@ pub async fn message(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(format!(
+    MessageType::TextOnly(
       ":white_check_mark: Message deleted. User will be notified via DM or private thread."
-    )),
+        .to_string(),
+    ),
     true,
   )
   .await?;
 
-  match message
+  if message
     .author
-    .direct_message(ctx, CreateMessage::new().embed(dm_embed.to_owned()))
+    .direct_message(ctx, CreateMessage::new().embed(dm_embed.clone()))
     .await
+    .is_ok()
   {
-    Ok(_) => {
-      //  commit_and_say(
-      //    ctx,
-      //    transaction,
-      //    MessageType::TextOnly(format!(":white_check_mark: Message deleted. Sent the reason in DMs.")),
-      //    true,
-      //  )
-      //  .await?;
-    }
-    Err(_) => {
-      let thread_channel: ChannelId = match message
-        .channel_id
-        .to_channel(&ctx)
-        .await
-        .unwrap()
-        .guild()
-        .unwrap()
-        .kind
-      {
-        serenity::ChannelType::Text => channel_id,
-        // If not a text channel, then create private thread in lounge to avoid failure
-        _ => ChannelId::from(501464482996944909),
-      };
+  } else {
+    let thread_channel: ChannelId = match message
+      .channel_id
+      .to_channel(&ctx)
+      .await
+      .unwrap()
+      .guild()
+      .unwrap()
+      .kind
+    {
+      serenity::ChannelType::Text => channel_id,
+      // If not a text channel, then create private thread in lounge to avoid failure
+      _ => ChannelId::from(501464482996944909),
+    };
 
-      let mut notification_thread = thread_channel
-        .create_thread(
-          ctx,
-          CreateThread::new(format!("Private Notification: Message Deleted")),
-        )
-        .await?;
+    let mut notification_thread = thread_channel
+      .create_thread(
+        ctx,
+        CreateThread::new("Private Notification: Message Deleted".to_string()),
+      )
+      .await?;
 
-      notification_thread
-        .edit_thread(ctx, EditThread::new().invitable(false).locked(true))
-        .await?;
+    notification_thread
+      .edit_thread(ctx, EditThread::new().invitable(false).locked(true))
+      .await?;
 
-      dm_embed = dm_embed.footer(CreateEmbedFooter::new(
-        "If you have any questions or concerns regarding this action, please contact staff via ModMail."
+    dm_embed = dm_embed.footer(CreateEmbedFooter::new(
+      "If you have any questions or concerns regarding this action, please contact staff via ModMail."
       ));
 
-      let thread_initial_message = format!("Private notification for <@{}>:", message.author.id);
+    let thread_initial_message = format!("Private notification for <@{}>:", message.author.id);
 
-      notification_thread
-        .send_message(
-          ctx,
-          CreateMessage::new()
-            .content(thread_initial_message)
-            .embed(dm_embed.to_owned())
-            .allowed_mentions(CreateAllowedMentions::new().users([message.author.id])),
-        )
-        .await?;
-
-      //commit_and_say(
-      //  ctx,
-      //  transaction,
-      //  MessageType::TextOnly(format!(
-      //    ":white_check_mark: Message deleted. Could not send the reason in DMs. Private thread created: <#{}>",
-      //    notification_thread.id
-      //  )),
-      //  true,
-      //)
-      //.await?;
-    }
-  };
+    notification_thread
+      .send_message(
+        ctx,
+        CreateMessage::new()
+          .content(thread_initial_message)
+          .embed(dm_embed.clone())
+          .allowed_mentions(CreateAllowedMentions::new().users([message.author.id])),
+      )
+      .await?;
+  }
 
   Ok(())
 }
@@ -224,29 +207,21 @@ pub async fn list(
     None => user.name.clone(),
   };
 
-  let privacy = if ctx.channel_id() == config::CHANNELS.logs {
-    false
-  } else {
-    true
-  };
+  let privacy = ctx.channel_id() != config::CHANNELS.logs;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
   // Define some unique identifiers for the navigation buttons
   let ctx_id = ctx.id();
-  let prev_button_id = format!("{}prev", ctx_id);
-  let next_button_id = format!("{}next", ctx_id);
+  let prev_button_id = format!("{ctx_id}prev");
+  let next_button_id = format!("{ctx_id}next");
 
-  let mut current_page = page.unwrap_or(0);
-
-  if current_page > 0 {
-    current_page = current_page - 1
-  }
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let erases = DatabaseHandler::get_erases(&mut transaction, &guild_id, &user.id).await?;
   let erases: Vec<PageRowRef> = erases.iter().map(|erase| erase as _).collect();
   drop(transaction);
-  let pagination = Pagination::new(format!("Erases for {}", user_nick_or_name), erases).await?;
+  let pagination = Pagination::new(format!("Erases for {user_nick_or_name}"), erases).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();
@@ -261,7 +236,7 @@ pub async fn list(
         f = f.components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(&prev_button_id).label("Previous"),
           CreateButton::new(&next_button_id).label("Next"),
-        ])])
+        ])]);
       }
       f.embeds = vec![first_page];
       f.ephemeral(privacy)
@@ -309,72 +284,22 @@ pub async fn populate(
   ctx: Context<'_>,
   #[description = "The user to populate erase data for"] user: serenity::User,
   #[description = "The link for the erase notification message"] message_link: String,
-  #[description = "The year of the erase"] year: u32,
-  #[description = "The month of the erase"]
-  #[min = 1]
-  #[max = 12]
-  month: u32,
-  #[description = "The day of the erase"]
-  #[min = 1]
-  #[max = 31]
-  day: u32,
-  #[description = "The hour of the erase (defaults to 0)"]
-  #[min = 0]
-  #[max = 23]
-  hour: Option<u32>,
-  #[description = "The minute of the erase (defaults to 0)"]
-  #[min = 0]
-  #[max = 59]
-  minute: Option<u32>,
+  #[description = "The date of the erasure (YYYY-MM-DD)"]
+  #[rename = "date"]
+  erase_date: chrono::NaiveDate,
+  #[description = "The time of the erasure (HH:MM)"]
+  #[rename = "time"]
+  erase_time: Option<chrono::NaiveTime>,
 ) -> Result<()> {
   let data = ctx.data();
 
   // We unwrap here, because we know that the command is guild-only.
   let guild_id = ctx.guild_id().unwrap();
 
-  let date = match chrono::NaiveDate::from_ymd_opt(year as i32, month, day) {
-    Some(date) => date,
-    None => {
-      ctx
-        .send(
-          CreateReply::default()
-            .embed(
-              CreateEmbed::new()
-                .title("Error")
-                .description(format!("Invalid date provided: {}-{}-{}", year, month, day))
-                .color(serenity::Color::RED),
-            )
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
-  };
+  let erase_time = erase_time
+    .unwrap_or(chrono::NaiveTime::from_hms_opt(0, 0, 0).expect("Hardcoded time is valid"));
 
-  let time = match chrono::NaiveTime::from_hms_opt(hour.unwrap_or(0), minute.unwrap_or(0), 0) {
-    Some(time) => time,
-    None => {
-      ctx
-        .send(
-          CreateReply::default()
-            .embed(
-              CreateEmbed::new()
-                .title("Error")
-                .description(format!(
-                  "Invalid time provided: {}:{}",
-                  hour.unwrap_or(0),
-                  minute.unwrap_or(0)
-                ))
-                .color(serenity::Color::RED),
-            )
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
-  };
-
-  let datetime = chrono::NaiveDateTime::new(date, time).and_utc();
+  let datetime = chrono::NaiveDateTime::new(erase_date, erase_time).and_utc();
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   DatabaseHandler::add_erase(

@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS};
 use crate::database::DatabaseHandler;
@@ -31,6 +33,7 @@ pub enum DataType {
   //hide_in_help,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn manage(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -45,7 +48,10 @@ pub async fn create(
   #[description = "The number of minutes for the entry"]
   #[min = 0]
   minutes: i32,
-  #[description = "The year of the entry"] year: u32,
+  // Message will not be older than Discord itself
+  #[min = 2015]
+  #[description = "The year of the entry"]
+  year: i32,
   #[description = "The month of the entry"]
   #[min = 1]
   #[max = 12]
@@ -63,49 +69,44 @@ pub async fn create(
   #[max = 59]
   minute: Option<u32>,
 ) -> Result<()> {
-  let date = match chrono::NaiveDate::from_ymd_opt(year as i32, month, day) {
-    Some(date) => date,
-    None => {
-      ctx
-        .send(
-          CreateReply::default()
-            .embed(
-              CreateEmbed::new()
-                .title("Error")
-                .description(format!("Invalid date provided: {}-{}-{}", year, month, day))
-                .color(serenity::Color::RED),
-            )
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
+  let Some(entry_date) = chrono::NaiveDate::from_ymd_opt(year, month, day) else {
+    ctx
+      .send(
+        CreateReply::default()
+          .embed(
+            CreateEmbed::new()
+              .title("Error")
+              .description(format!("Invalid date provided: {year}-{month}-{day}"))
+              .color(serenity::Color::RED),
+          )
+          .ephemeral(true),
+      )
+      .await?;
+    return Ok(());
   };
 
-  let time = match chrono::NaiveTime::from_hms_opt(hour.unwrap_or(0), minute.unwrap_or(0), 0) {
-    Some(time) => time,
-    None => {
-      ctx
-        .send(
-          CreateReply::default()
-            .embed(
-              CreateEmbed::new()
-                .title("Error")
-                .description(format!(
-                  "Invalid time provided: {}:{}",
-                  hour.unwrap_or(0),
-                  minute.unwrap_or(0)
-                ))
-                .color(serenity::Color::RED),
-            )
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
+  let Some(entry_time) = chrono::NaiveTime::from_hms_opt(hour.unwrap_or(0), minute.unwrap_or(0), 0)
+  else {
+    ctx
+      .send(
+        CreateReply::default()
+          .embed(
+            CreateEmbed::new()
+              .title("Error")
+              .description(format!(
+                "Invalid time provided: {}:{}",
+                hour.unwrap_or(0),
+                minute.unwrap_or(0)
+              ))
+              .color(serenity::Color::RED),
+          )
+          .ephemeral(true),
+      )
+      .await?;
+    return Ok(());
   };
 
-  let datetime = chrono::NaiveDateTime::new(date, time).and_utc();
+  let datetime = chrono::NaiveDateTime::new(entry_date, entry_time).and_utc();
 
   let data = ctx.data();
   let guild_id = ctx.guild_id().unwrap();
@@ -129,7 +130,7 @@ pub async fn create(
       datetime.format("%B %d, %Y"),
       minutes
     ))
-    .to_owned();
+    .clone();
 
   commit_and_say(
     ctx,
@@ -155,7 +156,7 @@ pub async fn create(
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     )
-    .to_owned();
+    .clone();
 
   let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 
@@ -182,14 +183,10 @@ pub async fn list(
 
   // Define some unique identifiers for the navigation buttons
   let ctx_id = ctx.id();
-  let prev_button_id = format!("{}prev", ctx_id);
-  let next_button_id = format!("{}next", ctx_id);
+  let prev_button_id = format!("{ctx_id}prev");
+  let next_button_id = format!("{ctx_id}next");
 
-  let mut current_page = page.unwrap_or(0);
-
-  if current_page > 0 {
-    current_page = current_page - 1
-  }
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let entries =
     DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &user.id).await?;
@@ -210,7 +207,7 @@ pub async fn list(
         f = f.components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(&prev_button_id).label("Previous"),
           CreateButton::new(&next_button_id).label("Next"),
-        ])])
+        ])]);
       }
       f.embeds = vec![first_page];
       f.ephemeral(true)
@@ -309,127 +306,118 @@ pub async fn update(
     return Ok(());
   }
 
-  match existing_entry {
-    Some(existing_entry) => {
-      let minutes = minutes.unwrap_or(existing_entry.meditation_minutes);
+  if let Some(existing_entry) = existing_entry {
+    let minutes = minutes.unwrap_or(existing_entry.meditation_minutes);
 
-      let existing_date = existing_entry.occurred_at;
-      let year = year.unwrap_or(existing_date.year());
-      let month = month.unwrap_or(existing_date.month());
-      let day = day.unwrap_or(existing_date.day());
-      let hour = hour.unwrap_or(existing_date.hour());
-      let minute = minute.unwrap_or(existing_date.minute());
+    let existing_date = existing_entry.occurred_at;
+    let year = year.unwrap_or(existing_date.year());
+    let month = month.unwrap_or(existing_date.month());
+    let day = day.unwrap_or(existing_date.day());
+    let hour = hour.unwrap_or(existing_date.hour());
+    let minute = minute.unwrap_or(existing_date.minute());
 
-      let date = match chrono::NaiveDate::from_ymd_opt(year as i32, month, day) {
-        Some(date) => date,
-        None => {
-          ctx
-            .send(
-              CreateReply::default()
-                .embed(
-                  CreateEmbed::new()
-                    .title("Error")
-                    .description(format!("Invalid date provided: {}-{}-{}", year, month, day))
-                    .color(serenity::Color::RED),
-                )
-                .ephemeral(true),
-            )
-            .await?;
-          return Ok(());
-        }
-      };
-
-      let time = match chrono::NaiveTime::from_hms_opt(hour, minute, 0) {
-        Some(time) => time,
-        None => {
-          ctx
-            .send(
-              CreateReply::default()
-                .embed(
-                  CreateEmbed::new()
-                    .title("Error")
-                    .description(format!("Invalid time provided: {}:{}", hour, minute))
-                    .color(serenity::Color::RED),
-                )
-                .ephemeral(true),
-            )
-            .await?;
-          return Ok(());
-        }
-      };
-
-      let datetime = chrono::NaiveDateTime::new(date, time).and_utc();
-
-      let data = ctx.data();
-
-      let mut transaction = data.db.start_transaction_with_retry(5).await?;
-
-      DatabaseHandler::update_meditation_entry(&mut transaction, &entry_id, minutes, datetime)
-        .await?;
-
-      let success_embed = BloomBotEmbed::new()
-        .title("Meditation Entry Updated")
-        .description(format!(
-          "**User**: <@{}>\n**ID**: {}\n\n**Before:** {} minute(s) on {}\n**After:** {} minute(s) on {}",
-          existing_entry.user_id,
-          entry_id,
-          existing_entry.meditation_minutes,
-          existing_date.format("%B %d, %Y at %l:%M %P"),
-          minutes,
-          datetime.format("%B %d, %Y at %l:%M %P")
-        ))
-        .to_owned();
-      commit_and_say(
-        ctx,
-        transaction,
-        MessageType::EmbedOnly(success_embed),
-        true,
-      )
-      .await?;
-
-      let log_embed = BloomBotEmbed::new()
-        .title("Meditation Entry Updated")
-        .description(format!(
-          "**User**: <@{}>\n**ID**: {}\n\n__**Before**__\n**Date**: {}\n**Time**: {} minute(s)\n\n__**After**__\n**Date**: {}\n**Time**: {} minute(s)",
-          existing_entry.user_id,
-          entry_id,
-          existing_date.format("%B %d, %Y at %l:%M %P"),
-          existing_entry.meditation_minutes,
-          datetime.format("%B %d, %Y at %l:%M %P"),
-          minutes
-        ))
-        .footer(CreateEmbedFooter::new(format!("Updated by {} ({})", ctx.author().name, ctx.author().id))
-          .icon_url(ctx.author().avatar_url().unwrap_or_default())
-        )
-        .to_owned();
-
-      let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
-
-      log_channel
-        .send_message(ctx, CreateMessage::new().embed(log_embed))
-        .await?;
-
-      Ok(())
-    }
-    None => {
+    let Some(entry_date) = chrono::NaiveDate::from_ymd_opt(year, month, day) else {
       ctx
         .send(
           CreateReply::default()
             .embed(
               CreateEmbed::new()
                 .title("Error")
-                .description(format!("No meditation entry found with ID `{}`.", entry_id))
-                .footer(CreateEmbedFooter::new(
-                  "Use `/manage list` to see a user's entries.",
-                ))
+                .description(format!("Invalid date provided: {year}-{month}-{day}"))
                 .color(serenity::Color::RED),
             )
             .ephemeral(true),
         )
         .await?;
+      return Ok(());
+    };
 
-      Ok(())
-    }
+    let Some(entry_time) = chrono::NaiveTime::from_hms_opt(hour, minute, 0) else {
+      ctx
+        .send(
+          CreateReply::default()
+            .embed(
+              CreateEmbed::new()
+                .title("Error")
+                .description(format!("Invalid time provided: {hour}:{minute}"))
+                .color(serenity::Color::RED),
+            )
+            .ephemeral(true),
+        )
+        .await?;
+      return Ok(());
+    };
+
+    let datetime = chrono::NaiveDateTime::new(entry_date, entry_time).and_utc();
+
+    let data = ctx.data();
+
+    let mut transaction = data.db.start_transaction_with_retry(5).await?;
+
+    DatabaseHandler::update_meditation_entry(&mut transaction, &entry_id, minutes, datetime)
+      .await?;
+
+    let success_embed = BloomBotEmbed::new()
+      .title("Meditation Entry Updated")
+      .description(format!(
+    "**User**: <@{}>\n**ID**: {}\n\n**Before:** {} minute(s) on {}\n**After:** {} minute(s) on {}",
+    existing_entry.user_id,
+    entry_id,
+    existing_entry.meditation_minutes,
+    existing_date.format("%B %d, %Y at %l:%M %P"),
+    minutes,
+    datetime.format("%B %d, %Y at %l:%M %P")
+    ))
+      .clone();
+    commit_and_say(
+      ctx,
+      transaction,
+      MessageType::EmbedOnly(success_embed),
+      true,
+    )
+    .await?;
+
+    let log_embed = BloomBotEmbed::new()
+    .title("Meditation Entry Updated")
+    .description(format!(
+    "**User**: <@{}>\n**ID**: {}\n\n__**Before**__\n**Date**: {}\n**Time**: {} minute(s)\n\n__**After**__\n**Date**: {}\n**Time**: {} minute(s)",
+    existing_entry.user_id,
+    entry_id,
+    existing_date.format("%B %d, %Y at %l:%M %P"),
+    existing_entry.meditation_minutes,
+    datetime.format("%B %d, %Y at %l:%M %P"),
+    minutes
+    ))
+    .footer(CreateEmbedFooter::new(format!("Updated by {} ({})", ctx.author().name, ctx.author().id))
+    .icon_url(ctx.author().avatar_url().unwrap_or_default())
+    )
+    .clone();
+
+    let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+
+    log_channel
+      .send_message(ctx, CreateMessage::new().embed(log_embed))
+      .await?;
+
+    Ok(())
+  } else {
+    ctx
+      .send(
+        CreateReply::default()
+          .embed(
+            CreateEmbed::new()
+              .title("Error")
+              .description(format!("No meditation entry found with ID `{entry_id}`."))
+              .footer(CreateEmbedFooter::new(
+                "Use `/manage list` to see a user's entries.",
+              ))
+              .color(serenity::Color::RED),
+          )
+          .ephemeral(true),
+      )
+      .await?;
+
+    Ok(())
   }
 }
 
@@ -446,28 +434,26 @@ pub async fn delete(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  let entry =
-    match DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, &entry_id).await? {
-      Some(entry) => entry,
-      None => {
-        ctx
-          .send(
-            CreateReply::default()
-              .embed(
-                CreateEmbed::new()
-                  .title("Error")
-                  .description(format!("No meditation entry found with ID `{}`.", entry_id))
-                  .footer(CreateEmbedFooter::new(
-                    "Use `/manage list` to see a user's entries.",
-                  ))
-                  .color(serenity::Color::RED),
-              )
-              .ephemeral(true),
+  let Some(entry) =
+    DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, &entry_id).await?
+  else {
+    ctx
+      .send(
+        CreateReply::default()
+          .embed(
+            CreateEmbed::new()
+              .title("Error")
+              .description(format!("No meditation entry found with ID `{entry_id}`."))
+              .footer(CreateEmbedFooter::new(
+                "Use `/manage list` to see a user's entries.",
+              ))
+              .color(serenity::Color::RED),
           )
-          .await?;
-        return Ok(());
-      }
-    };
+          .ephemeral(true),
+      )
+      .await?;
+    return Ok(());
+  };
 
   DatabaseHandler::delete_meditation_entry(&mut transaction, &entry_id).await?;
 
@@ -480,7 +466,7 @@ pub async fn delete(
       entry.occurred_at.format("%B %d, %Y"),
       entry.meditation_minutes
     ))
-    .to_owned();
+    .clone();
 
   commit_and_say(
     ctx,
@@ -507,7 +493,7 @@ pub async fn delete(
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     )
-    .to_owned();
+    .clone();
 
   let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 
@@ -542,17 +528,17 @@ pub async fn reset(
 
   match data_type {
     DataType::CustomizationSettings => {
-      DatabaseHandler::remove_tracking_profile(&mut transaction, &guild_id, &user.id).await?
+      DatabaseHandler::remove_tracking_profile(&mut transaction, &guild_id, &user.id).await?;
     }
     DataType::MeditationEntries => {
-      DatabaseHandler::reset_user_meditation_entries(&mut transaction, &guild_id, &user.id).await?
+      DatabaseHandler::reset_user_meditation_entries(&mut transaction, &guild_id, &user.id).await?;
     }
   }
 
   let ctx_id = ctx.id();
 
-  let confirm_id = format!("{}confirm", ctx_id);
-  let cancel_id = format!("{}cancel", ctx_id);
+  let confirm_id = format!("{ctx_id}confirm");
+  let cancel_id = format!("{ctx_id}cancel");
 
   ctx
     .send(
@@ -604,7 +590,7 @@ pub async fn reset(
         )
         .await
       {
-        Ok(_) => {
+        Ok(()) => {
           DatabaseHandler::commit_transaction(transaction).await?;
 
           let log_embed = BloomBotEmbed::new()
@@ -624,7 +610,7 @@ pub async fn reset(
               ))
               .icon_url(ctx.author().avatar_url().unwrap_or_default()),
             )
-            .to_owned();
+            .clone();
 
           let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 
@@ -643,18 +629,18 @@ pub async fn reset(
           ));
         }
       }
-    } else {
-      press
-        .create_response(
-          ctx,
-          CreateInteractionResponse::UpdateMessage(
-            CreateInteractionResponseMessage::new()
-              .content("Cancelled.")
-              .components(Vec::new()),
-          ),
-        )
-        .await?;
     }
+
+    press
+      .create_response(
+        ctx,
+        CreateInteractionResponse::UpdateMessage(
+          CreateInteractionResponseMessage::new()
+            .content("Cancelled.")
+            .components(Vec::new()),
+        ),
+      )
+      .await?;
   }
 
   // This happens when the user didn't press any button for 60 seconds
@@ -692,7 +678,7 @@ pub async fn migrate(
         &old_user.id,
         &new_user.id,
       )
-      .await?
+      .await?;
     }
     DataType::MeditationEntries => {
       DatabaseHandler::migrate_meditation_entries(
@@ -701,14 +687,14 @@ pub async fn migrate(
         &old_user.id,
         &new_user.id,
       )
-      .await?
+      .await?;
     }
   }
 
   let ctx_id = ctx.id();
 
-  let confirm_id = format!("{}confirm", ctx_id);
-  let cancel_id = format!("{}cancel", ctx_id);
+  let confirm_id = format!("{ctx_id}confirm");
+  let cancel_id = format!("{ctx_id}cancel");
 
   ctx
     .send(
@@ -761,7 +747,7 @@ pub async fn migrate(
         )
         .await
       {
-        Ok(_) => {
+        Ok(()) => {
           DatabaseHandler::commit_transaction(transaction).await?;
 
           let log_embed = BloomBotEmbed::new()
@@ -784,7 +770,7 @@ pub async fn migrate(
               ))
               .icon_url(ctx.author().avatar_url().unwrap_or_default()),
             )
-            .to_owned();
+            .clone();
 
           let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 
@@ -803,18 +789,18 @@ pub async fn migrate(
           ));
         }
       }
-    } else {
-      press
-        .create_response(
-          ctx,
-          CreateInteractionResponse::UpdateMessage(
-            CreateInteractionResponseMessage::new()
-              .content("Cancelled.")
-              .components(Vec::new()),
-          ),
-        )
-        .await?;
     }
+
+    press
+      .create_response(
+        ctx,
+        CreateInteractionResponse::UpdateMessage(
+          CreateInteractionResponseMessage::new()
+            .content("Cancelled.")
+            .components(Vec::new()),
+        ),
+      )
+      .await?;
   }
 
   // This happens when the user didn't press any button for 60 seconds

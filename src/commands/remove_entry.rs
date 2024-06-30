@@ -25,14 +25,12 @@ pub async fn remove_entry(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  let entry =
-    match DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, id.as_str()).await? {
-      Some(entry) => entry,
-      None => {
-        ctx.say(":x: No entry found with that ID.").await?;
-        return Ok(());
-      }
-    };
+  let Some(entry) =
+    DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, id.as_str()).await?
+  else {
+    ctx.say(":x: No entry found with that ID.").await?;
+    return Ok(());
+  };
 
   if entry.user_id != ctx.author().id {
     ctx.say(":x: You can only remove your own entries.").await?;
@@ -44,7 +42,7 @@ pub async fn remove_entry(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(format!(":white_check_mark: Entry has been removed.")),
+    MessageType::TextOnly(":white_check_mark: Entry has been removed.".to_string()),
     true,
   )
   .await?;
@@ -66,7 +64,7 @@ pub async fn remove_entry(
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     )
-    .to_owned();
+    .clone();
 
   let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 

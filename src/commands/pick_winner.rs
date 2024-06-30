@@ -31,7 +31,11 @@ async fn finalize_winner(
   selected_date: chrono::DateTime<chrono::Utc>,
 ) -> Result<()> {
   let now = chrono::Utc::now();
-  let guild_name = ctx.guild().expect("should only be called in an available guild that is currently cached").name.clone();
+  let guild_name = ctx
+    .guild()
+    .expect("should only be called in an available guild that is currently cached")
+    .name
+    .clone();
 
   let announcement_embed = BloomBotEmbed::new()
     .title(":tada: Monthly Challenge Winner :tada:")
@@ -48,7 +52,7 @@ async fn finalize_winner(
         selected_date.format("%B %Y"),
         now.format("%B %d, %Y")
       ))
-    ).to_owned();
+    ).clone();
 
   let dm_embed = BloomBotEmbed::new()
     .title(":tada: You've won a key! :tada:")
@@ -59,10 +63,9 @@ async fn finalize_winner(
       false,
     )
     .footer(CreateEmbedFooter::new(format!(
-        "From {} | If you need any assistance, please contact server staff.",
-        guild_name
+        "From {guild_name} | If you need any assistance, please contact server staff."
       ))
-    ).to_owned();
+    ).clone();
 
   let announcement_channel = serenity::ChannelId::new(CHANNELS.announcement);
   let dm_channel = winner.user.create_dm_channel(ctx).await?;
@@ -72,10 +75,10 @@ async fn finalize_winner(
     .await?;
 
   let ctx_id = ctx.id();
-  let redeem_id = format!("{}redeem", ctx_id);
-  let cancel_id = format!("{}cancel", ctx_id);
+  let redeem_id = format!("{ctx_id}redeem");
+  let cancel_id = format!("{ctx_id}cancel");
 
-  let mut dm_message = match dm_channel
+  let Ok(mut dm_message) = dm_channel
     .send_message(
       ctx,
       CreateMessage::new()
@@ -90,14 +93,11 @@ async fn finalize_winner(
         ])]),
     )
     .await
-  {
-    Ok(message) => message,
-    Err(_) => {
-      ctx
-        .send(CreateReply::default().content(":x: Could not send DM to member. Please run `/usekey` and copy a key manually if they want one.\n\n**No key has been used.**"))
-        .await?;
-      return Ok(());
-    }
+  else {
+    ctx
+      .send(CreateReply::default().content(":x: Could not send DM to member. Please run `/usekey` and copy a key manually if they want one.\n\n**No key has been used.**"))
+      .await?;
+    return Ok(());
   };
 
   ctx
@@ -121,8 +121,7 @@ async fn finalize_winner(
       let mut conn = ctx.data().db.get_connection_with_retry(5).await?;
       DatabaseHandler::mark_key_used(&mut conn, &reserved_key).await?;
       let hyperlink = format!(
-        "[Redeem your key](https://store.steampowered.com/account/registerkey?key={})",
-        reserved_key
+        "[Redeem your key](https://store.steampowered.com/account/registerkey?key={reserved_key})"
       );
       DatabaseHandler::record_steamkey_receipt(
         &mut conn,
@@ -139,8 +138,7 @@ async fn finalize_winner(
         .send_message(
           ctx,
           CreateMessage::new().content(format!(
-            "Awesome! Here is your key:\n```{}```\n{}",
-            reserved_key, hyperlink
+            "Awesome! Here is your key:\n```{reserved_key}```\n{hyperlink}"
           )),
         )
         .await?;
@@ -155,7 +153,7 @@ async fn finalize_winner(
           CreateEmbedFooter::new(format!("{} ({})", winner.user.name, winner.user.id))
             .icon_url(winner.user.avatar_url().unwrap_or_default()),
         )
-        .to_owned();
+        .clone();
 
       let log_channel = serenity::ChannelId::new(CHANNELS.logs);
 
@@ -189,7 +187,7 @@ async fn finalize_winner(
           CreateEmbedFooter::new(format!("{} ({})", winner.user.name, winner.user.id))
             .icon_url(winner.user.avatar_url().unwrap_or_default()),
         )
-        .to_owned();
+        .clone();
 
       let log_channel = serenity::ChannelId::new(CHANNELS.logs);
 
@@ -198,20 +196,16 @@ async fn finalize_winner(
         .await?;
 
       return Ok(());
-    } else {
-      // This is an unrelated button interaction
-      continue;
     }
+
+    // This is an unrelated button interaction
+    continue;
   }
 
   let timeout_embed = BloomBotEmbed::new()
     .title("**Congratulations on winning the giveaway!** 🥳")
     .description("You've won a key for [Playne: The Meditation Game](<https://store.steampowered.com/app/865540/PLAYNE__The_Meditation_Game/>) on Steam!\n\n**Would you like to redeem your key? Please contact server staff and we'll get one to you!**")
-    .footer(CreateEmbedFooter::new(format!(
-        "From {}",
-        guild_name
-      ))
-    ).to_owned();
+    .footer(CreateEmbedFooter::new(format!("From {guild_name}"))).clone();
 
   dm_message
     .edit(
@@ -230,7 +224,7 @@ async fn finalize_winner(
       ))
     .footer(CreateEmbedFooter::new(format!("{} ({})", winner.user.name, winner.user.id))
       .icon_url(winner.user.avatar_url().unwrap_or_default())
-    ).to_owned();
+    ).clone();
 
   let log_channel = serenity::ChannelId::new(CHANNELS.logs);
 
@@ -297,8 +291,8 @@ pub async fn pick_winner(
     now.year()
   });
 
-  let month = match month {
-    Some(month) => match month {
+  let month = if let Some(month) = month {
+    match month {
       Months::January => 1,
       Months::February => 2,
       Months::March => 3,
@@ -311,25 +305,21 @@ pub async fn pick_winner(
       Months::October => 10,
       Months::November => 11,
       Months::December => 12,
-    },
-    None => {
-      let now = chrono::Utc::now();
-      now.month()
     }
+  } else {
+    let now = chrono::Utc::now();
+    now.month()
   };
 
-  let start_date = match chrono::NaiveDate::from_ymd_opt(year, month, 1) {
-    Some(date) => date,
-    None => {
-      ctx
-        .send(
-          CreateReply::default()
-            .content("Invalid date.")
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
+  let Some(start_date) = chrono::NaiveDate::from_ymd_opt(year, month, 1) else {
+    ctx
+      .send(
+        CreateReply::default()
+          .content("Invalid date.")
+          .ephemeral(true),
+      )
+      .await?;
+    return Ok(());
   };
 
   let end_date = start_date + chrono::Months::new(1);
@@ -348,18 +338,12 @@ pub async fn pick_winner(
   let winner_role_id = serenity::RoleId::new(ROLES.meditation_challenger);
 
   while let Some(winner) = database_winner_candidates.next().await {
-    let winner = match winner {
-      Ok(winner) => winner,
-      Err(_) => {
-        continue;
-      }
+    let Ok(winner) = winner else {
+      continue;
     };
 
-    let member = match guild_id.member(ctx, winner).await {
-      Ok(member) => member,
-      Err(_) => {
-        continue;
-      }
+    let Ok(member) = guild_id.member(ctx, winner).await else {
+      continue;
     };
 
     if !member.roles.contains(&winner_role_id) {
@@ -398,20 +382,13 @@ pub async fn pick_winner(
       continue;
     }
 
-    let reserved_key = match DatabaseHandler::reserve_key(
-      &mut transaction,
-      &guild_id,
-      &member.user.id,
-    )
-    .await?
-    {
-      Some(key) => key,
-      None => {
-        ctx
-          .send(CreateReply::default().content(":x: No unused keys found. Please add one and run `/usekey` to give them one if they want one."))
-          .await?;
-        return Ok(());
-      }
+    let Some(reserved_key) =
+      DatabaseHandler::reserve_key(&mut transaction, &guild_id, &member.user.id).await?
+    else {
+      ctx
+      .send(CreateReply::default().content(":x: No unused keys found. Please add one and run `/usekey` to give them one if they want one."))
+      .await?;
+      return Ok(());
     };
 
     DatabaseHandler::commit_transaction(transaction).await?;

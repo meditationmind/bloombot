@@ -21,6 +21,7 @@ use poise::CreateReply;
   //hide_in_help,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn course(_: Context<'_>) -> Result<()> {
   Ok(())
 }
@@ -255,14 +256,10 @@ pub async fn list(
 
   // Define some unique identifiers for the navigation buttons
   let ctx_id = ctx.id();
-  let prev_button_id = format!("{}prev", ctx_id);
-  let next_button_id = format!("{}next", ctx_id);
+  let prev_button_id = format!("{ctx_id}prev");
+  let next_button_id = format!("{ctx_id}next");
 
-  let mut current_page = page.unwrap_or(0);
-
-  if current_page > 0 {
-    current_page = current_page - 1
-  }
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let courses = DatabaseHandler::get_all_courses(&mut transaction, &guild_id).await?;
   let courses: Vec<PageRowRef> = courses.iter().map(|course| course as _).collect();
@@ -282,7 +279,7 @@ pub async fn list(
         f = f.components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(&prev_button_id).label("Previous"),
           CreateButton::new(&next_button_id).label("Next"),
-        ])])
+        ])]);
       }
       f.embeds = vec![first_page];
       f.ephemeral(true)

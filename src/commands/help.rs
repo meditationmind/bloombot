@@ -34,7 +34,7 @@ pub struct OrderedMap<K, V>(pub Vec<(K, V)>);
 
 impl<K, V> Default for OrderedMap<K, V> {
   fn default() -> Self {
-    Self(Default::default())
+    Self(Vec::default())
   }
 }
 
@@ -65,12 +65,11 @@ impl<K: Eq, V> OrderedMap<K, V> {
 
   /// Finds a value in the map by the given key, or inserts it if it doesn't exist
   pub fn get_or_insert_with(&mut self, k: K, v: impl FnOnce() -> V) -> &mut V {
-    match self.0.iter().position(|entry| entry.0 == k) {
-      Some(i) => &mut self.0[i].1,
-      None => {
-        self.0.push((k, v()));
-        &mut self.0.last_mut().expect("we just inserted").1
-      }
+    if let Some(i) = self.0.iter().position(|entry| entry.0 == k) {
+      &mut self.0[i].1
+    } else {
+      self.0.push((k, v()));
+      &mut self.0.last_mut().expect("we just inserted").1
     }
   }
 }
@@ -101,7 +100,7 @@ async fn help_single_command<U, E>(
     false
   });
 
-  let command_not_found = format!("Command not found: `{}`", command_name);
+  let command_not_found = format!("Command not found: `{command_name}`");
 
   if command.is_none() {
     ctx
@@ -130,18 +129,20 @@ async fn help_single_command<U, E>(
     return Ok(());
   }
 
-  let prefix = match command.context_menu_action.is_some() {
-    true => String::from(""),
-    false => String::from("/"),
+  let prefix = if command.context_menu_action.is_some() {
+    String::new()
+  } else {
+    String::from("/")
   };
 
-  let command_name = match command.context_menu_action.is_some() {
-    true => command
+  let command_name = if command.context_menu_action.is_some() {
+    command
       .context_menu_name
       .clone()
       .unwrap_or(command.name.clone())
-      .to_string(),
-    false => command.name.clone(),
+      .to_string()
+  } else {
+    command.name.clone()
   };
 
   let mut help_text = match command.help_text.clone() {
@@ -172,7 +173,7 @@ async fn help_single_command<U, E>(
 
   let fields = subcommands.into_iter().map(|(subcommand_name, help_text)| {
     let field_name = format!("{}{} {}", prefix, command.name, subcommand_name);
-    let field_text = format!("```{}```", help_text);
+    let field_text = format!("```{help_text}```");
     (field_name, field_text, false)
   });
 
@@ -181,7 +182,7 @@ async fn help_single_command<U, E>(
       CreateReply::default()
         .embed(
           CreateEmbed::new()
-            .title(format!("{}{}", prefix, command_name))
+            .title(format!("{prefix}{command_name}"))
             .description(help_text)
             .fields(fields),
         )
@@ -277,18 +278,16 @@ async fn help_all_commands<U, E>(
 
     category_content += "```";
 
-    if category_content != "``````" {
+    if category_content == "``````" {
       ctx
         .send(
           CreateReply::default()
             .embed(
               CreateEmbed::new()
                 .fields(fields)
-                .field("Context Menu Commands", category_content, false)
-                .footer(CreateEmbedFooter::new(format!(
-                  "{}",
-                  config.extra_text_at_bottom
-                ))),
+                .footer(CreateEmbedFooter::new(
+                  config.extra_text_at_bottom.to_string(),
+                )),
             )
             .ephemeral(config.ephemeral),
         )
@@ -300,10 +299,10 @@ async fn help_all_commands<U, E>(
             .embed(
               CreateEmbed::new()
                 .fields(fields)
-                .footer(CreateEmbedFooter::new(format!(
-                  "{}",
-                  config.extra_text_at_bottom
-                ))),
+                .field("Context Menu Commands", category_content, false)
+                .footer(CreateEmbedFooter::new(
+                  config.extra_text_at_bottom.to_string(),
+                )),
             )
             .ephemeral(config.ephemeral),
         )
@@ -316,10 +315,9 @@ async fn help_all_commands<U, E>(
           .embed(
             CreateEmbed::new()
               .fields(fields)
-              .footer(CreateEmbedFooter::new(format!(
-                "{}",
-                config.extra_text_at_bottom
-              ))),
+              .footer(CreateEmbedFooter::new(
+                config.extra_text_at_bottom.to_string(),
+              )),
           )
           .ephemeral(config.ephemeral),
       )

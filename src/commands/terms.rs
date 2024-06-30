@@ -5,6 +5,7 @@ use anyhow::Result;
 use pgvector;
 use poise::serenity_prelude as serenity;
 use poise::Modal;
+use std::cmp::Ordering;
 
 #[derive(Debug, Modal)]
 #[name = "Add a new term"]
@@ -53,42 +54,46 @@ pub async fn term_not_found(
   let possible_terms =
     DatabaseHandler::get_possible_terms(transaction, &guild_id, term_name.as_str(), 0.8).await?;
 
-  if possible_terms.len() == 1 {
-    let possible_term = possible_terms.first().unwrap();
+  match possible_terms.len().cmp(&1) {
+    Ordering::Less => {
+      ctx
+        .send(
+          poise::CreateReply::default()
+            .content(":x: Term does not exist.")
+            .ephemeral(true),
+        )
+        .await?;
+    }
+    Ordering::Equal => {
+      let possible_term = possible_terms.first().unwrap();
 
-    ctx
-      .send(
-        poise::CreateReply::default()
-          .content(format!(
-            ":x: Term does not exist. Did you mean `{}`?",
-            possible_term.term_name
-          ))
-          .ephemeral(true),
-      )
-      .await?;
-  } else if possible_terms.len() > 1 {
-    ctx
-      .send(
-        poise::CreateReply::default()
-          .content(format!(
-            ":x: Term does not exist. Did you mean one of these?\n{}",
-            possible_terms
-              .iter()
-              .map(|term| format!("`{}`", term.term_name))
-              .collect::<Vec<String>>()
-              .join("\n")
-          ))
-          .ephemeral(true),
-      )
-      .await?;
-  } else {
-    ctx
-      .send(
-        poise::CreateReply::default()
-          .content(":x: Term does not exist.")
-          .ephemeral(true),
-      )
-      .await?;
+      ctx
+        .send(
+          poise::CreateReply::default()
+            .content(format!(
+              ":x: Term does not exist. Did you mean `{}`?",
+              possible_term.name
+            ))
+            .ephemeral(true),
+        )
+        .await?;
+    }
+    Ordering::Greater => {
+      ctx
+        .send(
+          poise::CreateReply::default()
+            .content(format!(
+              ":x: Term does not exist. Did you mean one of these?\n{}",
+              possible_terms
+                .iter()
+                .map(|term| format!("`{}`", term.name))
+                .collect::<Vec<String>>()
+                .join("\n")
+            ))
+            .ephemeral(true),
+        )
+        .await?;
+    }
   }
 
   Ok(())
@@ -109,6 +114,7 @@ pub async fn term_not_found(
   //hide_in_help,
   guild_only
 )]
+#[allow(clippy::unused_async)]
 pub async fn terms(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
   Ok(())
 }
@@ -125,62 +131,59 @@ pub async fn add(
 
   let term_data = AddTermModal::execute(ctx).await?;
 
-  match term_data {
-    Some(term_data) => {
-      let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+  if let Some(term_data) = term_data {
+    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-      // We unwrap here, because we know that the command is guild-only.
-      let guild_id = ctx.guild_id().unwrap();
+    // We unwrap here, because we know that the command is guild-only.
+    let guild_id = ctx.guild_id().unwrap();
 
-      let links = match term_data.links {
-        Some(links) => links.split(",").map(|s| s.trim().to_string()).collect(),
-        None => Vec::new(),
-      };
+    let links = match term_data.links {
+      Some(links) => links.split(',').map(|s| s.trim().to_string()).collect(),
+      None => Vec::new(),
+    };
 
-      let aliases = match term_data.aliases {
-        Some(aliases) => aliases.split(",").map(|s| s.trim().to_string()).collect(),
-        None => Vec::new(),
-      };
+    let aliases = match term_data.aliases {
+      Some(aliases) => aliases.split(',').map(|s| s.trim().to_string()).collect(),
+      None => Vec::new(),
+    };
 
-      let vector = pgvector::Vector::from(
-        ctx
-          .data()
-          .embeddings
-          .create_embedding(term_name.clone(), ctx.author().id)
-          .await?,
-      );
-
-      DatabaseHandler::add_term(
-        &mut transaction,
-        term_name.as_str(),
-        term_data.definition.as_str(),
-        term_data.example.as_deref(),
-        links.as_slice(),
-        term_data.category.as_deref(),
-        aliases.as_slice(),
-        &guild_id,
-        vector,
-      )
-      .await?;
-
-      commit_and_say(
-        poise::Context::Application(ctx),
-        transaction,
-        MessageType::TextOnly(format!(":white_check_mark: Term has been added.")),
-        true,
-      )
-      .await?;
-    }
-    None => {
+    let vector = pgvector::Vector::from(
       ctx
-        .send(
-          poise::CreateReply::default()
-            .content(":x: No data was provided.")
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
+        .data()
+        .embeddings
+        .create_embedding(term_name.clone(), ctx.author().id)
+        .await?,
+    );
+
+    DatabaseHandler::add_term(
+      &mut transaction,
+      term_name.as_str(),
+      term_data.definition.as_str(),
+      term_data.example.as_deref(),
+      links.as_slice(),
+      term_data.category.as_deref(),
+      aliases.as_slice(),
+      &guild_id,
+      vector,
+    )
+    .await?;
+
+    commit_and_say(
+      poise::Context::Application(ctx),
+      transaction,
+      MessageType::TextOnly(":white_check_mark: Term has been added.".to_string()),
+      true,
+    )
+    .await?;
+  } else {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(":x: No data was provided.")
+          .ephemeral(true),
+      )
+      .await?;
+    return Ok(());
   }
 
   Ok(())
@@ -214,14 +217,8 @@ pub async fn edit(
   }
 
   let existing_term = existing_term.unwrap();
-  let links = match existing_term.links {
-    Some(links) => Some(links.join(", ")),
-    None => None,
-  };
-  let aliases = match existing_term.aliases {
-    Some(aliases) => Some(aliases.join(", ")),
-    None => None,
-  };
+  let links = existing_term.links.map(|links| links.join(", "));
+  let aliases = existing_term.aliases.map(|aliases| aliases.join(", "));
 
   let existing_definition = existing_term.meaning.clone();
 
@@ -235,62 +232,59 @@ pub async fn edit(
 
   let term_data = UpdateTermModal::execute_with_defaults(ctx, defaults).await?;
 
-  match term_data {
-    Some(term_data) => {
-      let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+  if let Some(term_data) = term_data {
+    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-      let links = match term_data.links {
-        Some(links) => links.split(",").map(|s| s.trim().to_string()).collect(),
-        None => Vec::new(),
-      };
+    let links = match term_data.links {
+      Some(links) => links.split(',').map(|s| s.trim().to_string()).collect(),
+      None => Vec::new(),
+    };
 
-      let vector = if term_data.definition != existing_definition {
-        Some(pgvector::Vector::from(
-          ctx
-            .data()
-            .embeddings
-            .create_embedding(existing_term.term_name, ctx.author().id)
-            .await?,
-        ))
-      } else {
-        None
-      };
+    let vector = if term_data.definition == existing_definition {
+      None
+    } else {
+      Some(pgvector::Vector::from(
+        ctx
+          .data()
+          .embeddings
+          .create_embedding(existing_term.name, ctx.author().id)
+          .await?,
+      ))
+    };
 
-      let aliases = match term_data.aliases {
-        Some(aliases) => aliases.split(",").map(|s| s.trim().to_string()).collect(),
-        None => Vec::new(),
-      };
+    let aliases = match term_data.aliases {
+      Some(aliases) => aliases.split(',').map(|s| s.trim().to_string()).collect(),
+      None => Vec::new(),
+    };
 
-      DatabaseHandler::edit_term(
-        &mut transaction,
-        &existing_term.id,
-        term_data.definition.as_str(),
-        term_data.example.as_deref(),
-        links.as_slice(),
-        term_data.category.as_deref(),
-        aliases.as_slice(),
-        vector,
+    DatabaseHandler::edit_term(
+      &mut transaction,
+      &existing_term.id,
+      term_data.definition.as_str(),
+      term_data.example.as_deref(),
+      links.as_slice(),
+      term_data.category.as_deref(),
+      aliases.as_slice(),
+      vector,
+    )
+    .await?;
+
+    commit_and_say(
+      poise::Context::Application(ctx),
+      transaction,
+      MessageType::TextOnly(":white_check_mark: Term has been edited.".to_string()),
+      true,
+    )
+    .await?;
+  } else {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(":x: No data was provided.")
+          .ephemeral(true),
       )
       .await?;
-
-      commit_and_say(
-        poise::Context::Application(ctx),
-        transaction,
-        MessageType::TextOnly(format!(":white_check_mark: Term has been edited.")),
-        true,
-      )
-      .await?;
-    }
-    None => {
-      ctx
-        .send(
-          poise::CreateReply::default()
-            .content(":x: No data was provided.")
-            .ephemeral(true),
-        )
-        .await?;
-      return Ok(());
-    }
+    return Ok(());
   }
 
   Ok(())
@@ -326,7 +320,7 @@ pub async fn remove(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(format!(":white_check_mark: Term has been removed.")),
+    MessageType::TextOnly(":white_check_mark: Term has been removed.".to_string()),
     true,
   )
   .await?;

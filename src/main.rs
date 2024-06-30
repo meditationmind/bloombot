@@ -1,3 +1,10 @@
+#![warn(clippy::pedantic)]
+#![allow(
+  clippy::too_many_lines,
+  clippy::unreadable_literal,
+  clippy::module_name_repetitions
+)]
+
 use anyhow::{Context as ErrorContext, Error, Result};
 use commands::{
   add::add, challenge::challenge, coffee::coffee, complete::complete, courses::course,
@@ -71,8 +78,8 @@ async fn main() -> Result<()> {
         complete(),
         report_message(),
       ],
-      event_handler: |_ctx, event, _framework, _data| {
-        Box::pin(event_handler(_ctx, event, _framework, _data))
+      event_handler: |ctx, event, _framework, data| {
+        Box::pin(event_handler(ctx, event, data))
       },
       on_error: |error| {
         Box::pin(async move {
@@ -84,19 +91,23 @@ async fn main() -> Result<()> {
     .setup(|ctx, _ready, framework| {
       Box::pin(async move {
         if let Ok(test_guild) = test_guild {
-          info!("Registering commands in test guild {}", test_guild);
+          info!("Registering commands in test guild {test_guild}");
 
           let guild_id = serenity::GuildId::new(test_guild.parse::<u64>()?);
           poise::builtins::register_in_guild(ctx, &framework.options().commands, guild_id).await?;
-          
+
           info!("Setting default activity text");
-          ctx.set_activity(Some(serenity::ActivityData::custom("Tracking your meditations")));
+          ctx.set_activity(Some(serenity::ActivityData::custom(
+            "Tracking your meditations",
+          )));
         } else {
           info!("Registering commands globally");
           poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
           info!("Setting default activity text");
-          ctx.set_activity(Some(serenity::ActivityData::custom("Tracking your meditations")));
+          ctx.set_activity(Some(serenity::ActivityData::custom(
+            "Tracking your meditations",
+          )));
         }
         Ok(Data {
           db: database::DatabaseHandler::new().await?,
@@ -112,30 +123,8 @@ async fn main() -> Result<()> {
     .await
     .map_err(|e| anyhow::anyhow!(e))?;
 
-  match client.start().await {
-    //.map_err(|e| anyhow::anyhow!(e))?;
-    Ok(_) => {
-      info!("Client started successfully");
-      Ok(())
-    }
-    Err(e) => {
-      error!("Error starting client: {}", e);
-      return Err(anyhow::anyhow!(e));
-    }
-  }
-
-  //Ok(())
-
-  //match framework.run().await {
-  //  Ok(_) => {
-  //    info!("Framework exited successfully");
-  //    Ok(())
-  //  }
-  //  Err(e) => {
-  //    error!("Error while running framework: {}", e);
-  //    return Err(anyhow::anyhow!(e));
-  //  }
-  //}
+  client.start().await
+    .map_err(|e| anyhow::anyhow!("Error starting client: {e}"))
 }
 
 async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
@@ -144,18 +133,17 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
       match ctx.say("An error occurred while running the command").await {
         Ok(_) => {}
         Err(e) => {
-          error!("While handling error, could not send message: {}", e);
+          error!("While handling error, could not send message: {e}");
         }
       };
 
       let command = ctx.command();
       let channel_id = ctx.channel_id();
-      let channel = match channel_id.to_channel(ctx).await {
-        Ok(channel) => Some(channel),
-        Err(_) => {
-          error!("While handling error, could not get channel {}", channel_id);
-          None
-        }
+      let channel = if let Ok(channel) = channel_id.to_channel(ctx).await {
+        Some(channel)
+      } else {
+        error!("While handling error, could not get channel {channel_id}");
+        None
       };
 
       // Whether it's a guild or DM channel
@@ -180,7 +168,7 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
         "\x1B[1m/{}\x1B[0m failed with error: {:?}",
         command.name, error
       );
-      error!("\tSource: {}", source);
+      error!("\tSource: {source}");
 
       if let Some(channel) = channel {
         error!("\tChannel: {}", channel.id());
@@ -192,9 +180,9 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
       error, input, ctx, ..
     } => {
       let response = if let Some(input) = input {
-        format!("**Cannot parse `{}` as argument: {}**", input, error)
+        format!("**Cannot parse `{input}` as argument: {error}**")
       } else {
-        format!("**{}**", error)
+        format!("**{error}**")
       };
 
       match ctx
@@ -207,13 +195,13 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
       {
         Ok(_) => {}
         Err(e) => {
-          error!("While handling error, could not send message: {}", e);
+          error!("While handling error, could not send message: {e}");
         }
       };
     }
     error => {
       if let Err(e) = poise::builtins::on_error(error).await {
-        println!("Error while handling error: {}", e)
+        error!("Error while handling error: {e}");
       }
     }
   }
@@ -222,7 +210,7 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
 async fn event_handler(
   ctx: &serenity::Context,
   event: &Event,
-  _framework: poise::FrameworkContext<'_, Data, Error>,
+  // _framework: poise::FrameworkContext<'_, Data, Error>,
   data: &Data,
 ) -> Result<(), Error> {
   let database = &data.db;

@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{self as serenity, Guild, Member, RoleId, Embed};
+use poise::serenity_prelude::{self as serenity, Embed, Guild, Member, RoleId};
 
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
 pub const TERMS_PER_PAGE: usize = 10;
@@ -8,6 +8,7 @@ pub const MIN_STARS: u64 = 5;
 pub struct BloomBotEmbed {}
 
 impl BloomBotEmbed {
+  #[allow(clippy::new_ret_no_self)]
   pub fn new() -> serenity::CreateEmbed {
     serenity::CreateEmbed::default().color(EMBED_COLOR)
   }
@@ -107,11 +108,8 @@ impl TimeSumRoles {
     })
   }
 
-  fn from_role_id(id: &serenity::RoleId) -> Option<TimeSumRoles> {
-    let id = *id;
-    let id: u64 = id.into();
-
-    match id {
+  fn from_role_id(id: serenity::RoleId) -> Option<TimeSumRoles> {
+    match <u64>::from(id) {
       504641899890475018 => Some(TimeSumRoles::One),
       504641945596067851 => Some(TimeSumRoles::Two),
       504642088760115241 => Some(TimeSumRoles::Three),
@@ -134,10 +132,9 @@ impl TimeSumRoles {
   pub fn get_users_current_roles(guild: &Guild, member: &Member) -> Vec<RoleId> {
     let mut roles = Vec::new();
 
-    for user_role in member.roles.iter() {
-      let possible_role_id = match TimeSumRoles::from_role_id(user_role) {
-        Some(role) => role,
-        None => continue,
+    for user_role in &member.roles {
+      let Some(possible_role_id) = TimeSumRoles::from_role_id(*user_role) else {
+        continue;
       };
 
       if let Some(role) = guild.roles.get(&possible_role_id.to_role_id()) {
@@ -221,10 +218,9 @@ impl StreakRoles {
   pub fn get_users_current_roles(guild: &Guild, member: &Member) -> Vec<RoleId> {
     let mut roles = Vec::new();
 
-    for user_role in member.roles.iter() {
-      let possible_role_id = match StreakRoles::from_role_id(user_role) {
-        Some(role) => role,
-        None => continue,
+    for user_role in &member.roles {
+      let Some(possible_role_id) = StreakRoles::from_role_id(*user_role) else {
+        continue;
       };
 
       if let Some(role) = guild.roles.get(&possible_role_id.to_role_id()) {
@@ -237,11 +233,8 @@ impl StreakRoles {
     roles
   }
 
-  fn from_role_id(id: &serenity::RoleId) -> Option<StreakRoles> {
-    let id = *id;
-    let id: u64 = id.into();
-
-    match id {
+  fn from_role_id(id: serenity::RoleId) -> Option<StreakRoles> {
+    match <u64>::from(id) {
       857242224390832158 => Some(StreakRoles::Egg),
       857242222529347584 => Some(StreakRoles::HatchingChick),
       857242220675465227 => Some(StreakRoles::BabyChick),

@@ -27,7 +27,7 @@ pub async fn suggest(
       "Author ID: {}",
       &ctx.author().id
     )))
-    .to_owned();
+    .clone();
 
   let log_channel = serenity::ChannelId::new(CHANNELS.logs);
 
@@ -60,7 +60,7 @@ pub async fn suggest(
             suggestion.chars().take(85).collect::<String>()
           )
         } else {
-          format!("Discussion: {}", suggestion)
+          format!("Discussion: {suggestion}")
         }
       })
       .kind(serenity::ChannelType::PublicThread)
@@ -71,10 +71,7 @@ pub async fn suggest(
   ctx
     .send(
       poise::CreateReply::default()
-        .content(format!(
-          "Your suggestion has been added to <#{}>.",
-          channel_id
-        ))
+        .content(format!("Your suggestion has been added to <#{channel_id}>."))
         .ephemeral(true),
     )
     .await?;
