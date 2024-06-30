@@ -2160,10 +2160,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "weekly_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+            FROM "weekly_data"
+            WHERE "times_ago" <= 12
+        GROUP BY "times_ago";"#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -2175,10 +2175,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "monthly_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+            FROM "monthly_data"
+            WHERE "times_ago" <= 12
+        GROUP BY "times_ago";"#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -2190,10 +2190,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "yearly_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+            FROM "yearly_data"
+            WHERE "times_ago" <= 12
+        GROUP BY "times_ago";"#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -2257,10 +2257,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "weekly_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+            FROM "weekly_data"
+            WHERE "times_ago" <= 12
+        GROUP BY "times_ago";"#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
@@ -2271,10 +2271,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "monthly_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+            FROM "monthly_data"
+            WHERE "times_ago" <= 12
+        GROUP BY "times_ago";"#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
@@ -2285,10 +2285,10 @@ impl DatabaseHandler {
             SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes
             FROM meditation
             WHERE "guild_id" = $1
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "yearly_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+            FROM "yearly_data"
+            WHERE "times_ago" <= 12
+        GROUP BY "times_ago";"#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
