@@ -25,7 +25,7 @@ pub async fn recent(
   let prev_button_id = format!("{ctx_id}prev");
   let next_button_id = format!("{ctx_id}next");
 
-  let mut current_page = page.unwrap_or(0);
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let entries =
     DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &ctx.author().id)

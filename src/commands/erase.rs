@@ -7,6 +7,14 @@ use anyhow::Result;
 use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, MessageId};
 use poise::CreateReply;
 
+#[derive(poise::ChoiceParameter)]
+pub enum DateFormat {
+  #[name = "YYYY-MM-DD (ISO 8601)"]
+  Ymd,
+  #[name = "DD Month YYYY"]
+  Dmy,
+}
+
 /// Commands for erasing and erase logs
 ///
 /// Commands to delete a message with private notification or review and update deletion logs.
@@ -197,6 +205,7 @@ pub async fn list(
   ctx: Context<'_>,
   #[description = "The user to show erase data for"] user: serenity::User,
   #[description = "The page to show"] page: Option<usize>,
+  #[description = "Date format (Defaults to YYYY-MM-DD)"] date_format: Option<DateFormat>,
 ) -> Result<()> {
   let data = ctx.data();
 
@@ -227,7 +236,10 @@ pub async fn list(
     current_page = pagination.get_last_page_number();
   }
 
-  let first_page = pagination.create_page_embed(current_page);
+  let first_page = match date_format {
+    Some(DateFormat::Dmy) => pagination.create_alt_page_embed(current_page),
+    _ => pagination.create_page_embed(current_page),
+  };
 
   ctx
     .send({
@@ -263,14 +275,27 @@ pub async fn list(
     }
 
     // Update the message with the new page contents
-    press
-      .create_response(
-        ctx,
-        CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page)),
-        ),
-      )
-      .await?;
+    if let Some(DateFormat::Dmy) = date_format {
+      press
+        .create_response(
+          ctx,
+          CreateInteractionResponse::UpdateMessage(
+            CreateInteractionResponseMessage::new()
+              .embed(pagination.create_alt_page_embed(current_page)),
+          ),
+        )
+        .await?;
+    } else {
+      press
+        .create_response(
+          ctx,
+          CreateInteractionResponse::UpdateMessage(
+            CreateInteractionResponseMessage::new()
+              .embed(pagination.create_page_embed(current_page)),
+          ),
+        )
+        .await?;
+    }
   }
 
   Ok(())

@@ -12,6 +12,7 @@ use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateEmbedFooter};
 
 pub trait PageRow {
   fn title(&self) -> String;
+  fn alternate_title(&self) -> String;
   fn body(&self) -> String;
 }
 
@@ -115,6 +116,32 @@ impl<'a> Pagination<'a> {
       embed
     }
   }
+
+  pub fn create_alt_page_embed(&self, page: usize) -> CreateEmbed {
+    let mut embed = BloomBotEmbed::new();
+    let page = self.get_page(page);
+
+    if let Some(page) = page {
+      // If it is a valid page that is empty, it must be page 0
+      // This implies that there are no terms in the glossary
+      if page.is_empty() {
+        embed = embed
+          .title(self.title.to_string())
+          .description("No entries have been added yet.");
+
+        embed
+      } else {
+        page.to_alt_embed(self.title.as_str()).clone()
+      }
+    } else {
+      // This should never happen unless we have a bug in our pagination code
+      embed = embed
+        .title(self.title.to_string())
+        .description("This page does not exist.");
+
+      embed
+    }
+  }
 }
 
 pub struct PaginationPage<'a> {
@@ -148,6 +175,34 @@ impl PaginationPage<'_> {
       .entries
       .iter()
       .map(|entry| (entry.title(), entry.body(), false))
+      .collect();
+    embed = embed.fields(fields);
+
+    embed = embed.footer(CreateEmbedFooter::new(format!(
+      "Page {} of {}",
+      self.page_number + 1,
+      self.page_count
+    )));
+
+    embed
+  }
+
+  pub fn to_alt_embed(
+    &self,
+    //embed: &'embed_lifetime mut CreateEmbed,
+    title: &str,
+  ) -> serenity::CreateEmbed {
+    let terms_per_page = TERMS_PER_PAGE;
+    let mut embed = BloomBotEmbed::new().title(title).description(format!(
+      "Showing entries {} to {}.",
+      (self.page_number * terms_per_page) + 1,
+      (self.page_number * terms_per_page) + self.entries.len()
+    ));
+
+    let fields: Vec<(String, String, bool)> = self
+      .entries
+      .iter()
+      .map(|entry| (entry.alternate_title(), entry.body(), false))
       .collect();
     embed = embed.fields(fields);
 

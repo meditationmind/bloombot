@@ -98,6 +98,14 @@ impl PageRow for EraseData {
     }
   }
 
+  fn alternate_title(&self) -> String {
+    if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
+      "Date: `Not Available`".to_string()
+    } else {
+      format!("Date: `{}`", self.occurred_at.format("%e %B %Y %H:%M"))
+    }
+  }
+
   fn body(&self) -> String {
     if self.message_link == "None" {
       "Notification not available".to_string()
@@ -117,6 +125,10 @@ pub struct MeditationData {
 impl PageRow for MeditationData {
   fn title(&self) -> String {
     format!("{} minutes", self.meditation_minutes)
+  }
+
+  fn alternate_title(&self) -> String {
+      self.title()
   }
 
   fn body(&self) -> String {
@@ -149,6 +161,10 @@ impl PageRow for QuoteData {
     format!("`ID: {}`", self.id)
   }
 
+  fn alternate_title(&self) -> String {
+    self.title()
+  }
+
   fn body(&self) -> String {
     format!(
       "{}\n― {}",
@@ -168,6 +184,10 @@ pub struct SteamKeyData {
 impl PageRow for SteamKeyData {
   fn title(&self) -> String {
     self.steam_key.clone()
+  }
+
+  fn alternate_title(&self) -> String {
+    self.title()
   }
 
   fn body(&self) -> String {
@@ -193,6 +213,10 @@ pub struct SteamKeyRecipientData {
 impl PageRow for SteamKeyRecipientData {
   fn title(&self) -> String {
     "__Recipient__".to_string()
+  }
+
+  fn alternate_title(&self) -> String {
+    self.title()
   }
 
   fn body(&self) -> String {
@@ -233,6 +257,10 @@ impl PageRow for CourseData {
     self.course_name.clone()
   }
 
+  fn alternate_title(&self) -> String {
+    self.title()
+  }
+
   fn body(&self) -> String {
     format!(
       "Participants: {}\nGraduates: {}",
@@ -263,6 +291,10 @@ pub struct Term {
 impl PageRow for Term {
   fn title(&self) -> String {
     format!("__{}__", self.name.clone())
+  }
+
+  fn alternate_title(&self) -> String {
+    self.title()
   }
 
   fn body(&self) -> String {

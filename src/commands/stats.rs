@@ -212,8 +212,11 @@ pub async fn user(
     StatsType::MeditationCount => "sessions",
   };
 
-  //Hide streak in footer if streaks disabled
-  if tracking_profile.streaks_active {
+  // Hide streak in footer if streaks disabled
+  if tracking_profile.streaks_active
+    // Hide streak in footer if streak set to private, unless own stats in ephemeral
+    && (!tracking_profile.streaks_private || (ctx.author().id == user.id && privacy))
+  {
     embed = embed.footer(CreateEmbedFooter::new(format!(
       "Avg. {} {}: {}・Current streak: {}",
       timeframe.name().to_lowercase(),
