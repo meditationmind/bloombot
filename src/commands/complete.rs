@@ -35,7 +35,7 @@ pub async fn complete(
 
   let guild_id = course.guild_id;
 
-  if ctx.cache().guild(guild_id).is_none() {
+  if guild_id.to_guild_cached(&ctx).is_none() {
     ctx
       .say(
         ":x: Can't retrieve server information. Please contact server staff for assistance."

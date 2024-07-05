@@ -64,8 +64,9 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
   if let Some(quote_data) = quote_data {
     let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-    // We unwrap here, because we know that the command is guild-only.
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx
+      .guild_id()
+      .expect("GuildID should be available since command is guild_only");
 
     DatabaseHandler::add_quote(
       &mut transaction,
@@ -106,8 +107,9 @@ pub async fn edit(
 ) -> Result<()> {
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let existing_quote =
     DatabaseHandler::get_quote(&mut transaction, &guild_id, quote_id.as_str()).await?;
@@ -123,7 +125,8 @@ pub async fn edit(
     return Ok(());
   }
 
-  let existing_quote = existing_quote.unwrap();
+  let existing_quote = existing_quote
+    .expect("QuoteData should be Some since we already checked for is_none");
 
   let defaults = EditQuoteModal {
     quote: existing_quote.quote,
@@ -174,8 +177,9 @@ pub async fn remove(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::quote_exists(&mut transaction, &guild_id, id.as_str()).await? {
@@ -212,8 +216,9 @@ pub async fn list(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 

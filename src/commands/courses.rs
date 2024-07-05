@@ -41,8 +41,9 @@ pub async fn add(
 
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if DatabaseHandler::course_exists(&mut transaction, &guild_id, course_name.as_str()).await? {
@@ -147,8 +148,9 @@ pub async fn edit(
 
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let course =
@@ -160,7 +162,7 @@ pub async fn edit(
     return Ok(());
   }
 
-  let course = course.unwrap();
+  let course = course.expect("CourseData should be Some since we already checked for is_none");
 
   let participant_role = match participant_role {
     Some(participant_role) => {
@@ -249,8 +251,9 @@ pub async fn list(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -331,8 +334,9 @@ pub async fn remove(
 
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::course_exists(&mut transaction, &guild_id, course_name.as_str()).await? {

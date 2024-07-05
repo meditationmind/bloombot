@@ -113,7 +113,8 @@ async fn help_single_command<U, E>(
     return Ok(());
   }
 
-  let command = command.unwrap();
+  let command =
+    command.expect("command should be Some since we already checked for is_none");
 
   if command.category.clone().unwrap_or_default() == config.secret_category
     || (command.context_menu_action.is_some() && !config.show_context_menu_commands)
@@ -140,7 +141,6 @@ async fn help_single_command<U, E>(
       .context_menu_name
       .clone()
       .unwrap_or(command.name.clone())
-      .to_string()
   } else {
     command.name.clone()
   };
@@ -286,7 +286,7 @@ async fn help_all_commands<U, E>(
               CreateEmbed::new()
                 .fields(fields)
                 .footer(CreateEmbedFooter::new(
-                  config.extra_text_at_bottom.to_string(),
+                  config.extra_text_at_bottom.to_owned(),
                 )),
             )
             .ephemeral(config.ephemeral),
@@ -301,7 +301,7 @@ async fn help_all_commands<U, E>(
                 .fields(fields)
                 .field("Context Menu Commands", category_content, false)
                 .footer(CreateEmbedFooter::new(
-                  config.extra_text_at_bottom.to_string(),
+                  config.extra_text_at_bottom.to_owned(),
                 )),
             )
             .ephemeral(config.ephemeral),
@@ -316,7 +316,7 @@ async fn help_all_commands<U, E>(
             CreateEmbed::new()
               .fields(fields)
               .footer(CreateEmbedFooter::new(
-                config.extra_text_at_bottom.to_string(),
+                config.extra_text_at_bottom.to_owned(),
               )),
           )
           .ephemeral(config.ephemeral),

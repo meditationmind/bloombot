@@ -60,7 +60,9 @@ pub async fn message(
   let occurred_at = chrono::Utc::now();
 
   let data = ctx.data();
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = message.author.id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -152,18 +154,25 @@ pub async fn message(
     .is_ok()
   {
   } else {
-    let thread_channel: ChannelId = match message
-      .channel_id
-      .to_channel(&ctx)
-      .await
-      .unwrap()
-      .guild()
-      .unwrap()
-      .kind
-    {
-      serenity::ChannelType::Text => channel_id,
-      // If not a text channel, then create private thread in lounge to avoid failure
-      _ => ChannelId::from(501464482996944909),
+    let thread_channel = match message.channel_id.to_channel(&ctx).await {
+      Ok(channel) => {
+        if let Some(guild_channel) = channel.guild() {
+          if guild_channel.kind == serenity::ChannelType::Text {
+            // If message channel is text channel, we can create thread there
+            message.channel_id
+          } else {
+            // If not a text channel, then create private thread in lounge to avoid failure
+            ChannelId::from(501464482996944909)
+          }
+        } else {
+          // If we couldn't convert to GuildChannel, then just default to lounge
+          ChannelId::from(501464482996944909)
+        }
+      }
+      Err(_e) => {
+        // Default to lounge if channel retrieval request failed
+        ChannelId::from(501464482996944909)
+      }
     };
 
     let mut notification_thread = thread_channel
@@ -209,8 +218,9 @@ pub async fn list(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
     Some(nick) => nick,
     None => user.name.clone(),
@@ -318,8 +328,9 @@ pub async fn populate(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let erase_time = erase_time
     .unwrap_or(chrono::NaiveTime::from_hms_opt(0, 0, 0).expect("Hardcoded time is valid"));

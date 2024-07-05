@@ -21,12 +21,7 @@ pub async fn reaction_add(
 }
 
 async fn check_report(ctx: &Context, user: &UserId, reaction: &Reaction) -> Result<()> {
-  if let ReactionType::Custom {
-    animated: _,
-    id,
-    name: _,
-  } = reaction.emoji
-  {
+  if let ReactionType::Custom { id, .. } = reaction.emoji {
     if id == EMOTES.report {
       // Remove reaction from message
       reaction
@@ -57,10 +52,7 @@ async fn check_report(ctx: &Context, user: &UserId, reaction: &Reaction) -> Resu
             .content(format!("<@&{}> Message Reported", ROLES.staff))
             .embed(
               config::BloomBotEmbed::new()
-                .author(
-                  CreateEmbedAuthor::new(&message_user.name.to_string())
-                    .icon_url(message_user.face()),
-                )
+                .author(CreateEmbedAuthor::new(&message_user.name).icon_url(message_user.face()))
                 .description(message_content)
                 .field("Link", format!("[Go to message]({message_link})"), false)
                 .footer(CreateEmbedFooter::new(format!(
@@ -97,7 +89,7 @@ async fn add_star(ctx: &Context, database: &DatabaseHandler, reaction: &Reaction
         .await?
         .reactions
         .iter()
-        .find(|r| r.reaction_type == ReactionType::Unicode(EMOTES.star.to_string()))
+        .find(|r| r.reaction_type == ReactionType::Unicode(EMOTES.star.to_owned()))
         .map_or(0, |r| r.count);
 
       let mut transaction = database.start_transaction().await?;
@@ -131,7 +123,7 @@ async fn add_star(ctx: &Context, database: &DatabaseHandler, reaction: &Reaction
             .edit(ctx, EditMessage::new().embed(updated_embed))
             .await?;
         } else {
-          let _ = starboard_channel
+          _ = starboard_channel
             .delete_message(&ctx, starboard_message.id)
             .await;
 

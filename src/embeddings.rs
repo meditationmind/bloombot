@@ -24,7 +24,7 @@ impl OpenAIHandler {
 
   pub async fn create_embedding(&self, input: String, user: serenity::UserId) -> Result<Vec<f32>> {
     let input = CreateEmbeddingRequest {
-      model: "text-embedding-ada-002".to_string(),
+      model: "text-embedding-ada-002".to_owned(),
       input: EmbeddingInput::String(input),
       user: Some(user.to_string()),
       ..Default::default()

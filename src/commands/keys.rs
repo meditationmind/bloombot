@@ -35,8 +35,9 @@ pub async fn list_keys(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -115,8 +116,9 @@ pub async fn add_key(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
@@ -153,8 +155,9 @@ pub async fn remove_key(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
@@ -190,11 +193,27 @@ pub async fn use_key(ctx: Context<'_>) -> Result<()> {
 
   let data = ctx.data();
 
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  if !DatabaseHandler::unused_key_exists(&mut transaction, &guild_id).await? {
+  if DatabaseHandler::unused_key_exists(&mut transaction, &guild_id).await? {
+    let key = DatabaseHandler::get_key_and_mark_used(&mut transaction, &guild_id)
+      .await?
+      .expect("key should exist since unused_key_exists evaluated to true");
+
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            ":white_check_mark: Key retrieved and marked used: `{key}`"
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+  } else {
     ctx
       .send(
         CreateReply::default()
@@ -202,21 +221,7 @@ pub async fn use_key(ctx: Context<'_>) -> Result<()> {
           .ephemeral(true),
       )
       .await?;
-    return Ok(());
-  }
-
-  let key = DatabaseHandler::get_key_and_mark_used(&mut transaction, &guild_id).await?;
-  let key = key.unwrap();
-
-  ctx
-    .send(
-      CreateReply::default()
-        .content(format!(
-          ":white_check_mark: Key retrieved and marked used: `{key}`"
-        ))
-        .ephemeral(true),
-    )
-    .await?;
+  };
 
   Ok(())
 }
@@ -240,8 +245,9 @@ pub async fn list_recipients(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -324,7 +330,9 @@ pub async fn update_recipient(
   #[description = "Playne key recipient"] recipient: serenity::User,
   #[description = "Received key as challenge prize"] challenge_prize: Option<bool>,
   #[description = "Received key as donator perk"] donator_perk: Option<bool>,
-  #[description = "Total number of Playne keys received"] total_keys: Option<i16>,
+  #[description = "Total number of Playne keys received"]
+  #[min = 0]
+  total_keys: Option<i16>,
 ) -> Result<()> {
   if challenge_prize.is_none() && donator_perk.is_none() && total_keys.is_none() {
     ctx
@@ -337,21 +345,11 @@ pub async fn update_recipient(
     return Ok(());
   }
 
-  if total_keys.is_some() && total_keys.unwrap() < 0 {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(":x: Total keys cannot be less than zero.")
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
-  }
-
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let steamkey_recipient =
@@ -388,7 +386,7 @@ pub async fn update_recipient(
     return Ok(());
   }
 
-  if total_keys.is_some() && total_keys.unwrap() == 0 {
+  if total_keys.is_some_and(|total| total == 0) {
     DatabaseHandler::remove_steamkey_recipient(&mut transaction, &guild_id, &recipient.id).await?;
 
     let ctx_id = ctx.id();
@@ -476,7 +474,8 @@ pub async fn update_recipient(
     return Ok(());
   }
 
-  let steamkey_recipient = steamkey_recipient.unwrap();
+  let steamkey_recipient =
+    steamkey_recipient.expect("steamkey_recipient should be Some since we already handled None");
   let challenge_prize = match challenge_prize {
     Some(_) => challenge_prize,
     None => steamkey_recipient.challenge_prize,

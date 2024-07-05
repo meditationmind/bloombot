@@ -36,7 +36,9 @@ pub async fn join(
     ChallengeChoices,
   >,
 ) -> Result<()> {
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let member = guild_id.member(ctx, ctx.author().id).await?;
 
   if let Some(challenge) = challenge {
@@ -137,7 +139,9 @@ pub async fn leave(
     ChallengeChoices,
   >,
 ) -> Result<()> {
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let member = guild_id.member(ctx, ctx.author().id).await?;
 
   if let Some(challenge) = challenge {

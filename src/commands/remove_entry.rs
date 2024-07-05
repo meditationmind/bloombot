@@ -21,7 +21,9 @@ pub async fn remove_entry(
   #[description = "The ID of the entry to remove"] id: String,
 ) -> Result<()> {
   let data = ctx.data();
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 

@@ -1,4 +1,4 @@
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::unwrap_used)]
 #![allow(
   clippy::too_many_lines,
   clippy::unreadable_literal,
@@ -78,9 +78,7 @@ async fn main() -> Result<()> {
         complete(),
         report_message(),
       ],
-      event_handler: |ctx, event, _framework, data| {
-        Box::pin(event_handler(ctx, event, data))
-      },
+      event_handler: |ctx, event, _framework, data| Box::pin(event_handler(ctx, event, data)),
       on_error: |error| {
         Box::pin(async move {
           error_handler(error).await;
@@ -123,7 +121,9 @@ async fn main() -> Result<()> {
     .await
     .map_err(|e| anyhow::anyhow!(e))?;
 
-  client.start().await
+  client
+    .start()
+    .await
     .map_err(|e| anyhow::anyhow!("Error starting client: {e}"))
 }
 
@@ -152,15 +152,15 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
           channel::Channel::Guild(_) => {
             let guild_name = match ctx.guild() {
               Some(guild) => guild.name.clone(),
-              None => "unknown".to_string(),
+              None => "unknown".to_owned(),
             };
             format!("{} ({})", guild_name, channel.id())
           }
-          channel::Channel::Private(_) => "DM".to_string(),
+          channel::Channel::Private(_) => "DM".to_owned(),
           // channel::Channel::Category(_) => "category".to_string(),
-          _ => "unknown".to_string(),
+          _ => "unknown".to_owned(),
         },
-        None => "unknown".to_string(),
+        None => "unknown".to_owned(),
       };
       let user = ctx.author();
 
@@ -230,9 +230,7 @@ async fn event_handler(
       events::guild_member_update(ctx, old_if_available, new).await?;
     }
     Event::MessageDelete {
-      channel_id: _,
-      deleted_message_id,
-      guild_id: _,
+      deleted_message_id, ..
     } => {
       events::message_delete(database, deleted_message_id).await?;
     }

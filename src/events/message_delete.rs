@@ -1,6 +1,6 @@
 use crate::database::DatabaseHandler;
 use anyhow::Result;
-use poise::serenity_prelude::{self as serenity};
+use poise::serenity_prelude as serenity;
 
 pub async fn message_delete(
   database: &DatabaseHandler,

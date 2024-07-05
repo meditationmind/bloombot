@@ -65,7 +65,9 @@ pub async fn term_not_found(
         .await?;
     }
     Ordering::Equal => {
-      let possible_term = possible_terms.first().unwrap();
+      let possible_term = possible_terms
+        .first()
+        .expect("first element should be Some since we matched Equal for cmp(&1)");
 
       ctx
         .send(
@@ -134,8 +136,9 @@ pub async fn add(
   if let Some(term_data) = term_data {
     let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-    // We unwrap here, because we know that the command is guild-only.
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx
+      .guild_id()
+      .expect("GuildID should be available since command is guild_only");
 
     let links = match term_data.links {
       Some(links) => links.split(',').map(|s| s.trim().to_string()).collect(),
@@ -199,8 +202,9 @@ pub async fn edit(
 ) -> Result<()> {
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let existing_term =
     DatabaseHandler::get_term(&mut transaction, &guild_id, term_name.as_str()).await?;
@@ -216,7 +220,8 @@ pub async fn edit(
     return Ok(());
   }
 
-  let existing_term = existing_term.unwrap();
+  let existing_term =
+    existing_term.expect("existing_term should be Some since we already checked for is_none");
   let links = existing_term.links.map(|links| links.join(", "));
   let aliases = existing_term.aliases.map(|aliases| aliases.join(", "));
 
@@ -300,8 +305,9 @@ pub async fn remove(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::term_exists(&mut transaction, &guild_id, term.as_str()).await? {

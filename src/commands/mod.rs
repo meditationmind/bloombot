@@ -77,7 +77,7 @@ async fn commit_and_say(
       match DatabaseHandler::commit_transaction(transaction).await {
         Ok(()) => {}
         Err(e) => {
-          let _ = sent_message.edit(ctx, CreateReply::default()
+          _ = sent_message.edit(ctx, CreateReply::default()
             .content("<:mminfo:1194141918133768234> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
             .ephemeral(true)).await;
           return Err(anyhow::anyhow!("Could not send message: {e}"));
@@ -94,7 +94,7 @@ async fn commit_and_say(
         poise::Context::Application(app_ctx) => {
           let has_sent_initial_response = app_ctx.has_sent_initial_response.load(Ordering::SeqCst);
           if !has_sent_initial_response {
-            let _ = ctx
+            _ = ctx
               .channel_id()
               .say(&ctx, "<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
               .await;
@@ -102,7 +102,7 @@ async fn commit_and_say(
           }
         }
         poise::Context::Prefix(_) => {
-          let _ = ctx
+          _ = ctx
             .channel_id()
             .say(&ctx, "<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
             .await;

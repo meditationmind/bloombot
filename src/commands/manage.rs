@@ -109,7 +109,9 @@ pub async fn create(
   let datetime = chrono::NaiveDateTime::new(entry_date, entry_time).and_utc();
 
   let data = ctx.data();
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -177,7 +179,9 @@ pub async fn list(
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
   let data = ctx.data();
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -277,7 +281,9 @@ pub async fn update(
 ) -> Result<()> {
   let existing_entry = {
     let data = ctx.data();
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx
+      .guild_id()
+      .expect("GuildID should be available since command is guild_only");
 
     let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -430,7 +436,9 @@ pub async fn delete(
   #[description = "The entry to delete"] entry_id: String,
 ) -> Result<()> {
   let data = ctx.data();
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -516,7 +524,9 @@ pub async fn reset(
   data_type: Option<DataType>,
 ) -> Result<()> {
   let data = ctx.data();
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -660,7 +670,9 @@ pub async fn migrate(
   data_type: Option<DataType>,
 ) -> Result<()> {
   let data = ctx.data();
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 

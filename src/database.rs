@@ -92,7 +92,7 @@ pub struct EraseData {
 impl PageRow for EraseData {
   fn title(&self) -> String {
     if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
-      "Date: `Not Available`".to_string()
+      "Date: `Not Available`".to_owned()
     } else {
       format!("Date: `{}`", self.occurred_at.format("%Y-%m-%d %H:%M"))
     }
@@ -100,7 +100,7 @@ impl PageRow for EraseData {
 
   fn alternate_title(&self) -> String {
     if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
-      "Date: `Not Available`".to_string()
+      "Date: `Not Available`".to_owned()
     } else {
       format!("Date: `{}`", self.occurred_at.format("%e %B %Y %H:%M"))
     }
@@ -108,7 +108,7 @@ impl PageRow for EraseData {
 
   fn body(&self) -> String {
     if self.message_link == "None" {
-      "Notification not available".to_string()
+      "Notification not available".to_owned()
     } else {
       format!("[Go to erase notification]({})", self.message_link)
     }
@@ -128,7 +128,7 @@ impl PageRow for MeditationData {
   }
 
   fn alternate_title(&self) -> String {
-      self.title()
+    self.title()
   }
 
   fn body(&self) -> String {
@@ -169,7 +169,7 @@ impl PageRow for QuoteData {
     format!(
       "{}\n― {}",
       self.quote.clone(),
-      self.author.clone().unwrap_or("Anonymous".to_string())
+      self.author.clone().unwrap_or("Anonymous".to_owned())
     )
   }
 }
@@ -196,7 +196,7 @@ impl PageRow for SteamKeyData {
       if self.used { "Yes" } else { "No" },
       match self.reserved {
         Some(reserved) => reserved.mention().to_string(),
-        None => "Nobody".to_string(),
+        None => "Nobody".to_owned(),
       },
     )
   }
@@ -212,7 +212,7 @@ pub struct SteamKeyRecipientData {
 
 impl PageRow for SteamKeyRecipientData {
   fn title(&self) -> String {
-    "__Recipient__".to_string()
+    "__Recipient__".to_owned()
   }
 
   fn alternate_title(&self) -> String {
@@ -583,8 +583,8 @@ impl DatabaseHandler {
 
     let tracking_profile = match row {
       Some(row) => Some(TrackingProfile {
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>().unwrap()),
-        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>().unwrap()),
+        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
+        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>()?),
         utc_offset: row.utc_offset,
         anonymous_tracking: row.anonymous_tracking,
         streaks_active: row.streaks_active,
@@ -681,8 +681,8 @@ impl DatabaseHandler {
 
     let steamkey_recipient = match row {
       Some(row) => Some(SteamKeyRecipientData {
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>().unwrap()),
-        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>().unwrap()),
+        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
+        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>()?),
         challenge_prize: row.challenge_prize,
         donator_perk: row.donator_perk,
         total_keys: row.total_keys,
@@ -709,8 +709,18 @@ impl DatabaseHandler {
     let steamkey_recipients = rows
       .into_iter()
       .map(|row| SteamKeyRecipientData {
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>().unwrap()),
-        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>().unwrap()),
+        user_id: serenity::UserId::new(
+          row
+            .user_id
+            .parse::<u64>()
+            .expect("parse should not fail since user_id is UserId.to_string()"),
+        ),
+        guild_id: serenity::GuildId::new(
+          row
+            .guild_id
+            .parse::<u64>()
+            .expect("parse should not fail since guild_id is GuildId.to_string()"),
+        ),
         challenge_prize: row.challenge_prize,
         donator_perk: row.donator_perk,
         total_keys: row.total_keys,
@@ -735,7 +745,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.unwrap())
+    Ok(row.exists.expect("EXISTS query should return a bool"))
   }
 
   pub async fn record_steamkey_receipt(
@@ -826,7 +836,12 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| EraseData {
         id: row.record_id,
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>().unwrap()),
+        user_id: serenity::UserId::new(
+          row
+            .user_id
+            .parse::<u64>()
+            .expect("parse should not fail since user_id is UserId.to_string()"),
+        ),
         message_link: row.message_link.unwrap_or(String::from("None")),
         occurred_at: row.occurred_at.unwrap_or_default(),
       })
@@ -898,7 +913,12 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| MeditationData {
         id: row.record_id,
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>().unwrap()),
+        user_id: serenity::UserId::new(
+          row
+            .user_id
+            .parse::<u64>()
+            .expect("parse should not fail since user_id is UserId.to_string()"),
+        ),
         meditation_minutes: row.meditation_minutes,
         occurred_at: row.occurred_at,
       })
@@ -925,7 +945,7 @@ impl DatabaseHandler {
     let meditation_entry = match row {
       Some(row) => Some(MeditationData {
         id: row.record_id,
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>().unwrap()),
+        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
         meditation_minutes: row.meditation_minutes,
         occurred_at: row.occurred_at,
       }),
@@ -1029,7 +1049,7 @@ impl DatabaseHandler {
     rows_stream.map(|row| {
       let row = row?;
 
-      let user_id = serenity::UserId::new(row.user_id.parse::<u64>().unwrap());
+      let user_id = serenity::UserId::new(row.user_id.parse::<u64>()?);
 
       Ok(user_id)
     })
@@ -1054,7 +1074,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let winner_candidate_total = row.winner_candidate_total.unwrap();
+    let winner_candidate_total = row
+      .winner_candidate_total
+      .expect("row should include winner_candidate_total since it is computed in the DB query");
 
     Ok(winner_candidate_total)
   }
@@ -1078,9 +1100,11 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let winner_candidate_total = row.winner_candidate_total.unwrap();
+    let winner_candidate_total = row
+      .winner_candidate_total
+      .expect("row should include winner_candidate_total since it is computed in the DB query");
 
-    Ok(winner_candidate_total.try_into().unwrap())
+    Ok(winner_candidate_total.try_into()?)
   }
 
   pub async fn get_user_meditation_sum(
@@ -1098,7 +1122,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let user_total = row.user_total.unwrap();
+    let user_total = row
+      .user_total
+      .expect("row should include user_total since it is computed in the DB query");
 
     Ok(user_total)
   }
@@ -1118,9 +1144,11 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let user_total = row.user_total.unwrap();
+    let user_total = row
+      .user_total
+      .expect("row should include user_total since it is computed in the DB query");
 
-    Ok(user_total.try_into().unwrap())
+    Ok(user_total.try_into()?)
   }
 
   pub async fn get_guild_meditation_sum(
@@ -1136,7 +1164,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let guild_total = row.guild_total.unwrap();
+    let guild_total = row
+      .guild_total
+      .expect("row should include guild_total since it is computed in the DB query");
 
     Ok(guild_total)
   }
@@ -1154,9 +1184,11 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let guild_total = row.guild_total.unwrap();
+    let guild_total = row
+      .guild_total
+      .expect("row should include guild_total since it is computed in the DB query");
 
-    Ok(guild_total.try_into().unwrap())
+    Ok(guild_total.try_into()?)
   }
 
   pub async fn get_all_quotes(
@@ -1277,7 +1309,10 @@ impl DatabaseHandler {
     if let Some(first) = row.try_next().await? {
       // date_part 'day' can only be 1-31
       #[allow(clippy::cast_possible_truncation)]
-      let days_ago = first.days_ago.unwrap() as i32;
+      let days_ago = first
+        .days_ago
+        .expect("row should include days_ago since it is computed in the DB query")
+        as i32;
 
       if days_ago > 2 {
         return Ok(0);
@@ -1290,7 +1325,10 @@ impl DatabaseHandler {
     while let Some(row) = row.try_next().await? {
       // date_part 'day' can only be 1-31
       #[allow(clippy::cast_possible_truncation)]
-      let days_ago = row.days_ago.unwrap() as i32;
+      let days_ago = row
+        .days_ago
+        .expect("row should include days_ago since it is computed in the DB query")
+        as i32;
 
       if days_ago != last + 1 {
         break;
@@ -1318,7 +1356,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.unwrap())
+    Ok(row.exists.expect("EXISTS query should return a bool"))
   }
 
   pub async fn add_course(
@@ -1379,7 +1417,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.unwrap())
+    Ok(row.exists.expect("EXISTS query should return a bool"))
   }
 
   pub async fn add_steam_key(
@@ -1419,11 +1457,20 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| SteamKeyData {
         steam_key: row.steam_key,
-        reserved: row
-          .reserved
-          .map(|reserved| serenity::UserId::new(reserved.parse::<u64>().unwrap())),
+        reserved: row.reserved.map(|reserved| {
+          serenity::UserId::new(
+            reserved
+              .parse::<u64>()
+              .expect("parse should not fail since reserved is UserId.to_string()"),
+          )
+        }),
         used: row.used,
-        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>().unwrap()),
+        guild_id: serenity::GuildId::new(
+          row
+            .guild_id
+            .parse::<u64>()
+            .expect("parse should not fail since guild_id is GuildId.to_string()"),
+        ),
       })
       .collect();
 
@@ -1491,7 +1538,7 @@ impl DatabaseHandler {
     // I'm sorry for what you are about to see.
     // let pgvector_format = format!("{:?}", search_vector);
 
-    // limit will always be a small integer
+    // limit should be a small integer
     #[allow(clippy::cast_possible_wrap)]
     let terms: Vec<TermSearchResult> = sqlx::query_as(
       r#"
@@ -1628,8 +1675,18 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| CourseData {
         course_name: row.course_name,
-        participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>().unwrap()),
-        graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>().unwrap()),
+        participant_role: serenity::RoleId::new(
+          row
+            .participant_role
+            .parse::<u64>()
+            .expect("parse should not fail since participant_role is RoleId.to_string()"),
+        ),
+        graduate_role: serenity::RoleId::new(
+          row
+            .graduate_role
+            .parse::<u64>()
+            .expect("parse should not fail since graduate_role is RoleId.to_string()"),
+        ),
       })
       .collect();
 
@@ -1689,8 +1746,7 @@ impl DatabaseHandler {
           row
             .guild_id
             .expect("guild_id should not be empty in course database")
-            .parse::<u64>()
-            .unwrap(),
+            .parse::<u64>()?,
         ),
       }),
       None => None,
@@ -1783,9 +1839,11 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let term_count = row.term_count.unwrap();
+    let term_count = row
+      .term_count
+      .expect("row should include term_count since it is computed in the DB query");
 
-    Ok(term_count.try_into().unwrap())
+    Ok(term_count.try_into()?)
   }
 
   pub async fn get_term_list(
@@ -1860,7 +1918,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.unwrap())
+    Ok(row.exists.expect("EXISTS query should return a bool"))
   }
 
   pub async fn reserve_key(
@@ -2023,7 +2081,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.unwrap())
+    Ok(row.exists.expect("EXISTS query should return a bool"))
   }
 
   pub async fn remove_term(
@@ -2159,7 +2217,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.unwrap())
+    Ok(row.exists.expect("EXISTS query should return a bool"))
   }
 
   pub async fn get_user_chart_stats(
@@ -2236,9 +2294,12 @@ impl DatabaseHandler {
       .map(|i| {
         // Comparison is safe since floor produces integer
         #[allow(clippy::float_cmp)]
-        let row = rows
-          .iter()
-          .find(|row| row.times_ago.unwrap() == f64::from(i));
+        let row = rows.iter().find(|row| {
+          row
+            .times_ago
+            .expect("row should include times_ago since it is computed in the DB query")
+            == f64::from(i)
+        });
 
         let meditation_minutes = match row {
           Some(row) => row.meditation_minutes.unwrap_or(0),
@@ -2330,9 +2391,12 @@ impl DatabaseHandler {
       .map(|i| {
         // Comparison is safe since floor produces integer
         #[allow(clippy::float_cmp)]
-        let row = rows
-          .iter()
-          .find(|row| row.times_ago.unwrap() == f64::from(i));
+        let row = rows.iter().find(|row| {
+          row
+            .times_ago
+            .expect("row should include times_ago since it is computed in the DB query")
+            == f64::from(i)
+        });
 
         let meditation_minutes = match row {
           Some(row) => row.meditation_minutes.unwrap_or(0),
@@ -2373,13 +2437,9 @@ impl DatabaseHandler {
     let star_message = match row {
       Some(row) => Some(StarMessage {
         record_id: row.record_id,
-        starred_message_id: serenity::MessageId::new(
-          row.starred_message_id.parse::<u64>().unwrap(),
-        ),
-        board_message_id: serenity::MessageId::new(row.board_message_id.parse::<u64>().unwrap()),
-        starred_channel_id: serenity::ChannelId::new(
-          row.starred_channel_id.parse::<u64>().unwrap(),
-        ),
+        starred_message_id: serenity::MessageId::new(row.starred_message_id.parse::<u64>()?),
+        board_message_id: serenity::MessageId::new(row.board_message_id.parse::<u64>()?),
+        starred_channel_id: serenity::ChannelId::new(row.starred_channel_id.parse::<u64>()?),
       }),
       None => None,
     };

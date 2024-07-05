@@ -33,8 +33,9 @@ pub async fn glossary(_: Context<'_>) -> Result<()> {
 pub async fn list(ctx: Context<'_>) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let term_names = DatabaseHandler::get_term_list(&mut transaction, &guild_id).await?;
@@ -173,7 +174,9 @@ pub async fn info(
   ctx: Context<'_>,
   #[description = "The term to show information about"] term: String,
 ) -> Result<()> {
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
@@ -181,9 +184,7 @@ pub async fn info(
   let mut embed = BloomBotEmbed::new();
 
   if let Some(term_info) = term_info {
-    embed = embed
-      .title(term_info.name)
-      .description(term_info.meaning);
+    embed = embed.title(term_info.name).description(term_info.meaning);
     let usage = term_info.usage.unwrap_or(String::new());
     if !usage.is_empty() {
       embed = embed.field("Example of Usage:", usage, false);
@@ -235,7 +236,9 @@ pub async fn info(
       DatabaseHandler::get_possible_terms(&mut transaction, &guild_id, term.as_str(), 0.7).await?;
 
     if possible_terms.len() == 1 {
-      let possible_term = possible_terms.first().unwrap();
+      let possible_term = possible_terms
+        .first()
+        .expect("first element should be available since conditional specifies len() == 1");
 
       embed = embed
         .title(&possible_term.name)
@@ -343,8 +346,9 @@ pub async fn search(
 
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let start_time = std::time::Instant::now();
   let mut transaction = data.db.start_transaction_with_retry(5).await?;

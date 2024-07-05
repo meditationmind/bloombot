@@ -27,7 +27,7 @@ async fn remove_star(ctx: &Context, database: &DatabaseHandler, reaction: &React
           .await?
           .reactions
           .iter()
-          .find(|r| r.reaction_type == ReactionType::Unicode(EMOTES.star.to_string()))
+          .find(|r| r.reaction_type == ReactionType::Unicode(EMOTES.star.to_owned()))
           .map_or(0, |r| r.count);
 
         let starboard_channel = ChannelId::new(config::CHANNELS.starchannel);
@@ -38,7 +38,9 @@ async fn remove_star(ctx: &Context, database: &DatabaseHandler, reaction: &React
             .message(&ctx, star_message.board_message_id)
             .await?;
 
-          let existing_embed = starboard_message.embeds.first().unwrap();
+          let existing_embed = starboard_message.embeds.first().expect(
+            "existing Embed should always be available because starboard messages are created as Embeds",
+          );
           let updated_embed = CreateEmbed::from(existing_embed.clone()).footer(
             CreateEmbedFooter::new(format!("⭐ Times starred: {star_count}")),
           );

@@ -127,8 +127,9 @@ pub async fn add(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -440,10 +441,15 @@ pub async fn add(
     ctx.say(format!("Awesome sauce! This server has collectively generated {time_in_hours} hours of realmbreaking meditation!")).await?;
   }
 
-  let guild = ctx.guild().unwrap().clone();
-  let member = guild.member(ctx, user_id).await?;
+  let guild_roles = {
+    let guild = ctx
+      .guild()
+      .expect("GuildID should be available since command is guild_only");
+    guild.roles.clone()
+  };
+  let member = guild_id.member(ctx, user_id).await?;
 
-  let current_time_roles = TimeSumRoles::get_users_current_roles(&guild, &member);
+  let current_time_roles = TimeSumRoles::get_users_current_roles(&guild_roles, &member);
   let updated_time_role = TimeSumRoles::from_sum(user_sum);
 
   if let Some(updated_time_role) = updated_time_role {
@@ -484,7 +490,7 @@ pub async fn add(
   }
 
   if tracking_profile.streaks_active {
-    let current_streak_roles = StreakRoles::get_users_current_roles(&guild.clone(), &member);
+    let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
     let updated_streak_role = StreakRoles::from_streak(user_streak);
 
     if let Some(updated_streak_role) = updated_streak_role {

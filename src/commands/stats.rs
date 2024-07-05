@@ -70,7 +70,9 @@ pub async fn user(
   let data = ctx.data();
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let user = user.unwrap_or_else(|| ctx.author().clone());
   let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
@@ -266,8 +268,20 @@ pub async fn server(
 
   let data = ctx.data();
 
-  let guild_id = ctx.guild_id().unwrap();
-  let guild_name = guild_id.name(ctx).unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
+
+  let (guild_name, guild_icon) = {
+    if let Some(guild) = guild_id.to_guild_cached(&ctx) {
+      (guild.name.clone(), guild.icon_url().unwrap_or_default())
+    } else {
+      (
+        "This Server".to_string(),
+        "https://cdn.discordapp.com/embed/avatars/3.png".to_string(),
+      )
+    }
+  };
 
   let stats_type = stats_type.unwrap_or(StatsType::MeditationMinutes);
   let timeframe = timeframe.unwrap_or(Timeframe::Daily);
@@ -284,10 +298,9 @@ pub async fn server(
   let stats = DatabaseHandler::get_guild_stats(&mut transaction, &guild_id, &timeframe).await?;
 
   let mut embed = BloomBotEmbed::new();
-  embed = embed.title(format!("Stats for {guild_name}")).author(
-    CreateEmbedAuthor::new(format!("{guild_name}'s Stats"))
-      .icon_url(ctx.guild().unwrap().icon_url().unwrap_or_default()),
-  );
+  embed = embed
+    .title(format!("Stats for {guild_name}"))
+    .author(CreateEmbedAuthor::new(format!("{guild_name}'s Stats")).icon_url(guild_icon));
 
   match stats_type {
     StatsType::MeditationMinutes => {

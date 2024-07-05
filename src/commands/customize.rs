@@ -135,8 +135,9 @@ pub async fn customize(_: Context<'_>) -> Result<()> {
 pub async fn show(ctx: Context<'_>) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -202,7 +203,7 @@ pub async fn show(ctx: Context<'_>) -> Result<()> {
           //"**UTC Offset**: {}\n**Anonymous Tracking**: {}\n**Streak Reporting**: {}\n**Streak Visibility**: {}\n**Stats Visibility**: {}",
           "```UTC Offset:           {}\nAnonymous Tracking:   {}\nStreak Reporting:     {}\nStreak Visibility:    {}\nStats Visibility:     {}```",
           //Only show the offset (no time zone abbreviations)
-          utc_offset.split_whitespace().next().unwrap(),
+          utc_offset.split_whitespace().next().expect("should be Some since hardcoded names include time zone abbreviations after offset"),
           if tracking_profile.anonymous_tracking { "On" } else { "Off" },
           if tracking_profile.streaks_active { "On" } else { "Off" },
           if tracking_profile.streaks_private { "Private" } else { "Public" },
@@ -230,8 +231,9 @@ pub async fn offset(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -380,8 +382,9 @@ pub async fn tracking(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -469,8 +472,9 @@ pub async fn streak(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -525,10 +529,15 @@ pub async fn streak(
     .await?;
 
     if existing_profile.streaks_active && !streaks_active {
-      let guild = ctx.guild().unwrap().clone();
-      let member = guild.member(ctx, user_id).await?;
+      let guild_roles = {
+        let guild = ctx
+          .guild()
+          .expect("Guild should be available since command is guild_only");
+        guild.roles.clone()
+      };
+      let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
 
       for role in current_streak_roles {
         match member.remove_role(ctx, role).await {
@@ -548,10 +557,15 @@ pub async fn streak(
     if !existing_profile.streaks_active && streaks_active {
       let user_streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
-      let guild = ctx.guild().unwrap().clone();
-      let member = guild.member(ctx, user_id).await?;
+      let guild_roles = {
+        let guild = ctx
+          .guild()
+          .expect("Guild should be available since command is guild_only");
+        guild.roles.clone()
+      };
+      let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
       let earned_streak_role = StreakRoles::from_streak(user_streak);
 
       if let Some(earned_streak_role) = earned_streak_role {
@@ -604,10 +618,15 @@ pub async fn streak(
     .await?;
 
     if default.streaks_active && !streaks_active {
-      let guild = ctx.guild().unwrap().clone();
-      let member = guild.member(ctx, user_id).await?;
+      let guild_roles = {
+        let guild = ctx
+          .guild()
+          .expect("Guild should be available since command is guild_only");
+        guild.roles.clone()
+      };
+      let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
 
       for role in current_streak_roles {
         match member.remove_role(ctx, role).await {
@@ -627,10 +646,15 @@ pub async fn streak(
     if !default.streaks_active && streaks_active {
       let user_streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
-      let guild = ctx.guild().unwrap().clone();
-      let member = guild.member(ctx, user_id).await?;
+      let guild_roles = {
+        let guild = ctx
+          .guild()
+          .expect("Guild should be available since command is guild_only");
+        guild.roles.clone()
+      };
+      let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
       let earned_streak_role = StreakRoles::from_streak(user_streak);
 
       if let Some(earned_streak_role) = earned_streak_role {
@@ -674,8 +698,9 @@ pub async fn stats(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;

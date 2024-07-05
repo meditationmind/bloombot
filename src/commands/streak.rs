@@ -24,8 +24,9 @@ pub async fn streak(
 ) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
   let user_id = match &user {
     Some(user) => user.id,
     None => ctx.author().id,
@@ -51,7 +52,7 @@ pub async fn streak(
   };
 
   if user.is_some() && (user_id != ctx.author().id) {
-    let user = user.unwrap();
+    let user = user.expect("User should be Some since conditional specifies is_some");
     let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
       Some(nick) => nick,
       None => user.name.clone(),

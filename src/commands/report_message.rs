@@ -40,7 +40,7 @@ pub async fn report_message(
         .content(format!("<@&{}> Message Reported", ROLES.staff))
         .embed(
           BloomBotEmbed::new()
-            .author(CreateEmbedAuthor::new(&message_user.name.to_string()).icon_url(message_user.face()))
+            .author(CreateEmbedAuthor::new(&message_user.name).icon_url(message_user.face()))
             .description(message_content)
             .field("Link", format!("[Go to message]({message_link})"), false)
             .footer(CreateEmbedFooter::new(format!(

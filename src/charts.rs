@@ -16,7 +16,7 @@ pub struct ChartDrawer {
 }
 
 fn next_largest_factor(x: u32) -> u32 {
-  let n = x.to_string().len() as u32;
+  let n = x.checked_ilog10().unwrap_or(0) + 1;
   let factor = 10 * n;
 
   // Find the current quotient of x divided by 5n
@@ -54,7 +54,7 @@ impl ChartDrawer {
 
     let root = BitMapBackend::new(&path, (640, 480)).into_drawing_area();
     //root.fill(&WHITE).unwrap();
-    root.fill(background_color).unwrap();
+    root.fill(background_color)?;
 
     let header = match stats_type {
       StatsType::MeditationMinutes => String::from("# of Minutes"),
@@ -63,12 +63,34 @@ impl ChartDrawer {
 
     let upper_bound = match stats_type {
       StatsType::MeditationMinutes => {
-        let largest = stats.iter().map(|x| x.sum.unwrap()).max().unwrap();
-        next_largest_factor(largest as u32)
+        let largest = stats
+          .iter()
+          .map(|x| {
+            x.sum
+              .expect("sum should be Some since None values are defaulted to 0")
+          })
+          .max()
+          .expect("sum should not be empty since None values are defaulted to 0");
+        next_largest_factor(
+          largest
+            .try_into()
+            .expect("sum should not be larger than u32"),
+        )
       }
       StatsType::MeditationCount => {
-        let largest = stats.iter().map(|x| x.count).max().unwrap();
-        next_largest_factor(largest.unwrap() as u32)
+        let largest = stats
+          .iter()
+          .map(|x| {
+            x.count
+              .expect("count should be Some since None values are defaulted to 0")
+          })
+          .max()
+          .expect("count should not be empty since None values are defaulted to 0");
+        next_largest_factor(
+          largest
+            .try_into()
+            .expect("count should not be larger than u32"),
+        )
       }
     };
 
@@ -154,17 +176,27 @@ impl ChartDrawer {
     let stats = match stats_type {
       StatsType::MeditationMinutes => stats
         .iter()
-        .map(|x| x.sum.unwrap().try_into().unwrap())
+        .map(|x| {
+          x.sum
+            .expect("sum should be Some since None values are defaulted to 0")
+            .try_into()
+            .expect("sum should not be larger than u32")
+        })
         .collect::<Vec<u32>>(),
       StatsType::MeditationCount => stats
         .iter()
-        .map(|x| (x.count.unwrap()).try_into().unwrap())
+        .map(|x| {
+          x.count
+            .expect("count should be Some since None values are defaulted to 0")
+            .try_into()
+            .expect("count should not be larger than u32")
+        })
         .collect::<Vec<u32>>(),
     };
 
     chart.draw_series((0..12).map(|x: u32| {
-      let height = stats.get(x as usize).unwrap();
-      let mut rect = Rectangle::new([(x + 1, 0), (x + 1, *height)], shape_color.filled());
+      let height = stats[x as usize];
+      let mut rect = Rectangle::new([(x + 1, 0), (x + 1, height)], shape_color.filled());
 
       rect.set_margin(0, 0, 15, 15);
 
@@ -187,10 +219,10 @@ impl Chart {
       .file
       .path()
       .file_name()
-      .unwrap()
+      .expect("file_name called on a file should return a filename")
       .to_str()
-      .unwrap()
-      .to_string()
+      .expect("filename should be valid Unicode")
+      .to_owned()
   }
 
   pub fn get_attachment_url(&self) -> String {

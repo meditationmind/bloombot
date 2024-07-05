@@ -100,7 +100,7 @@ impl<'a> Pagination<'a> {
       // This implies that there are no terms in the glossary
       if page.is_empty() {
         embed = embed
-          .title(self.title.to_string())
+          .title(self.title.clone())
           .description("No entries have been added yet.");
 
         embed
@@ -110,7 +110,7 @@ impl<'a> Pagination<'a> {
     } else {
       // This should never happen unless we have a bug in our pagination code
       embed = embed
-        .title(self.title.to_string())
+        .title(self.title.clone())
         .description("This page does not exist.");
 
       embed
@@ -126,7 +126,7 @@ impl<'a> Pagination<'a> {
       // This implies that there are no terms in the glossary
       if page.is_empty() {
         embed = embed
-          .title(self.title.to_string())
+          .title(self.title.clone())
           .description("No entries have been added yet.");
 
         embed
@@ -136,7 +136,7 @@ impl<'a> Pagination<'a> {
     } else {
       // This should never happen unless we have a bug in our pagination code
       embed = embed
-        .title(self.title.to_string())
+        .title(self.title.clone())
         .description("This page does not exist.");
 
       embed

@@ -31,11 +31,13 @@ async fn finalize_winner(
   selected_date: chrono::DateTime<chrono::Utc>,
 ) -> Result<()> {
   let now = chrono::Utc::now();
-  let guild_name = ctx
-    .guild()
-    .expect("should only be called in an available guild that is currently cached")
-    .name
-    .clone();
+  let guild_name = {
+    if let Some(guild) = ctx.guild() {
+      guild.name.clone()
+    } else {
+      "Host Server".to_owned()
+    }
+  };
 
   let announcement_embed = BloomBotEmbed::new()
     .title(":tada: Monthly Challenge Winner :tada:")
@@ -125,7 +127,9 @@ async fn finalize_winner(
       );
       DatabaseHandler::record_steamkey_receipt(
         &mut conn,
-        &ctx.guild_id().unwrap(),
+        &ctx
+          .guild_id()
+          .expect("GuildID should be available since calling command is guild_only"),
         &winner.user.id,
       )
       .await?;
@@ -271,7 +275,9 @@ pub async fn pick_winner(
 
   let data = ctx.data();
 
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -324,7 +330,8 @@ pub async fn pick_winner(
 
   let end_date = start_date + chrono::Months::new(1);
 
-  let time = chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+  let time = chrono::NaiveTime::from_hms_opt(0, 0, 0)
+    .expect("hardcoded time (midnight) should never be invalid");
 
   let start_datetime = chrono::NaiveDateTime::new(start_date, time).and_utc();
   let end_datetime = chrono::NaiveDateTime::new(end_date, time).and_utc();

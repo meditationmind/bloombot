@@ -12,7 +12,9 @@ pub async fn whatis(
   ctx: Context<'_>,
   #[description = "The term to show information about"] term: String,
 ) -> Result<()> {
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
@@ -37,7 +39,9 @@ pub async fn whatis(
       DatabaseHandler::get_possible_terms(&mut transaction, &guild_id, term.as_str(), 0.7).await?;
 
     if possible_terms.len() == 1 {
-      let possible_term = possible_terms.first().unwrap();
+      let possible_term = possible_terms
+        .first()
+        .expect("first element should be Some since conditional specifies len() == 1");
 
       embed = embed.title(&possible_term.name);
       match &possible_term.meaning.split_once('\n') {

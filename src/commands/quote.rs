@@ -15,8 +15,9 @@ use anyhow::Result;
 pub async fn quote(ctx: Context<'_>) -> Result<()> {
   let data = ctx.data();
 
-  // We unwrap here, because we know that the command is guild-only.
-  let guild_id = ctx.guild_id().unwrap();
+  let guild_id = ctx
+    .guild_id()
+    .expect("GuildID should be available since command is guild_only");
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   match DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await? {
