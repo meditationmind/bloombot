@@ -2,9 +2,7 @@ use crate::config::BloomBotEmbed;
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::Result;
-use log::info;
 use poise::{serenity_prelude as serenity, CreateReply};
-use std::sync::atomic::Ordering;
 
 pub mod add;
 pub mod challenge;
@@ -86,29 +84,19 @@ async fn commit_and_say(
     }
     Err(e) => {
       DatabaseHandler::rollback_transaction(transaction).await?;
-      // As it's very likely that when this happens the interaction has timed out,
-      // we don't want to send a response to the interaction, but rather to the channel.
-      // The alternative is that there is a second instance of the bot running, which we can detect by checking if the interaction has already been responded to.
 
-      match ctx {
-        poise::Context::Application(app_ctx) => {
-          let has_sent_initial_response = app_ctx.has_sent_initial_response.load(Ordering::SeqCst);
-          if !has_sent_initial_response {
-            _ = ctx
-              .channel_id()
-              .say(&ctx, "<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
-              .await;
-            info!("Issued rollback transaction error for slash command with no initial response.");
-          }
-        }
-        poise::Context::Prefix(_) => {
-          _ = ctx
-            .channel_id()
-            .say(&ctx, "<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
-            .await;
-          info!("Issued rollback transaction error for prefix command.");
-        }
-      };
+      // This usually happens when two instances of the bot are running.
+      // If interaction has already been acknowledged, assume such and ignore error since command will have been successful.
+      if e.to_string() == "Interaction has already been acknowledged." {
+        return Err(anyhow::anyhow!("Multiple instances assumed. Ignoring error: {e}"));
+      }
+      
+      // Otherwise, it's likely the interaction has timed out for some reason.
+      // We'll send a response to the channel to inform the user.
+      _ = ctx
+        .channel_id()
+        .say(&ctx, "<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
+        .await;
 
       return Err(anyhow::anyhow!("Could not send message: {e}"));
     }
