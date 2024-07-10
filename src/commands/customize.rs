@@ -529,15 +529,9 @@ pub async fn streak(
     .await?;
 
     if existing_profile.streaks_active && !streaks_active {
-      let guild_roles = {
-        let guild = ctx
-          .guild()
-          .expect("Guild should be available since command is guild_only");
-        guild.roles.clone()
-      };
       let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
 
       for role in current_streak_roles {
         match member.remove_role(ctx, role).await {
@@ -557,15 +551,9 @@ pub async fn streak(
     if !existing_profile.streaks_active && streaks_active {
       let user_streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
-      let guild_roles = {
-        let guild = ctx
-          .guild()
-          .expect("Guild should be available since command is guild_only");
-        guild.roles.clone()
-      };
       let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
       let earned_streak_role = StreakRoles::from_streak(user_streak);
 
       if let Some(earned_streak_role) = earned_streak_role {
@@ -618,15 +606,9 @@ pub async fn streak(
     .await?;
 
     if default.streaks_active && !streaks_active {
-      let guild_roles = {
-        let guild = ctx
-          .guild()
-          .expect("Guild should be available since command is guild_only");
-        guild.roles.clone()
-      };
       let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
 
       for role in current_streak_roles {
         match member.remove_role(ctx, role).await {
@@ -646,15 +628,9 @@ pub async fn streak(
     if !default.streaks_active && streaks_active {
       let user_streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
-      let guild_roles = {
-        let guild = ctx
-          .guild()
-          .expect("Guild should be available since command is guild_only");
-        guild.roles.clone()
-      };
       let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
+      let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
       let earned_streak_role = StreakRoles::from_streak(user_streak);
 
       if let Some(earned_streak_role) = earned_streak_role {

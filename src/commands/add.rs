@@ -441,15 +441,9 @@ pub async fn add(
     ctx.say(format!("Awesome sauce! This server has collectively generated {time_in_hours} hours of realmbreaking meditation!")).await?;
   }
 
-  let guild_roles = {
-    let guild = ctx
-      .guild()
-      .expect("GuildID should be available since command is guild_only");
-    guild.roles.clone()
-  };
   let member = guild_id.member(ctx, user_id).await?;
 
-  let current_time_roles = TimeSumRoles::get_users_current_roles(&guild_roles, &member);
+  let current_time_roles = TimeSumRoles::get_users_current_roles(&member.roles);
   let updated_time_role = TimeSumRoles::from_sum(user_sum);
 
   if let Some(updated_time_role) = updated_time_role {
@@ -490,7 +484,7 @@ pub async fn add(
   }
 
   if tracking_profile.streaks_active {
-    let current_streak_roles = StreakRoles::get_users_current_roles(&guild_roles, &member);
+    let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
     let updated_streak_role = StreakRoles::from_streak(user_streak);
 
     if let Some(updated_streak_role) = updated_streak_role {

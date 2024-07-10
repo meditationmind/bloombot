@@ -1,5 +1,4 @@
-use poise::serenity_prelude::{self as serenity, Embed, Member, RoleId};
-use std::collections::HashMap;
+use poise::serenity_prelude::{self as serenity, Embed, RoleId};
 
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
 pub const TERMS_PER_PAGE: usize = 10;
@@ -131,21 +130,16 @@ impl TimeSumRoles {
   }
 
   pub fn get_users_current_roles(
-    guild_roles: &HashMap<serenity::RoleId, serenity::Role>,
-    member: &Member,
+    member_roles: &Vec<RoleId>,
   ) -> Vec<RoleId> {
     let mut roles = Vec::new();
 
-    for user_role in &member.roles {
-      let Some(possible_role_id) = TimeSumRoles::from_role_id(*user_role) else {
+    for user_role in member_roles {
+      let Some(matching_role_id) = TimeSumRoles::from_role_id(*user_role) else {
         continue;
       };
 
-      if let Some(role) = guild_roles.get(&possible_role_id.to_role_id()) {
-        if user_role == &role.id {
-          roles.push(role.id);
-        }
-      }
+      roles.push(matching_role_id.to_role_id());
     }
 
     roles
@@ -220,21 +214,16 @@ impl StreakRoles {
   }
 
   pub fn get_users_current_roles(
-    guild_roles: &HashMap<serenity::RoleId, serenity::Role>,
-    member: &Member,
+    member_roles: &Vec<RoleId>,
   ) -> Vec<RoleId> {
     let mut roles = Vec::new();
 
-    for user_role in &member.roles {
-      let Some(possible_role_id) = StreakRoles::from_role_id(*user_role) else {
+    for user_role in member_roles {
+      let Some(matching_role_id) = StreakRoles::from_role_id(*user_role) else {
         continue;
       };
 
-      if let Some(role) = guild_roles.get(&possible_role_id.to_role_id()) {
-        if user_role == &role.id {
-          roles.push(role.id);
-        }
-      }
+      roles.push(matching_role_id.to_role_id());
     }
 
     roles

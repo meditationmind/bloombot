@@ -63,34 +63,16 @@ impl ChartDrawer {
 
     let upper_bound = match stats_type {
       StatsType::MeditationMinutes => {
-        let largest = stats
-          .iter()
-          .map(|x| {
-            x.sum
-              .expect("sum should be Some since None values are defaulted to 0")
-          })
-          .max()
-          .expect("sum should not be empty since None values are defaulted to 0");
-        next_largest_factor(
-          largest
-            .try_into()
-            .expect("sum should not be larger than u32"),
-        )
+        let largest = stats.iter().map(|x| x.sum.unwrap_or(0)).max().unwrap_or(0);
+        next_largest_factor(largest.try_into()?)
       }
       StatsType::MeditationCount => {
         let largest = stats
           .iter()
-          .map(|x| {
-            x.count
-              .expect("count should be Some since None values are defaulted to 0")
-          })
+          .map(|x| x.count.unwrap_or(0))
           .max()
-          .expect("count should not be empty since None values are defaulted to 0");
-        next_largest_factor(
-          largest
-            .try_into()
-            .expect("count should not be larger than u32"),
-        )
+          .unwrap_or(0);
+        next_largest_factor(largest.try_into()?)
       }
     };
 
@@ -178,7 +160,7 @@ impl ChartDrawer {
         .iter()
         .map(|x| {
           x.sum
-            .expect("sum should be Some since None values are defaulted to 0")
+            .unwrap_or(0)
             .try_into()
             .expect("sum should not be larger than u32")
         })
@@ -187,7 +169,7 @@ impl ChartDrawer {
         .iter()
         .map(|x| {
           x.count
-            .expect("count should be Some since None values are defaulted to 0")
+            .unwrap_or(0)
             .try_into()
             .expect("count should not be larger than u32")
         })
@@ -215,14 +197,12 @@ impl Chart {
   }
 
   pub fn get_file_name(&self) -> String {
-    self
-      .file
-      .path()
-      .file_name()
-      .expect("file_name called on a file should return a filename")
-      .to_str()
-      .expect("filename should be valid Unicode")
-      .to_owned()
+    if let Some(filename) = self.file.path().file_name() {
+      filename.to_string_lossy().to_string()
+    } else {
+      // This should never happen, but if it does, assign default filename
+      String::from("attachment.png")
+    }
   }
 
   pub fn get_attachment_url(&self) -> String {
