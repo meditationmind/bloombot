@@ -1,7 +1,7 @@
 use crate::commands::BloomBotEmbed;
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::CreateEmbedFooter;
 
 /// See information about a term
@@ -14,7 +14,7 @@ pub async fn whatis(
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
@@ -41,7 +41,7 @@ pub async fn whatis(
     if possible_terms.len() == 1 {
       let possible_term = possible_terms
         .first()
-        .expect("first element should be Some since conditional specifies len() == 1");
+        .with_context(|| "Failed to retrieve first element of possible_terms")?;
 
       embed = embed.title(&possible_term.name);
       match &possible_term.meaning.split_once('\n') {

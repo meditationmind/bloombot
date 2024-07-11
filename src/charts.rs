@@ -155,6 +155,7 @@ impl ChartDrawer {
       return Err(anyhow::anyhow!("Not enough stats to draw chart"));
     }
 
+    #[allow(clippy::expect_used)]
     let stats = match stats_type {
       StatsType::MeditationMinutes => stats
         .iter()

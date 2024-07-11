@@ -1,6 +1,6 @@
 use crate::config::ROLES;
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use chrono;
 use poise::CreateReply;
 
@@ -38,7 +38,7 @@ pub async fn join(
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let member = guild_id.member(ctx, ctx.author().id).await?;
 
   if let Some(challenge) = challenge {
@@ -141,7 +141,7 @@ pub async fn leave(
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let member = guild_id.member(ctx, ctx.author().id).await?;
 
   if let Some(challenge) = challenge {

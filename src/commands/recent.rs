@@ -1,7 +1,7 @@
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::CreateReply;
 
@@ -18,7 +18,7 @@ pub async fn recent(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 

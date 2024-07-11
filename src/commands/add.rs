@@ -2,7 +2,7 @@ use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, StreakRoles, TimeSumRoles, CHANNELS};
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use chrono::Duration;
 use log::error;
 use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
@@ -129,7 +129,7 @@ pub async fn add(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;

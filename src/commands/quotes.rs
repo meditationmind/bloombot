@@ -2,7 +2,7 @@ use crate::commands::{commit_and_say, MessageType};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::{CreateReply, Modal};
 
@@ -66,7 +66,7 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
 
     let guild_id = ctx
       .guild_id()
-      .expect("GuildID should be available since command is guild_only");
+      .with_context(|| "Failed to retrieve guild ID from context")?;
 
     DatabaseHandler::add_quote(
       &mut transaction,
@@ -109,7 +109,7 @@ pub async fn edit(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let existing_quote =
     DatabaseHandler::get_quote(&mut transaction, &guild_id, quote_id.as_str()).await?;
@@ -125,8 +125,8 @@ pub async fn edit(
     return Ok(());
   }
 
-  let existing_quote = existing_quote
-    .expect("QuoteData should be Some since we already checked for is_none");
+  let existing_quote =
+    existing_quote.with_context(|| "Failed to assign QuoteData to existing_quote")?;
 
   let defaults = EditQuoteModal {
     quote: existing_quote.quote,
@@ -179,7 +179,7 @@ pub async fn remove(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::quote_exists(&mut transaction, &guild_id, id.as_str()).await? {
@@ -218,7 +218,7 @@ pub async fn list(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 

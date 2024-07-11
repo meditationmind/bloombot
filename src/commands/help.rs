@@ -1,10 +1,7 @@
 use crate::config::ROLES;
 use crate::Context;
-use anyhow::Result;
-use poise::{
-  serenity_prelude::{self as serenity, builder::*},
-  CreateReply,
-};
+use anyhow::{Context as AnyhowContext, Result};
+use poise::{serenity_prelude::builder::*, CreateReply};
 use std::fmt::Write as _;
 
 pub struct HelpConfiguration<'a> {
@@ -64,6 +61,7 @@ impl<K: Eq, V> OrderedMap<K, V> {
   }
 
   /// Finds a value in the map by the given key, or inserts it if it doesn't exist
+  #[allow(clippy::expect_used)]
   pub fn get_or_insert_with(&mut self, k: K, v: impl FnOnce() -> V) -> &mut V {
     if let Some(i) = self.0.iter().position(|entry| entry.0 == k) {
       &mut self.0[i].1
@@ -87,7 +85,7 @@ async fn help_single_command<U, E>(
   command_name: &str,
   config: HelpConfiguration<'_>,
   elevated_permissions: bool,
-) -> Result<(), serenity::Error> {
+) -> Result<()> {
   let command = ctx.framework().options().commands.iter().find(|command| {
     if command.name.eq_ignore_ascii_case(command_name) {
       return true;
@@ -113,8 +111,7 @@ async fn help_single_command<U, E>(
     return Ok(());
   }
 
-  let command =
-    command.expect("command should be Some since we already checked for is_none");
+  let command = command.with_context(|| "Failed to assign Command to command")?;
 
   if command.category.clone().unwrap_or_default() == config.secret_category
     || (command.context_menu_action.is_some() && !config.show_context_menu_commands)
@@ -197,7 +194,7 @@ async fn help_all_commands<U, E>(
   ctx: poise::Context<'_, U, E>,
   config: HelpConfiguration<'_>,
   elevated_permissions: bool,
-) -> Result<(), serenity::Error> {
+) -> Result<()> {
   let mut categories = OrderedMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
   for cmd in &ctx.framework().options().commands {
     if !elevated_permissions && !cmd.required_permissions.is_empty() {
@@ -332,7 +329,7 @@ pub async fn help_menu<U, E>(
   command: Option<&str>,
   config: HelpConfiguration<'_>,
   elevated_permissions: bool,
-) -> Result<(), serenity::Error> {
+) -> Result<()> {
   match command {
     Some(command) => help_single_command(ctx, command, config, elevated_permissions).await,
     None => help_all_commands(ctx, config, elevated_permissions).await,

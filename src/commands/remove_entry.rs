@@ -2,7 +2,7 @@ use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, CreateEmbedFooter, CreateMessage};
 
 /// Remove one of your meditation entries
@@ -23,7 +23,7 @@ pub async fn remove_entry(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 

@@ -5,7 +5,7 @@ use crate::database::Timeframe;
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::Context;
 use crate::{charts, config};
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::ChoiceParameter;
 
@@ -72,7 +72,7 @@ pub async fn user(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let user = user.unwrap_or_else(|| ctx.author().clone());
   let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
@@ -270,7 +270,7 @@ pub async fn server(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let (guild_name, guild_icon) = {
     if let Some(guild) = guild_id.to_guild_cached(&ctx) {

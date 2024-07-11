@@ -3,7 +3,7 @@ use crate::config::CHANNELS;
 use crate::database::DatabaseHandler;
 // use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use log::info;
 use pgvector;
 use poise::serenity_prelude::{self as serenity, builder::*};
@@ -35,7 +35,7 @@ pub async fn list(ctx: Context<'_>) -> Result<()> {
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let term_names = DatabaseHandler::get_term_list(&mut transaction, &guild_id).await?;
@@ -176,7 +176,7 @@ pub async fn info(
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
@@ -238,7 +238,7 @@ pub async fn info(
     if possible_terms.len() == 1 {
       let possible_term = possible_terms
         .first()
-        .expect("first element should be available since conditional specifies len() == 1");
+        .with_context(|| "Failed to retrieve first element of possible_terms")?;
 
       embed = embed
         .title(&possible_term.name)
@@ -348,7 +348,7 @@ pub async fn search(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let start_time = std::time::Instant::now();
   let mut transaction = data.db.start_transaction_with_retry(5).await?;

@@ -1,7 +1,7 @@
 use crate::commands::{commit_and_say, MessageType};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use pgvector;
 use poise::serenity_prelude as serenity;
 use poise::Modal;
@@ -67,7 +67,7 @@ pub async fn term_not_found(
     Ordering::Equal => {
       let possible_term = possible_terms
         .first()
-        .expect("first element should be Some since we matched Equal for cmp(&1)");
+        .with_context(|| "Failed to retrieve first element of possible_terms")?;
 
       ctx
         .send(
@@ -138,7 +138,7 @@ pub async fn add(
 
     let guild_id = ctx
       .guild_id()
-      .expect("GuildID should be available since command is guild_only");
+      .with_context(|| "Failed to retrieve guild ID from context")?;
 
     let links = match term_data.links {
       Some(links) => links.split(',').map(|s| s.trim().to_string()).collect(),
@@ -204,7 +204,7 @@ pub async fn edit(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let existing_term =
     DatabaseHandler::get_term(&mut transaction, &guild_id, term_name.as_str()).await?;
@@ -220,8 +220,7 @@ pub async fn edit(
     return Ok(());
   }
 
-  let existing_term =
-    existing_term.expect("existing_term should be Some since we already checked for is_none");
+  let existing_term = existing_term.with_context(|| "Failed to assign Term to existing_term")?;
   let links = existing_term.links.map(|links| links.join(", "));
   let aliases = existing_term.aliases.map(|aliases| aliases.join(", "));
 
@@ -307,7 +306,7 @@ pub async fn remove(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::term_exists(&mut transaction, &guild_id, term.as_str()).await? {

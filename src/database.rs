@@ -706,6 +706,7 @@ impl DatabaseHandler {
     .fetch_all(&mut **transaction)
     .await?;
 
+    #[allow(clippy::expect_used)]
     let steamkey_recipients = rows
       .into_iter()
       .map(|row| SteamKeyRecipientData {
@@ -745,7 +746,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.expect("EXISTS query should return a bool"))
+    row
+      .exists
+      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn record_steamkey_receipt(
@@ -832,6 +835,7 @@ impl DatabaseHandler {
     .fetch_all(&mut **transaction)
     .await?;
 
+    #[allow(clippy::expect_used)]
     let erase_data = rows
       .into_iter()
       .map(|row| EraseData {
@@ -909,6 +913,7 @@ impl DatabaseHandler {
     .fetch_all(&mut **transaction)
     .await?;
 
+    #[allow(clippy::expect_used)]
     let meditation_entries = rows
       .into_iter()
       .map(|row| MeditationData {
@@ -1076,7 +1081,7 @@ impl DatabaseHandler {
 
     let winner_candidate_total = row
       .winner_candidate_total
-      .expect("row should include winner_candidate_total since it is computed in the DB query");
+      .with_context(|| "Failed to assign winner_candidate_total computed by DB query")?;
 
     Ok(winner_candidate_total)
   }
@@ -1102,7 +1107,7 @@ impl DatabaseHandler {
 
     let winner_candidate_total = row
       .winner_candidate_total
-      .expect("row should include winner_candidate_total since it is computed in the DB query");
+      .with_context(|| "Failed to assign winner_candidate_total computed by DB query")?;
 
     Ok(winner_candidate_total.try_into()?)
   }
@@ -1124,7 +1129,7 @@ impl DatabaseHandler {
 
     let user_total = row
       .user_total
-      .expect("row should include user_total since it is computed in the DB query");
+      .with_context(|| "Failed to assign user_total computed by DB query")?;
 
     Ok(user_total)
   }
@@ -1146,7 +1151,7 @@ impl DatabaseHandler {
 
     let user_total = row
       .user_total
-      .expect("row should include user_total since it is computed in the DB query");
+      .with_context(|| "Failed to assign user_total computed by DB query")?;
 
     Ok(user_total.try_into()?)
   }
@@ -1166,7 +1171,7 @@ impl DatabaseHandler {
 
     let guild_total = row
       .guild_total
-      .expect("row should include guild_total since it is computed in the DB query");
+      .with_context(|| "Failed to assign guild_total computed by DB query")?;
 
     Ok(guild_total)
   }
@@ -1186,7 +1191,7 @@ impl DatabaseHandler {
 
     let guild_total = row
       .guild_total
-      .expect("row should include guild_total since it is computed in the DB query");
+      .with_context(|| "Failed to assign guild_total computed by DB query")?;
 
     Ok(guild_total.try_into()?)
   }
@@ -1311,7 +1316,7 @@ impl DatabaseHandler {
       #[allow(clippy::cast_possible_truncation)]
       let days_ago = first
         .days_ago
-        .expect("row should include days_ago since it is computed in the DB query")
+        .with_context(|| "Failed to assign days_ago computed by DB query")?
         as i32;
 
       if days_ago > 2 {
@@ -1327,7 +1332,7 @@ impl DatabaseHandler {
       #[allow(clippy::cast_possible_truncation)]
       let days_ago = row
         .days_ago
-        .expect("row should include days_ago since it is computed in the DB query")
+        .with_context(|| "Failed to assign days_ago computed by DB query")?
         as i32;
 
       if days_ago != last + 1 {
@@ -1356,7 +1361,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.expect("EXISTS query should return a bool"))
+    row
+      .exists
+      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn add_course(
@@ -1417,7 +1424,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.expect("EXISTS query should return a bool"))
+    row
+      .exists
+      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn add_steam_key(
@@ -1453,6 +1462,7 @@ impl DatabaseHandler {
     .fetch_all(&mut **transaction)
     .await?;
 
+    #[allow(clippy::expect_used)]
     let steam_keys = rows
       .into_iter()
       .map(|row| SteamKeyData {
@@ -1671,6 +1681,7 @@ impl DatabaseHandler {
     .fetch_all(&mut **transaction)
     .await?;
 
+    #[allow(clippy::expect_used)]
     let courses = rows
       .into_iter()
       .map(|row| CourseData {
@@ -1745,7 +1756,7 @@ impl DatabaseHandler {
         guild_id: serenity::GuildId::new(
           row
             .guild_id
-            .expect("guild_id should not be empty in course database")
+            .with_context(|| "Failed to retrieve guild_id from DB record")?
             .parse::<u64>()?,
         ),
       }),
@@ -1841,7 +1852,7 @@ impl DatabaseHandler {
 
     let term_count = row
       .term_count
-      .expect("row should include term_count since it is computed in the DB query");
+      .with_context(|| "Failed to assign term_count computed by DB query")?;
 
     Ok(term_count.try_into()?)
   }
@@ -1918,7 +1929,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.expect("EXISTS query should return a bool"))
+    row
+      .exists
+      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn reserve_key(
@@ -2081,7 +2094,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.expect("EXISTS query should return a bool"))
+    row
+      .exists
+      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn remove_term(
@@ -2217,7 +2232,9 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    Ok(row.exists.expect("EXISTS query should return a bool"))
+    row
+      .exists
+      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn get_user_chart_stats(
@@ -2290,6 +2307,7 @@ impl DatabaseHandler {
       },
     };
 
+    #[allow(clippy::expect_used)]
     let stats: Vec<TimeframeStats> = (0..12)
       .map(|i| {
         // Comparison is safe since floor produces integer
@@ -2387,6 +2405,7 @@ impl DatabaseHandler {
       },
     };
 
+    #[allow(clippy::expect_used)]
     let stats: Vec<TimeframeStats> = (0..12)
       .map(|i| {
         // Comparison is safe since floor produces integer

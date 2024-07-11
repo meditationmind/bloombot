@@ -5,7 +5,7 @@ use crate::config::{BloomBotEmbed, CHANNELS};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use chrono::{Datelike, Timelike};
 use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
 use poise::{ChoiceParameter, CreateReply};
@@ -111,7 +111,7 @@ pub async fn create(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -181,7 +181,7 @@ pub async fn list(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -283,7 +283,7 @@ pub async fn update(
     let data = ctx.data();
     let guild_id = ctx
       .guild_id()
-      .expect("GuildID should be available since command is guild_only");
+      .with_context(|| "Failed to retrieve guild ID from context")?;
 
     let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -438,7 +438,7 @@ pub async fn delete(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -526,7 +526,7 @@ pub async fn reset(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -672,7 +672,7 @@ pub async fn migrate(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 

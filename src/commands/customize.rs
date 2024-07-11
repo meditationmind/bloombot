@@ -2,7 +2,7 @@ use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, StreakRoles};
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use log::error;
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::{ChoiceParameter, CreateReply};
@@ -137,7 +137,7 @@ pub async fn show(ctx: Context<'_>) -> Result<()> {
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -203,7 +203,7 @@ pub async fn show(ctx: Context<'_>) -> Result<()> {
           //"**UTC Offset**: {}\n**Anonymous Tracking**: {}\n**Streak Reporting**: {}\n**Streak Visibility**: {}\n**Stats Visibility**: {}",
           "```UTC Offset:           {}\nAnonymous Tracking:   {}\nStreak Reporting:     {}\nStreak Visibility:    {}\nStats Visibility:     {}```",
           //Only show the offset (no time zone abbreviations)
-          utc_offset.split_whitespace().next().expect("should be Some since hardcoded names include time zone abbreviations after offset"),
+          utc_offset.split_whitespace().next().with_context(|| "Failed to retrieve offset portion of time zone choice")?,
           if tracking_profile.anonymous_tracking { "On" } else { "Off" },
           if tracking_profile.streaks_active { "On" } else { "Off" },
           if tracking_profile.streaks_private { "Private" } else { "Public" },
@@ -233,7 +233,7 @@ pub async fn offset(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -384,7 +384,7 @@ pub async fn tracking(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -474,7 +474,7 @@ pub async fn streak(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -676,7 +676,7 @@ pub async fn stats(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;

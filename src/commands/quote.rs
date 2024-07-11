@@ -1,7 +1,7 @@
 use crate::config::BloomBotEmbed;
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 
 /// Get a meditation/mindfulness quote
 ///
@@ -17,7 +17,7 @@ pub async fn quote(ctx: Context<'_>) -> Result<()> {
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   match DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await? {

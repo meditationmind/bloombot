@@ -1,6 +1,6 @@
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::{config, Context};
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude as serenity;
 
 #[derive(poise::ChoiceParameter)]
@@ -26,7 +26,7 @@ pub async fn streak(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = match &user {
     Some(user) => user.id,
     None => ctx.author().id,
@@ -52,7 +52,7 @@ pub async fn streak(
   };
 
   if user.is_some() && (user_id != ctx.author().id) {
-    let user = user.expect("User should be Some since conditional specifies is_some");
+    let user = user.with_context(|| "Failed to retrieve User")?;
     let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
       Some(nick) => nick,
       None => user.name.clone(),

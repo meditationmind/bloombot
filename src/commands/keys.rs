@@ -2,7 +2,7 @@ use crate::commands::{commit_and_say, MessageType};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
 use poise::CreateReply;
 
@@ -37,7 +37,7 @@ pub async fn list_keys(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -118,7 +118,7 @@ pub async fn add_key(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
@@ -157,7 +157,7 @@ pub async fn remove_key(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
@@ -195,14 +195,14 @@ pub async fn use_key(ctx: Context<'_>) -> Result<()> {
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
   if DatabaseHandler::unused_key_exists(&mut transaction, &guild_id).await? {
     let key = DatabaseHandler::get_key_and_mark_used(&mut transaction, &guild_id)
       .await?
-      .expect("key should exist since unused_key_exists evaluated to true");
+      .with_context(|| "Failed to retrieve key despite unused_key_exists returning true")?;
 
     ctx
       .send(
@@ -247,7 +247,7 @@ pub async fn list_recipients(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -349,7 +349,7 @@ pub async fn update_recipient(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let steamkey_recipient =
@@ -474,8 +474,8 @@ pub async fn update_recipient(
     return Ok(());
   }
 
-  let steamkey_recipient =
-    steamkey_recipient.expect("steamkey_recipient should be Some since we already handled None");
+  let steamkey_recipient = steamkey_recipient
+    .with_context(|| "Failed to assign SteamKeyRecipientData to steamkey_recipient")?;
   let challenge_prize = match challenge_prize {
     Some(_) => challenge_prize,
     None => steamkey_recipient.challenge_prize,

@@ -2,7 +2,7 @@ use crate::commands::{commit_and_say, course_not_found, MessageType};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::CreateReply;
 
@@ -43,7 +43,7 @@ pub async fn add(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if DatabaseHandler::course_exists(&mut transaction, &guild_id, course_name.as_str()).await? {
@@ -150,7 +150,7 @@ pub async fn edit(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let course =
@@ -162,7 +162,7 @@ pub async fn edit(
     return Ok(());
   }
 
-  let course = course.expect("CourseData should be Some since we already checked for is_none");
+  let course = course.with_context(|| "Failed to assign CourseData to course")?;
 
   let participant_role = match participant_role {
     Some(participant_role) => {
@@ -253,7 +253,7 @@ pub async fn list(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -336,7 +336,7 @@ pub async fn remove(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::course_exists(&mut transaction, &guild_id, course_name.as_str()).await? {

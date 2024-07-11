@@ -65,7 +65,13 @@ async fn commit_and_say(
     }
     MessageType::EmbedOnly(message) => {
       ctx
-        .send(CreateReply { embeds: vec![message], ..Default::default() }.ephemeral(ephemeral))
+        .send(
+          CreateReply {
+            embeds: vec![message],
+            ..Default::default()
+          }
+          .ephemeral(ephemeral),
+        )
         .await
     }
   };
@@ -86,11 +92,15 @@ async fn commit_and_say(
       DatabaseHandler::rollback_transaction(transaction).await?;
 
       // This usually happens when two instances of the bot are running.
-      // If interaction has already been acknowledged, assume such and ignore error since command will have been successful.
-      if e.to_string() == "Interaction has already been acknowledged." {
-        return Err(anyhow::anyhow!("Multiple instances assumed. Ignoring error: {e}"));
+      // If interaction is unknown or has already been acknowledged, assume such and ignore error since command will have been successful.
+      if e.to_string() == "Interaction has already been acknowledged."
+        || e.to_string() == "Unknown interaction"
+      {
+        return Err(anyhow::anyhow!(
+          "Multiple instances assumed. Ignoring error: {e}"
+        ));
       }
-      
+
       // Otherwise, it's likely the interaction has timed out for some reason.
       // We'll send a response to the channel to inform the user.
       _ = ctx

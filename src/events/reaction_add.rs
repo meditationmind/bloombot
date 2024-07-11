@@ -2,7 +2,7 @@ use crate::config::{self, CHANNELS, EMOTES, ROLES};
 use crate::database::DatabaseHandler;
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{
-  builder::*, ChannelId, Context, MessageFlags, Reaction, ReactionType, UserId,
+  builder::*, ChannelId, Context, MessageFlags, Reaction, ReactionType,
 };
 
 pub async fn reaction_add(
@@ -10,24 +10,30 @@ pub async fn reaction_add(
   database: &DatabaseHandler,
   add_reaction: &Reaction,
 ) -> Result<()> {
-  let Some(user) = add_reaction.user_id else {
+  if add_reaction.user_id.is_none() {
+    // Should only happen if reaction is added by bot when cache is not available.
+    // That should never happen, so we'll remove the reaction here just to be safe.
+    add_reaction
+      .delete(&ctx)
+      .await
+      .with_context(|| "Failed to remove reaction from message")?;
     return Ok(());
-  };
+  }
 
-  check_report(ctx, &user, add_reaction).await?;
+  check_report(ctx, add_reaction).await?;
   add_star(ctx, database, add_reaction).await?;
 
   Ok(())
 }
 
-async fn check_report(ctx: &Context, user: &UserId, reaction: &Reaction) -> Result<()> {
+async fn check_report(ctx: &Context, reaction: &Reaction) -> Result<()> {
   if let ReactionType::Custom { id, .. } = reaction.emoji {
     if id == EMOTES.report {
       // Remove reaction from message
       reaction
         .delete(&ctx)
         .await
-        .expect("Failed to remove reaction");
+        .with_context(|| "Failed to remove report reaction from message")?;
 
       let report_channel_id = ChannelId::new(CHANNELS.reportchannel);
       let message = reaction.message(&ctx).await?;
@@ -57,7 +63,7 @@ async fn check_report(ctx: &Context, user: &UserId, reaction: &Reaction) -> Resu
                 .field("Link", format!("[Go to message]({message_link})"), false)
                 .footer(CreateEmbedFooter::new(format!(
                   "Author ID: {}\nReported via reaction in #{} by {} ({})",
-                  &message_user.id, message_channel_name, reporting_user.name, user
+                  &message_user.id, message_channel_name, reporting_user.name, reporting_user.id
                 )))
                 .timestamp(message.timestamp),
             ),

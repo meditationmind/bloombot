@@ -1,6 +1,6 @@
 use crate::config::{self, EMOTES};
 use crate::database::DatabaseHandler;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{builder::*, ChannelId, Context, Reaction, ReactionType};
 
 pub async fn reaction_remove(
@@ -38,9 +38,10 @@ async fn remove_star(ctx: &Context, database: &DatabaseHandler, reaction: &React
             .message(&ctx, star_message.board_message_id)
             .await?;
 
-          let existing_embed = starboard_message.embeds.first().expect(
-            "existing Embed should always be available because starboard messages are created as Embeds",
-          );
+          let existing_embed = starboard_message
+            .embeds
+            .first()
+            .with_context(|| "Failed to get existing embed from starboard message")?;
           let updated_embed = CreateEmbed::from(existing_embed.clone()).footer(
             CreateEmbedFooter::new(format!("⭐ Times starred: {star_count}")),
           );

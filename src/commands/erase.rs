@@ -3,7 +3,7 @@ use crate::config::{self, BloomBotEmbed, CHANNELS};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, MessageId};
 use poise::CreateReply;
 
@@ -62,7 +62,7 @@ pub async fn message(
   let data = ctx.data();
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = message.author.id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
@@ -220,7 +220,7 @@ pub async fn list(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
     Some(nick) => nick,
     None => user.name.clone(),
@@ -330,10 +330,12 @@ pub async fn populate(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let erase_time = erase_time
-    .unwrap_or(chrono::NaiveTime::from_hms_opt(0, 0, 0).expect("Hardcoded time is valid"));
+  let erase_time = erase_time.unwrap_or(
+    chrono::NaiveTime::from_hms_opt(0, 0, 0)
+      .with_context(|| "Failed to assign hardcoded 00:00:00 NaiveTime to erase_time")?,
+  );
 
   let datetime = chrono::NaiveDateTime::new(erase_date, erase_time).and_utc();
 

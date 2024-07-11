@@ -1,7 +1,7 @@
 use crate::config::{BloomBotEmbed, CHANNELS, ROLES};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use chrono::Datelike;
 use futures::StreamExt;
 use poise::serenity_prelude::{self as serenity, builder::*};
@@ -125,14 +125,10 @@ async fn finalize_winner(
       let hyperlink = format!(
         "[Redeem your key](https://store.steampowered.com/account/registerkey?key={reserved_key})"
       );
-      DatabaseHandler::record_steamkey_receipt(
-        &mut conn,
-        &ctx
-          .guild_id()
-          .expect("GuildID should be available since calling command is guild_only"),
-        &winner.user.id,
-      )
-      .await?;
+      let guild_id = &ctx
+        .guild_id()
+        .with_context(|| "Failed to retrieve guild ID from context")?;
+      DatabaseHandler::record_steamkey_receipt(&mut conn, guild_id, &winner.user.id).await?;
 
       dm_message
         .edit(ctx, EditMessage::new().components(Vec::new()))
@@ -277,7 +273,7 @@ pub async fn pick_winner(
 
   let guild_id = ctx
     .guild_id()
-    .expect("GuildID should be available since command is guild_only");
+    .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -331,7 +327,7 @@ pub async fn pick_winner(
   let end_date = start_date + chrono::Months::new(1);
 
   let time = chrono::NaiveTime::from_hms_opt(0, 0, 0)
-    .expect("hardcoded time (midnight) should never be invalid");
+    .with_context(|| "Failed to assign hardcoded 00:00:00 NaiveTime to time")?;
 
   let start_datetime = chrono::NaiveDateTime::new(start_date, time).and_utc();
   let end_datetime = chrono::NaiveDateTime::new(end_date, time).and_utc();

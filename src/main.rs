@@ -1,4 +1,4 @@
-#![warn(clippy::pedantic, clippy::unwrap_used)]
+#![warn(clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
 #![allow(
   clippy::too_many_lines,
   clippy::unreadable_literal,
