@@ -155,10 +155,13 @@ async fn create_star_message(
   if star_count >= config::MIN_STARS {
     let starred_message = reaction.message(&ctx).await?;
     let author_nick_or_name = match reaction.guild_id {
-      Some(guild_id) => match starred_message.author.nick_in(&ctx, guild_id).await {
-        Some(nick) => nick,
-        None => starred_message.author.name.clone(),
-      },
+      Some(guild_id) => starred_message.author.nick_in(&ctx, guild_id).await.unwrap_or_else(|| {
+        if let Some(global_name) = &starred_message.author.global_name {
+          global_name.clone()
+        } else {
+          starred_message.author.name.clone()
+        }
+      }),
       None => starred_message.author.name.clone(),
     };
 

@@ -53,10 +53,13 @@ pub async fn streak(
 
   if user.is_some() && (user_id != ctx.author().id) {
     let user = user.with_context(|| "Failed to retrieve User")?;
-    let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
-      Some(nick) => nick,
-      None => user.name.clone(),
-    };
+    let user_nick_or_name = user.nick_in(&ctx, guild_id).await.unwrap_or_else(|| {
+      if let Some(global_name) = &user.global_name {
+        global_name.clone()
+      } else {
+        user.name.clone()
+      }
+    });
 
     if tracking_profile.streaks_private {
       //Show for staff even when private

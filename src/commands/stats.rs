@@ -75,10 +75,13 @@ pub async fn user(
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let user = user.unwrap_or_else(|| ctx.author().clone());
-  let user_nick_or_name = match user.nick_in(&ctx, guild_id).await {
-    Some(nick) => nick,
-    None => user.name.clone(),
-  };
+  let user_nick_or_name = user.nick_in(&ctx, guild_id).await.unwrap_or_else(|| {
+    if let Some(global_name) = &user.global_name {
+      global_name.clone()
+    } else {
+      user.name.clone()
+    }
+  });
 
   let tracking_profile =
     match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user.id).await? {

@@ -202,7 +202,14 @@ pub async fn add(
     None => 0,
   };
 
-  if minus_offset != 0 && plus_offset != 0 {
+  // If no offset is specified in the command or tracking profile, add using UTC.
+  // Check for this first since it's the most common usage. Otherwise, check if multiple
+  // offsets were specified in the command and abort if so. Then, add using the specified
+  // offset. Prioritize command parameters so that the user can override their tracking
+  // profile offset, if they choose to do so.
+  if minus_offset == 0 && plus_offset == 0 && tracking_profile.utc_offset == 0 {
+    DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes).await?;
+  } else if minus_offset != 0 && plus_offset != 0 {
     ctx
       .send(
         CreateReply::default()
@@ -234,7 +241,7 @@ pub async fn add(
       adjusted_datetime,
     )
     .await?;
-  } else if tracking_profile.utc_offset != 0 {
+  } else {
     let adjusted_datetime =
       chrono::Utc::now() + Duration::minutes(i64::from(tracking_profile.utc_offset));
     DatabaseHandler::create_meditation_entry(
@@ -245,14 +252,11 @@ pub async fn add(
       adjusted_datetime,
     )
     .await?;
-  } else {
-    DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes).await?;
   }
 
+  let random_quote = DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await?;
   let user_sum =
     DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, &user_id).await?;
-  let user_streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
-  let random_quote = DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await?;
 
   let response = match random_quote {
     Some(quote) => {
@@ -413,9 +417,28 @@ pub async fn add(
     }
   }
 
-  let guild_count =
-    DatabaseHandler::get_guild_meditation_count(&mut transaction, &guild_id).await?;
-  let guild_sum = DatabaseHandler::get_guild_meditation_sum(&mut transaction, &guild_id).await?;
+  // We only need to get the streak if streaks are active. If inactive,
+  // this variable will be unused, so just assign a default value of 0.
+  let user_streak = if tracking_profile.streaks_active {
+    DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?
+  } else {
+    0
+  };
+
+  // We only show the guild time every tenth add, so we can avoid getting
+  // the guild sum and computing the hours if this is not the tenth add.
+  // Return a string so we can use it to skip displaying the time later
+  // without risking a default integer value matching the actual time.
+  let guild_time_in_hours = {
+    let guild_count =
+      DatabaseHandler::get_guild_meditation_count(&mut transaction, &guild_id).await?;
+    if guild_count % 10 == 0 {
+      let guild_sum = DatabaseHandler::get_guild_meditation_sum(&mut transaction, &guild_id).await?;
+      (guild_sum / 60).to_string()
+    } else {
+      "skip".to_owned()
+    }
+  };
 
   if privacy {
     let private_response = format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:");
@@ -435,10 +458,8 @@ pub async fn add(
     commit_and_say(ctx, transaction, MessageType::TextOnly(response), false).await?;
   }
 
-  if guild_count % 10 == 0 {
-    let time_in_hours = guild_sum / 60;
-
-    ctx.say(format!("Awesome sauce! This server has collectively generated {time_in_hours} hours of realmbreaking meditation!")).await?;
+  if guild_time_in_hours != "skip" {
+    ctx.say(format!("Awesome sauce! This server has collectively generated {guild_time_in_hours} hours of realmbreaking meditation!")).await?;
   }
 
   let member = guild_id.member(ctx, user_id).await?;
