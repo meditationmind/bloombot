@@ -2491,6 +2491,7 @@ impl DatabaseHandler {
     sqlx::query!(
       r#"
         INSERT INTO "star" (record_id, starred_message_id, board_message_id, starred_channel_id) VALUES ($1, $2, $3, $4)
+        ON CONFLICT (starred_message_id) DO UPDATE SET board_message_id = $3
       "#,
       Ulid::new().to_string(),
       starred_message_id.to_string(),
