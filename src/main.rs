@@ -47,8 +47,12 @@ async fn main() -> Result<()> {
     std::env::var("DISCORD_TOKEN").with_context(|| "Missing DISCORD_TOKEN environment variable")?;
   let test_guild = std::env::var("TEST_GUILD_ID");
 
-  let intents =
-    serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::GUILD_MEMBERS;
+  let intents = serenity::GatewayIntents::GUILDS
+    | serenity::GatewayIntents::GUILD_MODERATION
+    | serenity::GatewayIntents::GUILD_MESSAGES
+    | serenity::GatewayIntents::GUILD_MESSAGE_REACTIONS
+    | serenity::GatewayIntents::DIRECT_MESSAGES
+    | serenity::GatewayIntents::GUILD_MEMBERS;
 
   let framework = poise::Framework::builder()
     .options(poise::FrameworkOptions {
