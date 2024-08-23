@@ -1,4 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
+use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
@@ -51,7 +52,7 @@ pub async fn list_keys(
   let keys = DatabaseHandler::get_all_steam_keys(&mut transaction, &guild_id).await?;
   let keys: Vec<PageRowRef> = keys.iter().map(|key| key as PageRowRef).collect();
   drop(transaction);
-  let pagination = Pagination::new("Playne Keys", keys).await?;
+  let pagination = Pagination::new("Playne Keys", keys, ENTRIES_PER_PAGE).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();
@@ -264,7 +265,7 @@ pub async fn list_recipients(
     .map(|recipient| recipient as PageRowRef)
     .collect();
   drop(transaction);
-  let pagination = Pagination::new("Playne Key Recipients", recipients).await?;
+  let pagination = Pagination::new("Playne Key Recipients", recipients, ENTRIES_PER_PAGE).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();

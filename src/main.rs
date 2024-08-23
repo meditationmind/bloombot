@@ -97,19 +97,9 @@ async fn main() -> Result<()> {
 
           let guild_id = serenity::GuildId::new(test_guild.parse::<u64>()?);
           poise::builtins::register_in_guild(ctx, &framework.options().commands, guild_id).await?;
-
-          info!("Setting default activity text");
-          ctx.set_activity(Some(serenity::ActivityData::custom(
-            "Tracking your meditations",
-          )));
         } else {
           info!("Registering commands globally");
           poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-
-          info!("Setting default activity text");
-          ctx.set_activity(Some(serenity::ActivityData::custom(
-            "Tracking your meditations",
-          )));
         }
         Ok(Data {
           db: database::DatabaseHandler::new().await?,
@@ -246,6 +236,11 @@ async fn event_handler(
     }
     Event::Ready { .. } => {
       info!("Connected!");
+
+      info!("Setting default activity text");
+      ctx.set_activity(Some(serenity::ActivityData::custom(
+        "Tracking your meditations",
+      )));
     }
     _ => {}
   }

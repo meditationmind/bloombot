@@ -1,7 +1,7 @@
 use poise::serenity_prelude::{self as serenity, Embed, RoleId};
 
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
-pub const TERMS_PER_PAGE: usize = 10;
+pub const ENTRIES_PER_PAGE: usize = 10;
 pub const MIN_STARS: u64 = 5;
 
 /// Sensible defaults for use within our application.

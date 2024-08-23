@@ -1,3 +1,4 @@
+use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
@@ -34,7 +35,7 @@ pub async fn recent(
       .await?;
   drop(transaction);
   let entries: Vec<PageRowRef> = entries.iter().map(|entry| entry as _).collect();
-  let pagination = Pagination::new("Meditation Entries", entries).await?;
+  let pagination = Pagination::new("Meditation Entries", entries, ENTRIES_PER_PAGE).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();

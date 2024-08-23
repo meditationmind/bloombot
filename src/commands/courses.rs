@@ -1,4 +1,5 @@
 use crate::commands::{commit_and_say, course_not_found, MessageType};
+use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
@@ -267,7 +268,7 @@ pub async fn list(
   let courses = DatabaseHandler::get_all_courses(&mut transaction, &guild_id).await?;
   let courses: Vec<PageRowRef> = courses.iter().map(|course| course as _).collect();
   drop(transaction);
-  let pagination = Pagination::new("Courses", courses).await?;
+  let pagination = Pagination::new("Courses", courses, ENTRIES_PER_PAGE).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();

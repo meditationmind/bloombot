@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{self, BloomBotEmbed, CHANNELS};
+use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
@@ -221,15 +221,12 @@ pub async fn list(
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
-  let user_nick_or_name = user.nick_in(&ctx, guild_id).await.unwrap_or_else(|| {
-    if let Some(global_name) = &user.global_name {
-      global_name.clone()
-    } else {
-      user.name.clone()
-    }
-  });
+  let user_nick_or_name = user
+    .nick_in(&ctx, guild_id)
+    .await
+    .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
 
-  let privacy = ctx.channel_id() != config::CHANNELS.logs;
+  let privacy = ctx.channel_id() != CHANNELS.logs;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -243,7 +240,12 @@ pub async fn list(
   let erases = DatabaseHandler::get_erases(&mut transaction, &guild_id, &user.id).await?;
   let erases: Vec<PageRowRef> = erases.iter().map(|erase| erase as _).collect();
   drop(transaction);
-  let pagination = Pagination::new(format!("Erases for {user_nick_or_name}"), erases).await?;
+  let pagination = Pagination::new(
+    format!("Erases for {user_nick_or_name}"),
+    erases,
+    ENTRIES_PER_PAGE,
+  )
+  .await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();

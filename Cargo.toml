@@ -24,6 +24,5 @@ plotters = "0.3.6"
 tempfile = "3.10.1"
 dotenvy = "0.15.7"
 
-[patch.crates-io.serenity]
-git = "https://github.com/serenity-rs/serenity"
-branch = "current"
+[patch.crates-io]
+serenity = { git = "https://github.com/serenity-rs/serenity", branch = "current" }

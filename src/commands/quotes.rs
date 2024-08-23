@@ -1,4 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
+use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
@@ -232,7 +233,7 @@ pub async fn list(
   let quotes = DatabaseHandler::get_all_quotes(&mut transaction, &guild_id).await?;
   let quotes: Vec<PageRowRef> = quotes.iter().map(|quote| quote as PageRowRef).collect();
   drop(transaction);
-  let pagination = Pagination::new("Quotes", quotes).await?;
+  let pagination = Pagination::new("Quotes", quotes, ENTRIES_PER_PAGE).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();

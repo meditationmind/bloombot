@@ -6,7 +6,7 @@
   clippy::unused_async
 )]
 
-use crate::config::{BloomBotEmbed, TERMS_PER_PAGE};
+use crate::config::BloomBotEmbed;
 use anyhow::Result;
 use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateEmbedFooter};
 
@@ -28,17 +28,20 @@ impl<'a> Pagination<'a> {
   pub async fn new(
     title: impl ToString,
     entries: Vec<&'a (dyn PageRow + Send + Sync)>,
+    entries_per_page: usize,
   ) -> Result<Pagination<'_>> {
-    let terms_per_page = if title.to_string() == "Glossary" {
-      1
+    // Limit entries per page to embed fields limit (25)
+    let entries_per_page = if entries_per_page > 25 {
+      25
     } else {
-      TERMS_PER_PAGE
+      entries_per_page
     };
+
     let entries_count = entries.len();
     let page_count = if entries_count == 0 {
       1
     } else {
-      (entries_count as f64 / terms_per_page as f64).ceil() as usize
+      (entries_count as f64 / entries_per_page as f64).ceil() as usize
     };
 
     let page_data = if entries_count == 0 {
@@ -46,15 +49,17 @@ impl<'a> Pagination<'a> {
         entries: vec![],
         page_number: 0,
         page_count: 1,
+        entries_per_page,
       }]
     } else {
       entries
-        .chunks(terms_per_page)
+        .chunks(entries_per_page)
         .enumerate()
         .map(|(page_number, entries)| PaginationPage {
           entries: entries.to_vec(),
           page_number,
           page_count,
+          entries_per_page,
         })
         .collect()
     };
@@ -96,8 +101,8 @@ impl<'a> Pagination<'a> {
     let page = self.get_page(page);
 
     if let Some(page) = page {
-      // If it is a valid page that is empty, it must be page 0
-      // This implies that there are no terms in the glossary
+      // If it is a valid page that is empty, it must be page 0.
+      // This implies that there are no entries to display.
       if page.is_empty() {
         embed = embed
           .title(self.title.clone())
@@ -122,8 +127,8 @@ impl<'a> Pagination<'a> {
     let page = self.get_page(page);
 
     if let Some(page) = page {
-      // If it is a valid page that is empty, it must be page 0
-      // This implies that there are no terms in the glossary
+      // If it is a valid page that is empty, it must be page 0.
+      // This implies that there are no entries to display.
       if page.is_empty() {
         embed = embed
           .title(self.title.clone())
@@ -148,6 +153,7 @@ pub struct PaginationPage<'a> {
   entries: Vec<&'a (dyn PageRow + Send + Sync)>,
   page_number: usize,
   page_count: usize,
+  entries_per_page: usize,
 }
 
 impl PaginationPage<'_> {
@@ -157,18 +163,12 @@ impl PaginationPage<'_> {
 
   pub fn to_embed(
     &self,
-    //embed: &'embed_lifetime mut CreateEmbed,
     title: &str,
   ) -> serenity::CreateEmbed {
-    let terms_per_page = if title == "Glossary" {
-      1
-    } else {
-      TERMS_PER_PAGE
-    };
     let mut embed = BloomBotEmbed::new().title(title).description(format!(
       "Showing entries {} to {}.",
-      (self.page_number * terms_per_page) + 1,
-      (self.page_number * terms_per_page) + self.entries.len()
+      (self.page_number * self.entries_per_page) + 1,
+      (self.page_number * self.entries_per_page) + self.entries.len()
     ));
 
     let fields: Vec<(String, String, bool)> = self
@@ -189,14 +189,12 @@ impl PaginationPage<'_> {
 
   pub fn to_alt_embed(
     &self,
-    //embed: &'embed_lifetime mut CreateEmbed,
     title: &str,
   ) -> serenity::CreateEmbed {
-    let terms_per_page = TERMS_PER_PAGE;
     let mut embed = BloomBotEmbed::new().title(title).description(format!(
       "Showing entries {} to {}.",
-      (self.page_number * terms_per_page) + 1,
-      (self.page_number * terms_per_page) + self.entries.len()
+      (self.page_number * self.entries_per_page) + 1,
+      (self.page_number * self.entries_per_page) + self.entries.len()
     ));
 
     let fields: Vec<(String, String, bool)> = self

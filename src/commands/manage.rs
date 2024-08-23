@@ -1,7 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{BloomBotEmbed, CHANNELS};
+use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
@@ -196,7 +196,7 @@ pub async fn list(
     DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &user.id).await?;
   drop(transaction);
   let entries: Vec<PageRowRef> = entries.iter().map(|entry| entry as _).collect();
-  let pagination = Pagination::new("Meditation Entries", entries).await?;
+  let pagination = Pagination::new("Meditation Entries", entries, ENTRIES_PER_PAGE).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();
