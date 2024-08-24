@@ -219,11 +219,17 @@ async fn create_star_message(
           .as_ref()
           .is_some_and(|content_type| content_type.starts_with("image"))
         {
-          embed = embed.image(attachment.url.clone()).clone();
-
           if starred_message.attachments.len() > 1 {
+            let mut msg = CreateMessage::new();
+            let image = CreateAttachment::url(ctx, attachment.url.as_str()).await?;
+            let filename = image.filename.clone();
+            msg = msg.add_file(image);
+            msg = msg.embed(
+              embed
+                .attachment(filename)
+                .url(starred_message.link().clone()),
+            );
             let mut image_count = 1;
-            let mut msg = CreateMessage::new().embed(embed.url(starred_message.link().clone()));
 
             for attachment in &starred_message.attachments {
               if attachment
@@ -237,9 +243,12 @@ async fn create_star_message(
                 if image_count > 3 {
                   break;
                 }
+                let image = CreateAttachment::url(ctx, attachment.url.as_str()).await?;
+                let filename = image.filename.clone();
+                msg = msg.add_file(image);
                 msg = msg.add_embed(
                   CreateEmbed::new()
-                    .image(attachment.url.clone())
+                    .attachment(filename)
                     .url(starred_message.link().clone()),
                 );
                 image_count += 1;
@@ -248,6 +257,8 @@ async fn create_star_message(
 
             starboard_channel.send_message(ctx, msg).await?
           } else {
+            embed = embed.image(attachment.url.clone()).clone();
+
             starboard_channel
               .send_message(ctx, CreateMessage::new().embed(embed))
               .await?
