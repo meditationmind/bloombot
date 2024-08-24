@@ -74,7 +74,7 @@ pub async fn guild_member_update(
               .embed(config::BloomBotEmbed::new()
                   .title(":tada: A new member has arrived! :tada:")
                   .description(format!(
-                    "Welcome to the Meditation Mind community, <@{}>!\n\nCheck out <id:customize> to grab some roles and customize your community experience.\n\nWe're glad you've joined us! <:aww:578864572979478558>",
+                    "Welcome to the Meditation Mind community, <@{}>!\n\nCheck out <id:customize> to grab some roles and [customize your community experience](<https://meditationmind.org/curating-your-experience/>).\n\nWe're glad you've joined us! <:aww:578864572979478558>",
                     new.user.id
                   ))
                   .thumbnail("https://meditationmind.org/wp-content/uploads/2020/04/Webp.net-resizeimage-1.png")
