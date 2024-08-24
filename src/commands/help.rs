@@ -26,60 +26,6 @@ impl Default for HelpConfiguration<'_> {
   }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct OrderedMap<K, V>(pub Vec<(K, V)>);
-
-impl<K, V> Default for OrderedMap<K, V> {
-  fn default() -> Self {
-    Self(Vec::default())
-  }
-}
-
-impl<K: Eq, V> OrderedMap<K, V> {
-  /// Creates a new [`OrderedMap`]
-  pub fn new() -> Self {
-    Self(Vec::new())
-  }
-
-  /// Finds a value in the map by the given key
-  #[allow(dead_code)]
-  pub fn get(&self, k: &K) -> Option<&V> {
-    self
-      .0
-      .iter()
-      .find(|entry| &entry.0 == k)
-      .map(|entry| &entry.1)
-  }
-
-  /// Inserts a key value pair into the map
-  #[allow(dead_code)]
-  pub fn insert(&mut self, k: K, v: V) {
-    match self.0.iter_mut().find(|entry| entry.0 == k) {
-      Some(entry) => entry.1 = v,
-      None => self.0.push((k, v)),
-    }
-  }
-
-  /// Finds a value in the map by the given key, or inserts it if it doesn't exist
-  #[allow(clippy::expect_used)]
-  pub fn get_or_insert_with(&mut self, k: K, v: impl FnOnce() -> V) -> &mut V {
-    if let Some(i) = self.0.iter().position(|entry| entry.0 == k) {
-      &mut self.0[i].1
-    } else {
-      self.0.push((k, v()));
-      &mut self.0.last_mut().expect("we just inserted").1
-    }
-  }
-}
-
-impl<K, V> IntoIterator for OrderedMap<K, V> {
-  type Item = (K, V);
-  type IntoIter = std::vec::IntoIter<(K, V)>;
-  fn into_iter(self) -> Self::IntoIter {
-    self.0.into_iter()
-  }
-}
-
 async fn help_single_command<U, E>(
   ctx: poise::Context<'_, U, E>,
   command_name: &str,
@@ -151,7 +97,7 @@ async fn help_single_command<U, E>(
       .to_owned(),
   };
 
-  let mut subcommands = OrderedMap::<&String, String>::new();
+  let mut subcommands = indexmap::IndexMap::<&String, String>::new();
 
   if !command.subcommands.is_empty() {
     help_text += "\n\nSubcommands:";
@@ -195,7 +141,7 @@ async fn help_all_commands<U, E>(
   config: HelpConfiguration<'_>,
   elevated_permissions: bool,
 ) -> Result<()> {
-  let mut categories = OrderedMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
+  let mut categories = indexmap::IndexMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
   for cmd in &ctx.framework().options().commands {
     if !elevated_permissions && !cmd.required_permissions.is_empty() {
       continue;
@@ -207,7 +153,8 @@ async fn help_all_commands<U, E>(
       continue;
     }
     categories
-      .get_or_insert_with(cmd.category.as_deref(), Vec::new)
+      .entry(cmd.category.as_deref())
+      .or_default()
       .push(cmd);
   }
 
@@ -240,13 +187,14 @@ async fn help_all_commands<U, E>(
     });
 
   if config.show_context_menu_commands {
-    let mut context_categories = OrderedMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
+    let mut context_categories = indexmap::IndexMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
     for cmd in &ctx.framework().options().commands {
       if cmd.context_menu_action.is_none() || cmd.hide_in_help {
         continue;
       }
       context_categories
-        .get_or_insert_with(cmd.category.as_deref(), Vec::new)
+        .entry(cmd.category.as_deref())
+        .or_default()
         .push(cmd);
     }
 
