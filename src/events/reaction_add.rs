@@ -186,27 +186,24 @@ async fn create_star_message(
       None => config::BloomBotEmbed::new().description(starred_message.content.clone()),
     };
 
-    //let mut embed = config::BloomBotEmbed::new()
     embed = embed
       .author(CreateEmbedAuthor::new(author_nick_or_name).icon_url(starred_message.author.face()))
-      //.description(starred_message.content.clone())
       .field(
         "Link",
         format!(
           "**[Click to jump to {}.]({})**",
           message_type,
-          starred_message.link().clone()
+          starred_message.link()
         ),
         false,
       )
       .footer(CreateEmbedFooter::new(format!(
         "⭐ Times starred: {star_count}"
-      )))
-      .clone();
+      )));
 
     if let Some(sticker) = starred_message.sticker_items.first() {
       if let Some(sticker_url) = sticker.image_url() {
-        embed = embed.image(sticker_url.clone()).clone();
+        embed = embed.image(sticker_url.clone());
       }
     }
 
@@ -220,16 +217,9 @@ async fn create_star_message(
           .is_some_and(|content_type| content_type.starts_with("image"))
         {
           if starred_message.attachments.len() > 1 {
+            embed = embed.url(starred_message.link());
             let mut msg = CreateMessage::new();
-            let image = CreateAttachment::url(ctx, attachment.url.as_str()).await?;
-            let filename = image.filename.clone();
-            msg = msg.add_file(image);
-            msg = msg.embed(
-              embed
-                .attachment(filename)
-                .url(starred_message.link().clone()),
-            );
-            let mut image_count = 1;
+            let mut image_count = 0;
 
             for attachment in &starred_message.attachments {
               if attachment
@@ -237,27 +227,21 @@ async fn create_star_message(
                 .as_ref()
                 .is_some_and(|content_type| content_type.starts_with("image"))
               {
-                if image_count == 1 {
-                  continue;
-                }
                 if image_count > 3 {
                   break;
                 }
                 let image = CreateAttachment::url(ctx, attachment.url.as_str()).await?;
                 let filename = image.filename.clone();
                 msg = msg.add_file(image);
-                msg = msg.add_embed(
-                  CreateEmbed::new()
-                    .attachment(filename)
-                    .url(starred_message.link().clone()),
-                );
+                embed = embed.attachment(filename);
+                msg = msg.add_embed(embed.clone());
                 image_count += 1;
               }
             }
 
             starboard_channel.send_message(ctx, msg).await?
           } else {
-            embed = embed.image(attachment.url.clone()).clone();
+            embed = embed.image(attachment.url.clone());
 
             starboard_channel
               .send_message(ctx, CreateMessage::new().embed(embed))
