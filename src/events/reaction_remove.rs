@@ -1,6 +1,7 @@
 use crate::config::{self, EMOTES};
 use crate::database::DatabaseHandler;
-use anyhow::{Context as AnyhowContext, Result};
+use crate::events::create_star_message;
+use anyhow::Result;
 use poise::serenity_prelude::{builder::*, ChannelId, Context, Reaction, ReactionType};
 
 pub async fn reaction_remove(
@@ -38,17 +39,30 @@ async fn remove_star(ctx: &Context, database: &DatabaseHandler, reaction: &React
             .message(&ctx, star_message.board_message_id)
             .await?;
 
-          let existing_embed = starboard_message
-            .embeds
-            .first()
-            .with_context(|| "Failed to get existing embed from starboard message")?;
-          let updated_embed = CreateEmbed::from(existing_embed.clone()).footer(
-            CreateEmbedFooter::new(format!("⭐ Times starred: {star_count}")),
-          );
+          // Check to see if message was created by previous bot
+          if starboard_message.author.id == ctx.cache.current_user().id {
+            let existing_embeds = starboard_message.embeds.clone();
+            let mut updated_embeds: Vec<CreateEmbed> = Vec::new();
 
-          starboard_message
-            .edit(ctx, EditMessage::new().embed(updated_embed))
-            .await?;
+            for embed in existing_embeds {
+              let updated_embed = CreateEmbed::from(embed).footer(CreateEmbedFooter::new(format!(
+                "⭐ Times starred: {star_count}"
+              )));
+              updated_embeds.push(updated_embed);
+            }
+
+            starboard_message
+              .edit(ctx, EditMessage::new().embeds(updated_embeds))
+              .await?;
+          } else {
+            starboard_channel
+              .delete_message(&ctx, starboard_message.id)
+              .await?;
+            DatabaseHandler::delete_star_message(&mut transaction, &star_message.record_id).await?;
+
+            create_star_message(ctx, &mut transaction, reaction, star_count).await?;
+            transaction.commit().await?;
+          }
         } else {
           starboard_channel
             .delete_message(&ctx, star_message.board_message_id)
