@@ -112,21 +112,20 @@ async fn add_star(ctx: &Context, database: &DatabaseHandler, reaction: &Reaction
           .message(&ctx, star_message.board_message_id)
           .await?;
 
-        let existing_embed = starboard_message.embeds.first().with_context(|| {
-          format!(
-            "Failed to get embed from starboard message {}",
-            starboard_message.id
-          )
-        })?;
-
-        let updated_embed = CreateEmbed::from(existing_embed.clone()).footer(
-          CreateEmbedFooter::new(format!("⭐ Times starred: {star_count}")),
-        );
-
         // Check to see if message was created by previous bot
         if starboard_message.author.id == ctx.cache.current_user().id {
+          let existing_embeds = starboard_message.embeds.clone();
+          let mut updated_message = EditMessage::new();
+
+          for embed in existing_embeds {
+            let updated_embed = CreateEmbed::from(embed).footer(
+              CreateEmbedFooter::new(format!("⭐ Times starred: {star_count}")),
+            );
+            updated_message = updated_message.add_embed(updated_embed);
+          }
+          
           starboard_message
-            .edit(ctx, EditMessage::new().embed(updated_embed))
+            .edit(ctx, updated_message)
             .await?;
         } else {
           _ = starboard_channel
