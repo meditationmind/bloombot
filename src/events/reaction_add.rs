@@ -115,17 +115,17 @@ async fn add_star(ctx: &Context, database: &DatabaseHandler, reaction: &Reaction
         // Check to see if message was created by previous bot
         if starboard_message.author.id == ctx.cache.current_user().id {
           let existing_embeds = starboard_message.embeds.clone();
-          let mut updated_message = EditMessage::new();
+          let mut updated_embeds: Vec<CreateEmbed> = Vec::new();
 
           for embed in existing_embeds {
             let updated_embed = CreateEmbed::from(embed).footer(
               CreateEmbedFooter::new(format!("⭐ Times starred: {star_count}")),
             );
-            updated_message = updated_message.add_embed(updated_embed);
+            updated_embeds.push(updated_embed);
           }
           
           starboard_message
-            .edit(ctx, updated_message)
+            .edit(ctx, EditMessage::new().embeds(updated_embeds))
             .await?;
         } else {
           _ = starboard_channel
