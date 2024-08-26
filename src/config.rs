@@ -239,7 +239,7 @@ impl StreakRoles {
       857242214588612629 => Some(StreakRoles::Owl),
       857242212991762463 => Some(StreakRoles::Eagle),
       857242210302427186 => Some(StreakRoles::Dragon),
-      85724215578486375 => Some(StreakRoles::Alien),
+      857242155784863754 => Some(StreakRoles::Alien),
       1226730813190836367 => Some(StreakRoles::SpaceInvader),
       _ => None,
     }
