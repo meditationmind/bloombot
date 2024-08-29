@@ -1,3 +1,5 @@
+#![allow(clippy::cast_precision_loss)]
+
 use crate::config::{BloomBotEmbed, ROLES};
 use crate::database::{ChallengeTimeframe, DatabaseHandler, TrackingProfile};
 use crate::Context;
@@ -308,25 +310,63 @@ pub async fn stats(
         (end_time - start_time).num_days()
       };
 
+      let total_time = stats.timeframe_stats.sum.unwrap_or(0) as f64;
+      let total_hrs = (total_time.trunc() / 60.0).trunc();
+      let total_min = (total_time.trunc() / 60.0).fract() * 60.0;
+      let total_sec = total_time.fract() * 60.0;
+
+      let total_h = if total_hrs > 0.0 {
+        format!("{total_hrs:.0}h ")
+      } else {
+        String::new()
+      };
+      let total_m = if total_min > 0.0 {
+        format!("{total_min:.0}m ")
+      } else {
+        String::new()
+      };
+      let total_s = if total_sec > 0.0 {
+        format!("{total_sec:.0}s")
+      } else {
+        String::new()
+      };
+
+      let avg_time = stats.timeframe_stats.sum.unwrap_or(0) as f64 / days as f64;
+      let avg_hrs = (avg_time.trunc() / 60.0).trunc();
+      let avg_min = (avg_time.trunc() / 60.0).fract() * 60.0;
+      let avg_sec = avg_time.fract() * 60.0;
+
+      let avg_h = if avg_hrs > 0.0 {
+        format!("{avg_hrs:.0}h ")
+      } else {
+        String::new()
+      };
+      let avg_m = if avg_min > 0.0 {
+        format!("{avg_min:.0}m ")
+      } else {
+        String::new()
+      };
+      let avg_s = if avg_sec > 0.0 {
+        format!("{avg_sec:.0}s")
+      } else {
+        String::new()
+      };
+
       let mut embed = BloomBotEmbed::new();
       embed = embed
         .title("365-Day Meditation Challenge Stats")
         .author(CreateEmbedAuthor::new(member_nick_or_name).icon_url(member.user.face()))
         .field(
-          "Minutes",
-          format!(
-            "```autohotkey\nChallenge Total: {}\nAverage Per Day: {}```",
-            stats.timeframe_stats.sum.unwrap_or(0),
-            stats.timeframe_stats.sum.unwrap_or(0) / days
-          ),
+          "Time",
+          format!("```yml\nChallenge Total: {total_h}{total_m}{total_s}\nAverage Per Day: {avg_h}{avg_m}{avg_s}```"),
           false,
         )
         .field(
           "Sessions",
           format!(
-            "```autohotkey\nChallenge Total: {}\nAverage Per Day: {}```",
+            "```yml\nChallenge Total: {}\nAverage Per Day: {:.2}```",
             stats.timeframe_stats.count.unwrap_or(0),
-            stats.timeframe_stats.count.unwrap_or(0) / days
+            ((stats.timeframe_stats.count.unwrap_or(0) as f64 / days as f64) * 100.0).round() / 100.0
           ),
           false,
         );
@@ -339,7 +379,7 @@ pub async fn stats(
         embed = embed.field(
           "Streaks",
           format!(
-            "```autohotkey\nCurrent Streak: {}\nLongest Streak: {}```",
+            "```yml\nCurrent Streak: {}\nLongest Streak: {}```",
             stats.streak.current, stats.streak.longest
           ),
           false,
@@ -421,25 +461,63 @@ pub async fn stats(
       (end_time - start_time).num_days()
     };
 
+    let total_time = stats.timeframe_stats.sum.unwrap_or(0) as f64;
+    let total_hrs = (total_time.trunc() / 60.0).trunc();
+    let total_min = (total_time.trunc() / 60.0).fract() * 60.0;
+    let total_sec = total_time.fract() * 60.0;
+
+    let total_h = if total_hrs > 0.0 {
+      format!("{total_hrs:.0}h ")
+    } else {
+      String::new()
+    };
+    let total_m = if total_min > 0.0 {
+      format!("{total_min:.0}m ")
+    } else {
+      String::new()
+    };
+    let total_s = if total_sec > 0.0 {
+      format!("{total_sec:.0}s")
+    } else {
+      String::new()
+    };
+
+    let avg_time = stats.timeframe_stats.sum.unwrap_or(0) as f64 / days as f64;
+    let avg_hrs = (avg_time.trunc() / 60.0).trunc();
+    let avg_min = (avg_time.trunc() / 60.0).fract() * 60.0;
+    let avg_sec = avg_time.fract() * 60.0;
+
+    let avg_h = if avg_hrs > 0.0 {
+      format!("{avg_hrs:.0}h ")
+    } else {
+      String::new()
+    };
+    let avg_m = if avg_min > 0.0 {
+      format!("{avg_min:.0}m ")
+    } else {
+      String::new()
+    };
+    let avg_s = if avg_sec > 0.0 {
+      format!("{avg_sec:.0}s")
+    } else {
+      String::new()
+    };
+
     let mut embed = BloomBotEmbed::new();
     embed = embed
       .title("Monthly Meditation Challenge Stats")
       .author(CreateEmbedAuthor::new(member_nick_or_name).icon_url(member.user.face()))
       .field(
-        "Minutes",
-        format!(
-          "```autohotkey\nChallenge Total: {}\nAverage Per Day: {}```",
-          stats.timeframe_stats.sum.unwrap_or(0),
-          stats.timeframe_stats.sum.unwrap_or(0) / days
-        ),
+        "Time",
+        format!("```yml\nChallenge Total: {total_h}{total_m}{total_s}\nAverage Per Day: {avg_h}{avg_m}{avg_s}```"),
         false,
       )
       .field(
         "Sessions",
         format!(
-          "```autohotkey\nChallenge Total: {}\nAverage Per Day: {}```",
+          "```yml\nChallenge Total: {}\nAverage Per Day: {:.2}```",
           stats.timeframe_stats.count.unwrap_or(0),
-          stats.timeframe_stats.count.unwrap_or(0) / days
+          ((stats.timeframe_stats.count.unwrap_or(0) as f64 / days as f64) * 100.0).round() / 100.0
         ),
         false,
       );
@@ -452,7 +530,7 @@ pub async fn stats(
       embed = embed.field(
         "Streaks",
         format!(
-          "```autohotkey\nCurrent Streak: {}\nLongest Streak: {}```",
+          "```yml\nCurrent Streak: {}\nLongest Streak: {}```",
           stats.streak.current, stats.streak.longest
         ),
         false,
