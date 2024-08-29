@@ -104,7 +104,7 @@ pub enum Privacy {
   Public,
 }
 
-/// Add a meditation entry, with optional UTC offset
+/// Add a meditation entry
 ///
 /// Adds a specified number of minutes to your meditation time. You can add minutes each time you meditate or add the combined minutes for multiple sessions.
 ///
@@ -420,7 +420,8 @@ pub async fn add(
   // We only need to get the streak if streaks are active. If inactive,
   // this variable will be unused, so just assign a default value of 0.
   let user_streak = if tracking_profile.streaks_active {
-    DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?
+    let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
+    streak.current
   } else {
     0
   };
@@ -433,7 +434,8 @@ pub async fn add(
     let guild_count =
       DatabaseHandler::get_guild_meditation_count(&mut transaction, &guild_id).await?;
     if guild_count % 10 == 0 {
-      let guild_sum = DatabaseHandler::get_guild_meditation_sum(&mut transaction, &guild_id).await?;
+      let guild_sum =
+        DatabaseHandler::get_guild_meditation_sum(&mut transaction, &guild_id).await?;
       (guild_sum / 60).to_string()
     } else {
       "skip".to_owned()
@@ -506,7 +508,8 @@ pub async fn add(
 
   if tracking_profile.streaks_active {
     let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
-    let updated_streak_role = StreakRoles::from_streak(user_streak);
+    #[allow(clippy::cast_sign_loss)]
+    let updated_streak_role = StreakRoles::from_streak(user_streak as u64);
 
     if let Some(updated_streak_role) = updated_streak_role {
       if !current_streak_roles.contains(&updated_streak_role.to_role_id()) {

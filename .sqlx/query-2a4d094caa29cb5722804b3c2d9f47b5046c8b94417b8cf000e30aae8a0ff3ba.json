@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n          UPDATE streak SET current_streak = $1, longest_streak = $2 WHERE guild_id = $3 AND user_id = $4\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2a4d094caa29cb5722804b3c2d9f47b5046c8b94417b8cf000e30aae8a0ff3ba"
+}

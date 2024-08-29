@@ -7,7 +7,7 @@
 
 use crate::pagination::PageRow;
 use anyhow::{Context, Result};
-use chrono::Utc;
+use chrono::{Datelike, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use poise::serenity_prelude::{self as serenity, Mentionable};
@@ -55,11 +55,16 @@ impl Default for TrackingProfile {
   }
 }
 
+pub struct Streak {
+  pub current: i32,
+  pub longest: i32,
+}
+
 pub struct UserStats {
   pub all_minutes: i64,
   pub all_count: u64,
   pub timeframe_stats: TimeframeStats,
-  pub streak: u64,
+  pub streak: Streak,
 }
 
 pub struct GuildStats {
@@ -74,6 +79,14 @@ pub enum Timeframe {
   Monthly,
   Weekly,
   Daily,
+}
+
+#[derive(poise::ChoiceParameter, PartialEq)]
+pub enum ChallengeTimeframe {
+  #[name = "Monthly Challenge"]
+  Monthly,
+  #[name = "365-Day Challenge"]
+  YearRound,
 }
 
 #[derive(Debug)]
@@ -1288,7 +1301,19 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
-  ) -> Result<u64> {
+  ) -> Result<Streak> {
+    let mut streak_data = sqlx::query_as!(
+      Streak,
+      r#"
+        SELECT current_streak AS current, longest_streak AS longest FROM streak WHERE guild_id = $1 AND user_id = $2
+      "#,
+      guild_id.to_string(),
+      user_id.to_string(),
+    )
+    .fetch_optional(&mut **transaction)
+    .await?
+    .unwrap_or(Streak { current: 0, longest: 0 });
+
     let mut row = sqlx::query_as!(
       MeditationCountByDay,
       r#"
@@ -1310,9 +1335,10 @@ impl DatabaseHandler {
 
     let mut last = 0;
     let mut streak = 0;
+    let mut streak_broken = false;
 
+    // Check if currently maintaining a streak
     if let Some(first) = row.try_next().await? {
-      // date_part 'day' can only be 1-31
       #[allow(clippy::cast_possible_truncation)]
       let days_ago = first
         .days_ago
@@ -1320,15 +1346,16 @@ impl DatabaseHandler {
         as i32;
 
       if days_ago > 2 {
-        return Ok(0);
+        streak_broken = true;
+        streak_data.current = 0;
       }
 
       last = days_ago;
       streak = 1;
     }
 
+    // Calculate most recent streak
     while let Some(row) = row.try_next().await? {
-      // date_part 'day' can only be 1-31
       #[allow(clippy::cast_possible_truncation)]
       let days_ago = row
         .days_ago
@@ -1336,6 +1363,7 @@ impl DatabaseHandler {
         as i32;
 
       if days_ago != last + 1 {
+        last = days_ago;
         break;
       }
 
@@ -1343,7 +1371,74 @@ impl DatabaseHandler {
       streak += 1;
     }
 
-    Ok(streak)
+    if !streak_broken {
+      streak_data.current = if streak < 2 { 0 } else { streak };
+    }
+    // Return early if longest streak has already been calculated
+    if streak_data.longest > 0 {
+      if streak > streak_data.longest {
+        streak_data.longest = if streak < 2 { 0 } else { streak };
+      }
+
+      drop(row);
+      
+      sqlx::query!(
+        r#"
+          UPDATE streak SET current_streak = $1, longest_streak = $2 WHERE guild_id = $3 AND user_id = $4
+        "#,
+        streak_data.current,
+        streak_data.longest,
+        guild_id.to_string(),
+        user_id.to_string(),
+      )
+      .execute(&mut **transaction)
+      .await?;
+
+      return Ok(streak_data);
+    }
+    streak_data.longest = if streak < 2 { 0 } else { streak };
+    streak = 1;
+
+    // Calculate longest streak (first time only)
+    while let Some(row) = row.try_next().await? {
+      #[allow(clippy::cast_possible_truncation)]
+      let days_ago = row
+        .days_ago
+        .with_context(|| "Failed to assign days_ago computed by DB query")?
+        as i32;
+
+      if days_ago != last + 1 {
+        if streak > streak_data.longest {
+          streak_data.longest = streak;
+        }
+        streak = 1;
+        last = days_ago;
+        continue;
+      }
+
+      last = days_ago;
+      streak += 1;
+    }
+
+    if streak > streak_data.longest {
+      streak_data.longest = if streak < 2 { 0 } else { streak };
+    }
+
+    drop(row);
+
+    sqlx::query!(
+      r#"
+        UPDATE streak SET current_streak = $1, longest_streak = $2 WHERE guild_id = $3 AND user_id = $4
+      "#,
+      streak_data.current,
+      streak_data.longest,
+      guild_id.to_string(),
+      user_id.to_string(),
+    )
+    .execute(&mut **transaction)
+    .await?;
+
+    Ok(streak_data)
   }
 
   pub async fn course_exists(
@@ -2115,6 +2210,46 @@ impl DatabaseHandler {
     .await?;
 
     Ok(())
+  }
+
+  pub async fn get_challenge_stats(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+    timeframe: &ChallengeTimeframe,
+  ) -> Result<UserStats> {
+    // Get total count, total sum, and count/sum for timeframe
+    let end_time = chrono::Utc::now();
+    let start_time = match timeframe {
+      ChallengeTimeframe::Monthly =>
+        end_time.with_day(1).unwrap_or_default().with_hour(0).unwrap_or_default().with_minute(0).unwrap_or_default(),
+      ChallengeTimeframe::YearRound =>
+        end_time.with_month(1).unwrap_or_default().with_day(1).unwrap_or_default().with_hour(0).unwrap_or_default().with_minute(0).unwrap_or_default(),
+    };
+
+    let timeframe_data = sqlx::query_as!(
+      TimeframeStats,
+      r#"
+        SELECT COUNT(record_id) AS count, SUM(meditation_minutes) AS sum
+        FROM meditation
+        WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
+      "#,
+      guild_id.to_string(),
+      user_id.to_string(),
+      start_time,
+      end_time,
+    )
+    .fetch_one(&mut **transaction)
+    .await?;
+
+    let user_stats = UserStats {
+      all_minutes: 0,
+      all_count: 0,
+      timeframe_stats: timeframe_data,
+      streak: DatabaseHandler::get_streak(transaction, guild_id, user_id).await?,
+    };
+
+    Ok(user_stats)
   }
 
   pub async fn get_user_stats(

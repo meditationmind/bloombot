@@ -111,7 +111,7 @@ pub enum OnOff {
   Off,
 }
 
-/// Customize your meditation tracking experience
+/// Customize your tracking experience
 ///
 /// Customize your meditation tracking experience.
 ///
@@ -554,7 +554,8 @@ pub async fn streak(
       let member = guild_id.member(ctx, user_id).await?;
 
       let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
-      let earned_streak_role = StreakRoles::from_streak(user_streak);
+      #[allow(clippy::cast_sign_loss)]
+      let earned_streak_role = StreakRoles::from_streak(user_streak.current as u64);
 
       if let Some(earned_streak_role) = earned_streak_role {
         if !current_streak_roles.contains(&earned_streak_role.to_role_id()) {
@@ -631,7 +632,8 @@ pub async fn streak(
       let member = guild_id.member(ctx, user_id).await?;
 
       let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
-      let earned_streak_role = StreakRoles::from_streak(user_streak);
+      #[allow(clippy::cast_sign_loss)]
+      let earned_streak_role = StreakRoles::from_streak(user_streak.current as u64);
 
       if let Some(earned_streak_role) = earned_streak_role {
         if !current_streak_roles.contains(&earned_streak_role.to_role_id()) {

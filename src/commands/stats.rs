@@ -224,7 +224,7 @@ pub async fn user(
       timeframe.name().to_lowercase(),
       stats_type_label,
       average,
-      stats.streak
+      stats.streak.current
     )));
   } else {
     embed = embed.footer(CreateEmbedFooter::new(format!(

@@ -65,12 +65,22 @@ pub async fn streak(
         .has_role(&ctx, guild_id, config::ROLES.staff)
         .await?
       {
+        let message = if streak.current == streak.longest {
+          format!(
+            "{user_nick_or_name}'s current **private** meditation streak is {} days. This is {user_nick_or_name}'s longest streak.",
+            streak.current
+          )
+        } else {
+          format!(
+            "{user_nick_or_name}'s current **private** meditation streak is {} days. {user_nick_or_name}'s longest streak is {} days.",
+            streak.current, streak.longest
+          )
+        };
+
         ctx
           .send(
             poise::CreateReply::default()
-              .content(format!(
-                "{user_nick_or_name}'s current **private** meditation streak is {streak} days."
-              ))
+              .content(message)
               .ephemeral(true)
               .allowed_mentions(serenity::CreateAllowedMentions::new()),
           )
@@ -93,12 +103,22 @@ pub async fn streak(
       return Ok(());
     }
 
+    let message = if streak.current == streak.longest {
+      format!(
+        "{user_nick_or_name}'s current meditation streak is {} days. This is {user_nick_or_name}'s longest streak.",
+        streak.current
+      )
+    } else {
+      format!(
+        "{user_nick_or_name}'s current meditation streak is {} days. {user_nick_or_name}'s longest streak is {} days.",
+        streak.current, streak.longest
+      )
+    };
+
     ctx
       .send(
         poise::CreateReply::default()
-          .content(format!(
-            "{user_nick_or_name}'s current meditation streak is {streak} days."
-          ))
+          .content(message)
           .ephemeral(privacy)
           .allowed_mentions(serenity::CreateAllowedMentions::new()),
       )
@@ -107,10 +127,22 @@ pub async fn streak(
     return Ok(());
   }
 
+  let message = if streak.current == streak.longest {
+    format!(
+      "Your current meditation streak is {} days. This is your longest streak.",
+      streak.current
+    )
+  } else {
+    format!(
+      "Your current meditation streak is {} days. Your longest streak is {} days.",
+      streak.current, streak.longest
+    )
+  };
+
   ctx
     .send(
       poise::CreateReply::default()
-        .content(format!("Your current meditation streak is {streak} days."))
+        .content(message)
         .ephemeral(privacy),
     )
     .await?;
