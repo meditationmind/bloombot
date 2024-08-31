@@ -82,7 +82,7 @@ async fn commit_and_say(
         Ok(()) => {}
         Err(e) => {
           _ = sent_message.edit(ctx, CreateReply::default()
-            .content("<:mminfo:1194141918133768234> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
+            .content("<:mminfo:1279517292455264359> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
             .ephemeral(true)).await;
           return Err(anyhow::anyhow!("Could not send message: {e}"));
         }
@@ -105,7 +105,7 @@ async fn commit_and_say(
       // We'll send a response to the channel to inform the user.
       _ = ctx
         .channel_id()
-        .say(&ctx, "<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
+        .say(&ctx, "<:mminfo:1279517292455264359> An error may have occurred. If your command failed, please contact staff for assistance.")
         .await;
 
       return Err(anyhow::anyhow!("Could not send message: {e}"));

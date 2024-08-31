@@ -366,7 +366,7 @@ pub async fn add(
               Ok(()) => {}
               Err(e) => {
                 check.edit(ctx, CreateReply::default()
-                  .content("<:mminfo:1194141918133768234> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
+                  .content("<:mminfo:1279517292455264359> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
                   .ephemeral(privacy)).await?;
                 return Err(anyhow::anyhow!("Could not send message: {e}"));
               }
@@ -376,7 +376,7 @@ pub async fn add(
         Err(e) => {
           check
             .edit(ctx, CreateReply::default()
-              .content("<:mminfo:1194141918133768234> An error may have occurred. If your command failed, please contact staff for assistance.")
+              .content("<:mminfo:1279517292455264359> An error may have occurred. If your command failed, please contact staff for assistance.")
                 .ephemeral(privacy)
             )
             .await?;

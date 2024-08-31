@@ -96,7 +96,7 @@ pub async fn join(
           .await?;
 
         ctx.say(format!(
-    "Awesome, <@{}>! You have successfully joined the 365-day challenge <:pepeglow:1174181400249901076>",
+    "Awesome, <@{}>! You have successfully joined the 365-day challenge <:pepeglow:1279541855150673991>",
     member.user.id,
     )).await?;
 
