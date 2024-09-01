@@ -5,6 +5,7 @@ use anyhow::Result;
 use poise::{serenity_prelude as serenity, CreateReply};
 
 pub mod add;
+pub mod bookmark;
 pub mod challenge;
 pub mod coffee;
 pub mod complete;

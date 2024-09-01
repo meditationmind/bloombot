@@ -259,6 +259,40 @@ impl PageRow for SteamKeyRecipientData {
   }
 }
 
+pub struct BookmarkData {
+  pub id: String,
+  pub link: String,
+  pub description: Option<String>,
+  pub added: chrono::DateTime<Utc>,
+}
+
+impl PageRow for BookmarkData {
+  fn title(&self) -> String {
+    self.link.clone()
+  }
+
+  fn alternate_title(&self) -> String {
+    self.title()
+  }
+
+  fn body(&self) -> String {
+    if let Some(description) = &self.description {
+      format!(
+        "```{}```\n-# Added: <t:{}:f>\n-# ID: `{}`",
+        description,
+        self.added.timestamp(),
+        self.id,
+      )
+    } else {
+      format!(
+        "-# Added: <t:{}:f>\n-# ID: `{}`",
+        self.added.timestamp(),
+        self.id,
+      )
+    }
+  }
+}
+
 pub struct CourseData {
   pub course_name: String,
   pub participant_role: serenity::RoleId,
@@ -806,6 +840,95 @@ impl DatabaseHandler {
         .await?;
       }
     }
+
+    Ok(())
+  }
+
+  pub async fn add_bookmark(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+    message_link: &str,
+    description: Option<&str>,
+  ) -> Result<()> {
+    sqlx::query!(
+      r#"
+        INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)
+      "#,
+      Ulid::new().to_string(),
+      user_id.to_string(),
+      guild_id.to_string(),
+      message_link,
+      description,
+    )
+    .execute(&mut **transaction)
+    .await?;
+
+    Ok(())
+  }
+
+  pub async fn get_bookmark_count(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+  ) -> Result<u64> {
+    let row = sqlx::query!(
+      r#"
+        SELECT COUNT(record_id) AS bookmark_count FROM bookmarks WHERE user_id = $1 AND guild_id = $2
+      "#,
+      user_id.to_string(),
+      guild_id.to_string(),
+    )
+    .fetch_one(&mut **transaction)
+    .await?;
+
+    let bookmark_count = row
+      .bookmark_count
+      .with_context(|| "Failed to assign bookmark_count computed by DB query")?;
+
+    Ok(bookmark_count.try_into()?)
+  }
+
+  pub async fn get_bookmarks(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+  ) -> Result<Vec<BookmarkData>> {
+    let rows = sqlx::query!(
+      r#"
+        SELECT record_id, message_link, user_desc, occurred_at FROM bookmarks WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at ASC
+      "#,
+      user_id.to_string(),
+      guild_id.to_string(),
+    )
+    .fetch_all(&mut **transaction)
+    .await?;
+
+    let bookmark_data = rows
+      .into_iter()
+      .map(|row| BookmarkData {
+        id: row.record_id,
+        link: row.message_link,
+        description: row.user_desc,
+        added: row.occurred_at,
+      })
+      .collect();
+
+    Ok(bookmark_data)
+  }
+
+  pub async fn remove_bookmark(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    bookmark_id: &str,
+  ) -> Result<()> {
+    sqlx::query!(
+      r#"
+        DELETE FROM bookmarks WHERE record_id = $1
+      "#,
+      bookmark_id,
+    )
+    .execute(&mut **transaction)
+    .await?;
 
     Ok(())
   }

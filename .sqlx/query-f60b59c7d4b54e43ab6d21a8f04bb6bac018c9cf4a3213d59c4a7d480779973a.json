@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM bookmarks WHERE record_id = $1\n      ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f60b59c7d4b54e43ab6d21a8f04bb6bac018c9cf4a3213d59c4a7d480779973a"
+}

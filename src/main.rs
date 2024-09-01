@@ -7,11 +7,12 @@
 
 use anyhow::{Context as ErrorContext, Error, Result};
 use commands::{
-  add::add, challenge::challenge, coffee::coffee, complete::complete, courses::course,
-  customize::customize, erase::erase, glossary::glossary, hello::hello, help::help, keys::keys,
-  manage::manage, pick_winner::pick_winner, ping::ping, quote::quote, quotes::quotes,
-  recent::recent, remove_entry::remove_entry, report_message::report_message, stats::stats,
-  streak::streak, suggest::suggest, terms::terms, whatis::whatis,
+  add::add, bookmark::add_bookmark, bookmark::bookmark, challenge::challenge, coffee::coffee,
+  complete::complete, courses::course, customize::customize, erase::erase, glossary::glossary,
+  hello::hello, help::help, keys::keys, manage::manage, pick_winner::pick_winner, ping::ping,
+  quote::quote, quotes::quotes, recent::recent, remove_entry::remove_entry,
+  report_message::report_message, stats::stats, streak::streak, suggest::suggest, terms::terms,
+  whatis::whatis,
 };
 use dotenvy::dotenv;
 use log::{error, info};
@@ -81,6 +82,8 @@ async fn main() -> Result<()> {
         suggest(),
         complete(),
         report_message(),
+        add_bookmark(),
+        bookmark(),
       ],
       event_handler: |ctx, event, _framework, data| Box::pin(event_handler(ctx, event, data)),
       on_error: |error| {
