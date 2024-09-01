@@ -23,7 +23,7 @@ use poise::CreateReply;
   guild_only
 )]
 #[allow(clippy::unused_async)]
-pub async fn course(_: Context<'_>) -> Result<()> {
+pub async fn courses(_: Context<'_>) -> Result<()> {
   Ok(())
 }
 
