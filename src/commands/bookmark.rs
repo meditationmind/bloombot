@@ -12,7 +12,6 @@ use poise::{CreateReply, Modal};
 struct AddBookmarkModal {
   #[name = "Description"]
   #[placeholder = "Include a short description (optional)"]
-  #[paragraph]
   #[max_length = 100]
   description: Option<String>,
 }
@@ -99,12 +98,12 @@ pub async fn add_bookmark(
   Ok(())
 }
 
-/// Commands for managing your bookmarks
+/// Manage your bookmarks
 ///
-/// List your bookmarks or remove a bookmark from your list.
+/// View your bookmarks or remove a bookmark from your list.
 #[poise::command(
   slash_command,
-  category = "Utilities",
+  category = "Informational",
   subcommands("list", "remove"),
   subcommand_required,
   guild_only

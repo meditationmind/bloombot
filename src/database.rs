@@ -278,15 +278,17 @@ impl PageRow for BookmarkData {
   fn body(&self) -> String {
     if let Some(description) = &self.description {
       format!(
-        "```{}```\n-# Added: <t:{}:f>\n-# ID: `{}`",
+        "> {}\n-# Added: <t:{}:f>\n-# ID: [{}](discord://{} \"For copying a bookmark ID on mobile. Not a working link.\")",
         description,
         self.added.timestamp(),
+        self.id,
         self.id,
       )
     } else {
       format!(
-        "-# Added: <t:{}:f>\n-# ID: `{}`",
+        "-# Added: <t:{}:f>\n-# ID: [{}](discord://{} \"For copying a bookmark ID on mobile. Not a working link.\")",
         self.added.timestamp(),
+        self.id,
         self.id,
       )
     }

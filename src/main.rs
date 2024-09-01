@@ -74,6 +74,7 @@ async fn main() -> Result<()> {
         streak(),
         whatis(),
         glossary(),
+        bookmark(),
         quote(),
         coffee(),
         hello(),
@@ -81,9 +82,8 @@ async fn main() -> Result<()> {
         ping(),
         suggest(),
         complete(),
-        report_message(),
         add_bookmark(),
-        bookmark(),
+        report_message(),
       ],
       event_handler: |ctx, event, _framework, data| Box::pin(event_handler(ctx, event, data)),
       on_error: |error| {
