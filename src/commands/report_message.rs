@@ -3,7 +3,7 @@ use crate::Context;
 use anyhow::Result;
 use poise::serenity_prelude::{self as serenity, builder::*};
 
-/// Reports a message to server staff
+/// Report a message to server staff
 ///
 /// Reports a message to server staff.
 ///

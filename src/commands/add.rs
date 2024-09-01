@@ -401,8 +401,12 @@ pub async fn add(
             minutes
           ))
           .footer(
-            CreateEmbedFooter::new(format!("Added by {}", ctx.author()))
-              .icon_url(ctx.author().avatar_url().unwrap_or_default()),
+            CreateEmbedFooter::new(format!(
+              "Added by {} ({})",
+              ctx.author().name,
+              ctx.author().id
+            ))
+            .icon_url(ctx.author().avatar_url().unwrap_or_default()),
           )
           .clone();
 
