@@ -167,6 +167,9 @@ async fn help_all_commands<U, E>(
         if command.hide_in_help {
           continue;
         }
+        if command.guild_only && ctx.guild_id().is_none() {
+          continue;
+        }
 
         let prefix = String::from("/");
         let total_command_name_length = prefix.chars().count() + command.name.chars().count();
@@ -190,6 +193,9 @@ async fn help_all_commands<U, E>(
     let mut context_categories = indexmap::IndexMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
     for cmd in &ctx.framework().options().commands {
       if cmd.context_menu_action.is_none() || cmd.hide_in_help {
+        continue;
+      }
+      if cmd.guild_only && ctx.guild_id().is_none() {
         continue;
       }
       context_categories
