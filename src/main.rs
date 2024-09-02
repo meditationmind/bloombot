@@ -12,7 +12,7 @@ use commands::{
   glossary::glossary, hello::hello, help::help, keys::keys, manage::manage,
   pick_winner::pick_winner, ping::ping, quote::quote, quotes::quotes, recent::recent,
   remove_entry::remove_entry, report_message::report_message, stats::stats, streak::streak,
-  suggest::suggest, terms::terms, whatis::whatis,
+  suggest::suggest, terms::terms, uptime::uptime, whatis::whatis,
 };
 use dotenvy::dotenv;
 use log::{error, info};
@@ -35,6 +35,7 @@ pub struct Data {
   pub db: database::DatabaseHandler,
   pub rng: Arc<Mutex<SmallRng>>,
   pub embeddings: Arc<embeddings::OpenAIHandler>,
+  pub bloom_start_time: std::time::Instant,
 }
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -80,6 +81,7 @@ async fn main() -> Result<()> {
         hello(),
         help(),
         ping(),
+        uptime(),
         course(),
         suggest(),
         complete(),
@@ -109,6 +111,7 @@ async fn main() -> Result<()> {
           db: database::DatabaseHandler::new().await?,
           rng: Arc::new(Mutex::new(SmallRng::from_entropy())),
           embeddings: Arc::new(embeddings::OpenAIHandler::new()?),
+          bloom_start_time: std::time::Instant::now(),
         })
       })
     })

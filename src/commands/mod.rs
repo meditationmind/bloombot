@@ -29,6 +29,7 @@ pub mod stats;
 pub mod streak;
 pub mod suggest;
 pub mod terms;
+pub mod uptime;
 pub mod whatis;
 
 #[allow(clippy::large_enum_variant)]
