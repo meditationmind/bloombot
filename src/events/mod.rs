@@ -53,7 +53,11 @@ pub async fn create_star_message(
     };
 
     let mut embed = match starred_message.embeds.first() {
-      Some(embed) => config::BloomBotEmbed::from(embed.clone()),
+      Some(embed) => if starred_message.content.is_empty() {
+        config::BloomBotEmbed::from(embed.clone())
+      } else {
+        config::BloomBotEmbed::new().description(starred_message.content.clone())
+      }
       None => config::BloomBotEmbed::new().description(starred_message.content.clone()),
     };
 
