@@ -152,6 +152,9 @@ async fn help_all_commands<U, E>(
     if cmd.context_menu_action.is_some() {
       continue;
     }
+    if ctx.guild_id().is_none() && cmd.guild_only {
+      continue;
+    }
     categories
       .entry(cmd.category.as_deref())
       .or_default()
@@ -167,7 +170,7 @@ async fn help_all_commands<U, E>(
         if command.hide_in_help {
           continue;
         }
-        if command.guild_only && ctx.guild_id().is_none() {
+        if ctx.guild_id().is_none() && command.guild_only {
           continue;
         }
 
@@ -195,7 +198,7 @@ async fn help_all_commands<U, E>(
       if cmd.context_menu_action.is_none() || cmd.hide_in_help {
         continue;
       }
-      if cmd.guild_only && ctx.guild_id().is_none() {
+      if ctx.guild_id().is_none() && cmd.guild_only {
         continue;
       }
       context_categories
