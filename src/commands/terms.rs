@@ -178,15 +178,6 @@ pub async fn add(
       true,
     )
     .await?;
-  } else {
-    ctx
-      .send(
-        poise::CreateReply::default()
-          .content(":x: No data was provided.")
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
   }
 
   Ok(())
@@ -280,15 +271,6 @@ pub async fn edit(
       true,
     )
     .await?;
-  } else {
-    ctx
-      .send(
-        poise::CreateReply::default()
-          .content(":x: No data was provided.")
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
   }
 
   Ok(())

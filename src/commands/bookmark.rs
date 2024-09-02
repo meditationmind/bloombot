@@ -84,15 +84,6 @@ pub async fn add_bookmark(
       true,
     )
     .await?;
-  } else {
-    ctx
-      .send(
-        CreateReply::default()
-          .content("<:mminfo:1279517292455264359> No data was provided. Please try again.")
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
   }
 
   Ok(())

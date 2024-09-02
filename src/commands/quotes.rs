@@ -84,15 +84,6 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
       true,
     )
     .await?;
-  } else {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(":x: No data was provided.")
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
   }
 
   Ok(())
@@ -154,15 +145,6 @@ pub async fn edit(
       true,
     )
     .await?;
-  } else {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(":x: No data was provided.")
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
   }
 
   Ok(())
