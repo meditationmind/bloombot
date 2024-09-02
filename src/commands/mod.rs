@@ -137,7 +137,7 @@ pub async fn course_not_found(
         .send(
           poise::CreateReply::default()
             .content(format!(
-              ":x: Course does not exist. Did you mean `{}`?",
+              "<:mminfo:1279517292455264359> Course does not exist. Did you mean `{}`?",
               possible_course.course_name
             ))
             .ephemeral(true),
@@ -147,7 +147,7 @@ pub async fn course_not_found(
       ctx
         .send(
           poise::CreateReply::default()
-            .content(":x: Course does not exist.")
+            .content("<:mminfo:1279517292455264359> Course does not exist.")
             .ephemeral(true),
         )
         .await?;
@@ -156,7 +156,7 @@ pub async fn course_not_found(
     ctx
       .send(
         poise::CreateReply::default()
-          .content(":x: Course does not exist.")
+          .content("<:mminfo:1279517292455264359> Course does not exist.")
           .ephemeral(true),
       )
       .await?;
