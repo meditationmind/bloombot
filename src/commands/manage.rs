@@ -3,7 +3,7 @@
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, Pagination};
+use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{Datelike, Timelike};
@@ -202,7 +202,7 @@ pub async fn list(
     current_page = pagination.get_last_page_number();
   }
 
-  let first_page = pagination.create_page_embed(current_page);
+  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
 
   ctx
     .send({
@@ -242,7 +242,7 @@ pub async fn list(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page)),
+          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;

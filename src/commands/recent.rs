@@ -1,6 +1,6 @@
 use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, Pagination};
+use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*};
@@ -41,7 +41,7 @@ pub async fn recent(
     current_page = pagination.get_last_page_number();
   }
 
-  let first_page = pagination.create_page_embed(current_page);
+  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
 
   ctx
     .send({
@@ -81,7 +81,7 @@ pub async fn recent(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page)),
+          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;

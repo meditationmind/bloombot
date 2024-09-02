@@ -1,7 +1,7 @@
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, Pagination};
+use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, MessageId};
@@ -252,8 +252,8 @@ pub async fn list(
   }
 
   let first_page = match date_format {
-    Some(DateFormat::Dmy) => pagination.create_alt_page_embed(current_page),
-    _ => pagination.create_page_embed(current_page),
+    Some(DateFormat::Dmy) => pagination.create_page_embed(current_page, PageType::Alternate),
+    _ => pagination.create_page_embed(current_page, PageType::Standard),
   };
 
   ctx
@@ -296,7 +296,7 @@ pub async fn list(
           ctx,
           CreateInteractionResponse::UpdateMessage(
             CreateInteractionResponseMessage::new()
-              .embed(pagination.create_alt_page_embed(current_page)),
+              .embed(pagination.create_page_embed(current_page, PageType::Alternate)),
           ),
         )
         .await?;
@@ -306,7 +306,7 @@ pub async fn list(
           ctx,
           CreateInteractionResponse::UpdateMessage(
             CreateInteractionResponseMessage::new()
-              .embed(pagination.create_page_embed(current_page)),
+              .embed(pagination.create_page_embed(current_page, PageType::Standard)),
           ),
         )
         .await?;

@@ -4,8 +4,9 @@
   clippy::struct_excessive_bools,
   clippy::too_many_arguments
 )]
+#![cfg_attr(any(), rustfmt::skip::macros(query, query_as))]
 
-use crate::pagination::PageRow;
+use crate::pagination::{PageRow, PageType};
 use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
@@ -103,19 +104,22 @@ pub struct EraseData {
 }
 
 impl PageRow for EraseData {
-  fn title(&self) -> String {
-    if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
-      "Date: `Not Available`".to_owned()
-    } else {
-      format!("Date: `{}`", self.occurred_at.format("%Y-%m-%d %H:%M"))
-    }
-  }
-
-  fn alternate_title(&self) -> String {
-    if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
-      "Date: `Not Available`".to_owned()
-    } else {
-      format!("Date: `{}`", self.occurred_at.format("%e %B %Y %H:%M"))
+  fn title(&self, page_type: PageType) -> String {
+    match page_type {
+      PageType::Standard => {
+        if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
+          "Date: `Not Available`".to_owned()
+        } else {
+          format!("Date: `{}`", self.occurred_at.format("%Y-%m-%d %H:%M"))
+        }
+      }
+      PageType::Alternate => {
+        if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
+          "Date: `Not Available`".to_owned()
+        } else {
+          format!("Date: `{}`", self.occurred_at.format("%e %B %Y %H:%M"))
+        }
+      }
     }
   }
 
@@ -136,12 +140,8 @@ pub struct MeditationData {
 }
 
 impl PageRow for MeditationData {
-  fn title(&self) -> String {
+  fn title(&self, _page_type: PageType) -> String {
     format!("{} minutes", self.meditation_minutes)
-  }
-
-  fn alternate_title(&self) -> String {
-    self.title()
   }
 
   fn body(&self) -> String {
@@ -170,12 +170,8 @@ pub struct QuoteData {
 }
 
 impl PageRow for QuoteData {
-  fn title(&self) -> String {
+  fn title(&self, _page_type: PageType) -> String {
     format!("`ID: {}`", self.id)
-  }
-
-  fn alternate_title(&self) -> String {
-    self.title()
   }
 
   fn body(&self) -> String {
@@ -195,12 +191,8 @@ pub struct SteamKeyData {
 }
 
 impl PageRow for SteamKeyData {
-  fn title(&self) -> String {
+  fn title(&self, _page_type: PageType) -> String {
     self.steam_key.clone()
-  }
-
-  fn alternate_title(&self) -> String {
-    self.title()
   }
 
   fn body(&self) -> String {
@@ -224,12 +216,8 @@ pub struct SteamKeyRecipientData {
 }
 
 impl PageRow for SteamKeyRecipientData {
-  fn title(&self) -> String {
+  fn title(&self, _page_type: PageType) -> String {
     "__Recipient__".to_owned()
-  }
-
-  fn alternate_title(&self) -> String {
-    self.title()
   }
 
   fn body(&self) -> String {
@@ -267,12 +255,8 @@ pub struct BookmarkData {
 }
 
 impl PageRow for BookmarkData {
-  fn title(&self) -> String {
+  fn title(&self, _page_type: PageType) -> String {
     self.link.clone()
-  }
-
-  fn alternate_title(&self) -> String {
-    self.title()
   }
 
   fn body(&self) -> String {
@@ -302,12 +286,8 @@ pub struct CourseData {
 }
 
 impl PageRow for CourseData {
-  fn title(&self) -> String {
+  fn title(&self, _page_type: PageType) -> String {
     self.course_name.clone()
-  }
-
-  fn alternate_title(&self) -> String {
-    self.title()
   }
 
   fn body(&self) -> String {
@@ -338,12 +318,8 @@ pub struct Term {
 }
 
 impl PageRow for Term {
-  fn title(&self) -> String {
+  fn title(&self, _page_type: PageType) -> String {
     format!("__{}__", self.name.clone())
-  }
-
-  fn alternate_title(&self) -> String {
-    self.title()
   }
 
   fn body(&self) -> String {
@@ -1506,7 +1482,7 @@ impl DatabaseHandler {
       }
 
       drop(row);
-      
+
       sqlx::query!(
         r#"
           UPDATE streak SET current_streak = $1, longest_streak = $2 WHERE guild_id = $3 AND user_id = $4
@@ -2346,10 +2322,22 @@ impl DatabaseHandler {
     // Get total count, total sum, and count/sum for timeframe
     let end_time = chrono::Utc::now();
     let start_time = match timeframe {
-      ChallengeTimeframe::Monthly =>
-        end_time.with_day(1).unwrap_or_default().with_hour(0).unwrap_or_default().with_minute(0).unwrap_or_default(),
-      ChallengeTimeframe::YearRound =>
-        end_time.with_month(1).unwrap_or_default().with_day(1).unwrap_or_default().with_hour(0).unwrap_or_default().with_minute(0).unwrap_or_default(),
+      ChallengeTimeframe::Monthly => end_time
+        .with_day(1)
+        .unwrap_or_default()
+        .with_hour(0)
+        .unwrap_or_default()
+        .with_minute(0)
+        .unwrap_or_default(),
+      ChallengeTimeframe::YearRound => end_time
+        .with_month(1)
+        .unwrap_or_default()
+        .with_day(1)
+        .unwrap_or_default()
+        .with_hour(0)
+        .unwrap_or_default()
+        .with_minute(0)
+        .unwrap_or_default(),
     };
 
     let timeframe_data = sqlx::query_as!(

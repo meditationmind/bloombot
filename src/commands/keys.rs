@@ -1,7 +1,7 @@
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, Pagination};
+use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
@@ -58,7 +58,7 @@ pub async fn list_keys(
     current_page = pagination.get_last_page_number();
   }
 
-  let first_page = pagination.create_page_embed(current_page);
+  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
 
   ctx
     .send({
@@ -98,7 +98,7 @@ pub async fn list_keys(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page)),
+          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;
@@ -271,7 +271,7 @@ pub async fn list_recipients(
     current_page = pagination.get_last_page_number();
   }
 
-  let first_page = pagination.create_page_embed(current_page);
+  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
 
   ctx
     .send({
@@ -311,7 +311,7 @@ pub async fn list_recipients(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page)),
+          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;

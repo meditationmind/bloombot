@@ -10,9 +10,14 @@ use crate::config::BloomBotEmbed;
 use anyhow::Result;
 use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateEmbedFooter};
 
+#[derive(Debug, Copy, Clone)]
+pub enum PageType {
+  Standard,
+  Alternate,
+}
+
 pub trait PageRow {
-  fn title(&self) -> String;
-  fn alternate_title(&self) -> String;
+  fn title(&self, page_type: PageType) -> String;
   fn body(&self) -> String;
 }
 
@@ -96,7 +101,7 @@ impl<'a> Pagination<'a> {
     new_page as usize
   }
 
-  pub fn create_page_embed(&self, page: usize) -> CreateEmbed {
+  pub fn create_page_embed(&self, page: usize, page_type: PageType) -> CreateEmbed {
     let mut embed = BloomBotEmbed::new();
     let page = self.get_page(page);
 
@@ -110,33 +115,7 @@ impl<'a> Pagination<'a> {
 
         embed
       } else {
-        page.to_embed(self.title.as_str()).clone()
-      }
-    } else {
-      // This should never happen unless we have a bug in our pagination code
-      embed = embed
-        .title(self.title.clone())
-        .description("This page does not exist.");
-
-      embed
-    }
-  }
-
-  pub fn create_alt_page_embed(&self, page: usize) -> CreateEmbed {
-    let mut embed = BloomBotEmbed::new();
-    let page = self.get_page(page);
-
-    if let Some(page) = page {
-      // If it is a valid page that is empty, it must be page 0.
-      // This implies that there are no entries to display.
-      if page.is_empty() {
-        embed = embed
-          .title(self.title.clone())
-          .description("No entries have been added yet.");
-
-        embed
-      } else {
-        page.to_alt_embed(self.title.as_str()).clone()
+        page.to_embed(self.title.as_str(), page_type).clone()
       }
     } else {
       // This should never happen unless we have a bug in our pagination code
@@ -164,6 +143,7 @@ impl PaginationPage<'_> {
   pub fn to_embed(
     &self,
     title: &str,
+    page_type: PageType,
   ) -> serenity::CreateEmbed {
     let mut embed = BloomBotEmbed::new().title(title).description(format!(
       "Showing entries {} to {}.",
@@ -174,33 +154,7 @@ impl PaginationPage<'_> {
     let fields: Vec<(String, String, bool)> = self
       .entries
       .iter()
-      .map(|entry| (entry.title(), entry.body(), false))
-      .collect();
-    embed = embed.fields(fields);
-
-    embed = embed.footer(CreateEmbedFooter::new(format!(
-      "Page {} of {}",
-      self.page_number + 1,
-      self.page_count
-    )));
-
-    embed
-  }
-
-  pub fn to_alt_embed(
-    &self,
-    title: &str,
-  ) -> serenity::CreateEmbed {
-    let mut embed = BloomBotEmbed::new().title(title).description(format!(
-      "Showing entries {} to {}.",
-      (self.page_number * self.entries_per_page) + 1,
-      (self.page_number * self.entries_per_page) + self.entries.len()
-    ));
-
-    let fields: Vec<(String, String, bool)> = self
-      .entries
-      .iter()
-      .map(|entry| (entry.alternate_title(), entry.body(), false))
+      .map(|entry| (entry.title(page_type), entry.body(), false))
       .collect();
     embed = embed.fields(fields);
 
