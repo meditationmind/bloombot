@@ -400,7 +400,16 @@ pub async fn search(
         None => "Unknown",
       };
 
-      let meaning = possible_term.meaning.clone();
+      // If longer than 1024 (embed field max) - 45 (relevance message),
+      // truncate to 979 - 3 for "..."
+      let meaning = if possible_term.meaning.len() > 979 {
+        format!(
+          "{}...",
+          possible_term.meaning.chars().take(976).collect::<String>()
+        )
+      } else {
+        possible_term.meaning.clone()
+      };
 
       embed = embed.field(
         format!("Term {}: `{}`", index + 1, &possible_term.term_name),
