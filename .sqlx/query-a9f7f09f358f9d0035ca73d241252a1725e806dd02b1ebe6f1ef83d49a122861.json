@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT record_id, term_name, meaning, usage, links, category, aliases\n        FROM term\n        WHERE guild_id = $2\n        AND (LOWER(term_name) = LOWER($1)) OR (regexp_like(ARRAY_TO_STRING(aliases, ','), '(?:^|,)' || $1 || '(?:$|,)', 'i'))\n      ",
+  "query": "\n        SELECT record_id, term_name, meaning, usage, links, category, aliases, SET_LIMIT($2), SIMILARITY(LOWER(term_name), LOWER($1)) AS similarity_score\n        FROM term\n        WHERE guild_id = $3\n        AND (LOWER(term_name) % LOWER($1)) OR (f_textarr2text(aliases) ILIKE '%' || $1 || '%')\n        ORDER BY similarity_score DESC\n        LIMIT 5\n      ",
   "describe": {
     "columns": [
       {
@@ -37,11 +37,22 @@
         "ordinal": 6,
         "name": "aliases",
         "type_info": "TextArray"
+      },
+      {
+        "ordinal": 7,
+        "name": "set_limit",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 8,
+        "name": "similarity_score",
+        "type_info": "Float4"
       }
     ],
     "parameters": {
       "Left": [
         "Text",
+        "Float4",
         "Text"
       ]
     },
@@ -52,8 +63,10 @@
       true,
       true,
       true,
-      true
+      true,
+      null,
+      null
     ]
   },
-  "hash": "e13735604a1c2140f0b433f5c72a020b3dc59464c2b3f63b9812d7da6b329294"
+  "hash": "a9f7f09f358f9d0035ca73d241252a1725e806dd02b1ebe6f1ef83d49a122861"
 }

@@ -1774,7 +1774,7 @@ impl DatabaseHandler {
         SELECT record_id, term_name, meaning, usage, links, category, aliases
         FROM term
         WHERE guild_id = $2
-        AND (LOWER(term_name) = LOWER($1)) OR (regexp_like(ARRAY_TO_STRING(aliases, ','), '(?:^|,)' || $1 || '(?:$|,)', 'i'))
+        AND (LOWER(term_name) = LOWER($1)) OR (f_textarr2text(aliases) ~* ('(?:^|,)' || $1 || '(?:$|,)'))
       "#,
       term_name,
       guild_id.to_string(),
@@ -2006,7 +2006,7 @@ impl DatabaseHandler {
         SELECT record_id, term_name, meaning, usage, links, category, aliases, SET_LIMIT($2), SIMILARITY(LOWER(term_name), LOWER($1)) AS similarity_score
         FROM term
         WHERE guild_id = $3
-        AND (LOWER(term_name) % LOWER($1)) OR (ARRAY_TO_STRING(aliases, ',') ILIKE '%' || $1 || '%')
+        AND (LOWER(term_name) % LOWER($1)) OR (f_textarr2text(aliases) ILIKE '%' || $1 || '%')
         ORDER BY similarity_score DESC
         LIMIT 5
       "#,
