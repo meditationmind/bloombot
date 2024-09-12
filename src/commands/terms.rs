@@ -327,6 +327,8 @@ pub async fn remove(
 /// Updates embeddings for all terms.
 #[poise::command(slash_command)]
 pub async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
+  ctx.defer_ephemeral().await?;
+  
   let data = ctx.data();
 
   let guild_id = ctx
