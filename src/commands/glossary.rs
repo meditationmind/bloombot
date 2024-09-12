@@ -360,7 +360,7 @@ pub async fn search(
   );
   let possible_terms =
     DatabaseHandler::search_terms_by_vector(&mut transaction, &guild_id, vector, 3).await?;
-  let end_time = std::time::Instant::now();
+  let search_time = start_time.elapsed();
 
   let mut embed = BloomBotEmbed::new();
   let mut terms_returned = 0;
@@ -426,7 +426,7 @@ pub async fn search(
 
   embed = embed.footer(CreateEmbedFooter::new(format!(
     "Search took {}ms",
-    (end_time - start_time).as_millis()
+    search_time.as_millis()
   )));
 
   if terms_returned == 0 {
