@@ -2,6 +2,7 @@ use crate::commands::{commit_and_say, MessageType};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
+use log::info;
 use pgvector;
 use poise::serenity_prelude as serenity;
 use poise::Modal;
@@ -111,7 +112,7 @@ pub async fn term_not_found(
   required_permissions = "MANAGE_ROLES",
   default_member_permissions = "MANAGE_ROLES",
   category = "Moderator Commands",
-  subcommands("add", "remove", "edit"),
+  subcommands("add", "remove", "edit", "update_embeddings"),
   subcommand_required,
   //hide_in_help,
   guild_only
@@ -154,7 +155,10 @@ pub async fn add(
       ctx
         .data()
         .embeddings
-        .create_embedding(term_name.clone(), ctx.author().id)
+        .create_embedding(
+          format!("{term_name} {}", term_data.definition),
+          ctx.author().id,
+        )
         .await?,
     );
 
@@ -242,7 +246,10 @@ pub async fn edit(
         ctx
           .data()
           .embeddings
-          .create_embedding(existing_term.name, ctx.author().id)
+          .create_embedding(
+            format!("{} {}", existing_term.name, term_data.definition),
+            ctx.author().id,
+          )
           .await?,
       ))
     };
@@ -308,6 +315,63 @@ pub async fn remove(
     ctx,
     transaction,
     MessageType::TextOnly(":white_check_mark: Term has been removed.".to_string()),
+    true,
+  )
+  .await?;
+
+  Ok(())
+}
+
+/// Update all embeddings
+///
+/// Updates embeddings for all terms.
+#[poise::command(slash_command)]
+pub async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
+  let data = ctx.data();
+
+  let guild_id = ctx
+    .guild_id()
+    .with_context(|| "Failed to retrieve guild ID from context")?;
+
+  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let terms = DatabaseHandler::get_term_list(&mut transaction, &guild_id).await?;
+
+  for term in terms {
+    let existing_term =
+      DatabaseHandler::get_term_meaning(&mut transaction, &guild_id, term.term_name.as_str())
+        .await?;
+
+    if existing_term.is_none() {
+      info!("Unable to retrieve term: {}", term.term_name);
+      continue;
+    }
+
+    let existing_term = existing_term.with_context(|| "Failed to assign Term to existing_term")?;
+
+    let vector = Some(pgvector::Vector::from(
+      ctx
+        .data()
+        .embeddings
+        .create_embedding(
+          format!("{} {}", term.term_name, existing_term.meaning),
+          ctx.author().id,
+        )
+        .await?,
+    ));
+
+    DatabaseHandler::edit_term_embedding(
+      &mut transaction,
+      &guild_id,
+      term.term_name.as_str(),
+      vector,
+    )
+    .await?;
+  }
+
+  commit_and_say(
+    ctx,
+    transaction,
+    MessageType::TextOnly(":white_check_mark: Term embeddings have been updated.".to_string()),
     true,
   )
   .await?;

@@ -1798,18 +1798,19 @@ impl DatabaseHandler {
     Ok(term)
   }
 
-  /*pub async fn get_term_from_alias(
+  pub async fn get_term_meaning(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-    alias: &str,
+    term_name: &str,
   ) -> Result<Option<Term>> {
     let row = sqlx::query!(
       r#"
-        SELECT record_id, term_name, meaning, usage, links, category, aliases
+        SELECT meaning
         FROM term
-        WHERE ARRAY_TO_STRING(aliases, ',') ILIKE $1 AND guild_id = $2
+        WHERE guild_id = $2
+        AND (LOWER(term_name) = LOWER($1))
       "#,
-      alias,
+      term_name,
       guild_id.to_string(),
     )
     .fetch_optional(&mut **transaction)
@@ -1817,19 +1818,19 @@ impl DatabaseHandler {
 
     let term = match row {
       Some(row) => Some(Term {
-        id: row.record_id,
-        term_name: row.term_name,
+        id: String::new(),
+        name: String::new(),
         meaning: row.meaning,
-        usage: row.usage,
-        links: row.links,
-        category: row.category,
-        aliases: row.aliases,
+        usage: None,
+        links: None,
+        category: None,
+        aliases: None,
       }),
       None => None,
     };
 
     Ok(term)
-  }*/
+  }
 
   pub async fn edit_term(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -1855,6 +1856,29 @@ impl DatabaseHandler {
     .bind(aliases)
     .bind(vector)
     .bind(original_id)
+    .execute(&mut **transaction)
+    .await?;
+
+    Ok(())
+  }
+
+  pub async fn edit_term_embedding(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    term_name: &str,
+    vector: Option<pgvector::Vector>,
+  ) -> Result<()> {
+    sqlx::query(
+      r#"
+        UPDATE term
+        SET embedding = $3
+        WHERE guild_id = $1
+        AND (LOWER(term_name) = LOWER($2))
+      "#,
+    )
+    .bind(guild_id.to_string())
+    .bind(term_name)
+    .bind(vector)
     .execute(&mut **transaction)
     .await?;
 
