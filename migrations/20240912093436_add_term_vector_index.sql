@@ -1,0 +1,1 @@
+CREATE INDEX ON term USING hnsw (embedding vector_cosine_ops) WITH (m = 8, ef_construction = 32);
