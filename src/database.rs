@@ -1398,6 +1398,29 @@ impl DatabaseHandler {
     Ok(row.map(|row| row.quote))
   }
 
+  pub async fn update_streak(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+    current: i32,
+    longest: i32,
+  ) -> Result<()> {
+    sqlx::query!(
+      r#"
+        INSERT INTO streak (current_streak, longest_streak, guild_id, user_id) VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id) DO UPDATE SET current_streak = $1, longest_streak = $2
+      "#,
+      current,
+      longest,
+      guild_id.to_string(),
+      user_id.to_string(),
+    )
+    .execute(&mut **transaction)
+    .await?;
+
+    Ok(())
+  }
+
   pub async fn get_streak(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
@@ -1482,17 +1505,13 @@ impl DatabaseHandler {
       }
 
       drop(row);
-
-      sqlx::query!(
-        r#"
-          UPDATE streak SET current_streak = $1, longest_streak = $2 WHERE guild_id = $3 AND user_id = $4
-        "#,
+      DatabaseHandler::update_streak(
+        transaction,
+        guild_id,
+        user_id,
         streak_data.current,
         streak_data.longest,
-        guild_id.to_string(),
-        user_id.to_string(),
       )
-      .execute(&mut **transaction)
       .await?;
 
       return Ok(streak_data);
@@ -1526,17 +1545,13 @@ impl DatabaseHandler {
     }
 
     drop(row);
-
-    sqlx::query!(
-      r#"
-        UPDATE streak SET current_streak = $1, longest_streak = $2 WHERE guild_id = $3 AND user_id = $4
-      "#,
+    DatabaseHandler::update_streak(
+      transaction,
+      guild_id,
+      user_id,
       streak_data.current,
       streak_data.longest,
-      guild_id.to_string(),
-      user_id.to_string(),
     )
-    .execute(&mut **transaction)
     .await?;
 
     Ok(streak_data)

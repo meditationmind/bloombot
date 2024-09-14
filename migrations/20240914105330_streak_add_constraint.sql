@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS streak ADD UNIQUE (user_id);
