@@ -273,9 +273,9 @@ pub async fn list(
 
 /// Search the quote database
 ///
-/// Searches the quote database using one or more keywords in search engine format. Valid search operators include `""`, `or`, and `-`.
+/// Searches the quote database using one or more keywords in search engine format. Valid search operators include quotation marks (""), OR, and minus (-).
 ///
-/// Example: `"coming back" pema or chodron -thubten`
+/// Example: "coming back" pema or chodron -thubten
 #[poise::command(slash_command)]
 pub async fn search(
   ctx: Context<'_>,
