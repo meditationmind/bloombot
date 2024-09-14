@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
@@ -139,10 +139,10 @@ pub async fn message(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(
-      ":white_check_mark: Message deleted. User will be notified via DM or private thread."
-        .to_string(),
-    ),
+    MessageType::TextOnly(format!(
+      "{} Message deleted. User will be notified via DM or private thread.",
+      EMOJI.mmcheck
+    )),
     true,
   )
   .await?;
@@ -357,7 +357,7 @@ pub async fn populate(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Erase data has been added.".to_string()),
+    MessageType::TextOnly(format!("{} Erase data has been added.", EMOJI.mmcheck)),
     true,
   )
   .await?;

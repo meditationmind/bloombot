@@ -1,4 +1,4 @@
-use crate::config::{BloomBotEmbed, ROLES};
+use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -97,7 +97,7 @@ pub async fn quote(
     ctx
       .send(
         poise::CreateReply::default()
-          .content("<:mminfo:1279517292455264359> The keyword option is only available to [subscription-based donators](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>).")
+          .content(format!("{} The keyword option is only available to [subscription-based donators](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>).", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;

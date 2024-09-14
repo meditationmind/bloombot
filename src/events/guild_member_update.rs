@@ -1,4 +1,4 @@
-use crate::config;
+use crate::config::{self, EMOJI};
 use anyhow::Result;
 use poise::serenity_prelude::{self as serenity, Context, CreateMessage, Member};
 
@@ -30,7 +30,9 @@ pub async fn guild_member_update(
   old_if_available: &Option<Member>,
   new: &Option<Member>,
 ) -> Result<()> {
-  let Some(old) = old_if_available else { return Ok(()) };
+  let Some(old) = old_if_available else {
+    return Ok(());
+  };
   let Some(new) = new else { return Ok(()) };
 
   if let Some(update_type) = UpdateType::get_type(old, new) {
@@ -43,8 +45,9 @@ pub async fn guild_member_update(
             .embed(config::BloomBotEmbed::new()
               .title(":tada: New Donator :tada:")
               .description(format!(
-                "Please welcome <@{}> as a new donator on Patreon.\n\nThank you for your generosity! It helps keep this community alive <:loveit:1279540710747672689>",
-                new.user.id
+                "Please welcome <@{}> as a new donator on Patreon.\n\nThank you for your generosity! It helps keep this community alive {}",
+                new.user.id,
+                EMOJI.loveit
               ))
             )
           )
@@ -58,7 +61,8 @@ pub async fn guild_member_update(
             .embed(config::BloomBotEmbed::new()
               .title(":tada: New Donator :tada:")
               .description(format!(
-                "Please welcome <@{}> as a new donator on Ko-fi.\n\nThank you for your generosity! It helps keep this community alive <:loveit:1279540710747672689>",
+                "Please welcome <@{}> as a new donator on Ko-fi.\n\nThank you for your generosity! It helps keep this community alive {}",
+                EMOJI.loveit,
                 new.user.id
               ))
             )
@@ -74,8 +78,8 @@ pub async fn guild_member_update(
               .embed(config::BloomBotEmbed::new()
                   .title(":tada: A new member has arrived! :tada:")
                   .description(format!(
-                    "Welcome to the Meditation Mind community, <@{}>!\n\nCheck out <id:customize> to grab some roles and [customize your community experience](<https://meditationmind.org/curating-your-experience/>).\n\nWe're glad you've joined us! <:aww:1279541172049678438>",
-                    new.user.id
+                    "Welcome to the Meditation Mind community, <@{}>!\n\nCheck out <id:customize> to grab some roles and [customize your community experience](<https://meditationmind.org/curating-your-experience/>).\n\nWe're glad you've joined us! {}",
+                    new.user.id, EMOJI.aww
                   ))
                   .thumbnail("https://meditationmind.org/wp-content/uploads/2020/04/Webp.net-resizeimage-1.png")
             )

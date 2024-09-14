@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{BloomBotEmbed, CHANNELS};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -30,12 +30,19 @@ pub async fn remove_entry(
   let Some(entry) =
     DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, id.as_str()).await?
   else {
-    ctx.say(":x: No entry found with that ID.").await?;
+    ctx
+      .say(format!("{} No entry found with that ID.", EMOJI.mminfo))
+      .await?;
     return Ok(());
   };
 
   if entry.user_id != ctx.author().id {
-    ctx.say(":x: You can only remove your own entries.").await?;
+    ctx
+      .say(format!(
+        "{} You can only remove your own entries.",
+        EMOJI.mminfo
+      ))
+      .await?;
     return Ok(());
   }
 
@@ -44,7 +51,7 @@ pub async fn remove_entry(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Entry has been removed.".to_string()),
+    MessageType::TextOnly(format!("{} Entry has been removed.", EMOJI.mmcheck)),
     true,
   )
   .await?;

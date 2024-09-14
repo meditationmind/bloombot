@@ -1,5 +1,5 @@
 use crate::commands::course_not_found;
-use crate::config::{BloomBotEmbed, CHANNELS};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -64,7 +64,10 @@ pub async fn join(
     ctx
       .send(
         CreateReply::default()
-          .content(format!("<:mminfo:1279517292455264359> You are already enrolled in the course: **{course_name}**."))
+          .content(format!(
+            "{} You are already enrolled in the course: **{course_name}**.",
+            EMOJI.mminfo
+          ))
           .ephemeral(true),
       )
       .await?;
@@ -76,7 +79,10 @@ pub async fn join(
     ctx
       .send(
         CreateReply::default()
-          .content(format!("<:mminfo:1279517292455264359> You have already completed the course: **{course_name}**."))
+          .content(format!(
+            "{} You have already completed the course: **{course_name}**.",
+            EMOJI.mminfo
+          ))
           .ephemeral(true),
       )
       .await?;
@@ -165,7 +171,10 @@ pub async fn leave(
     ctx
       .send(
         CreateReply::default()
-          .content(format!("<:mminfo:1279517292455264359> You are not currently enrolled in the course: **{course_name}**."))
+          .content(format!(
+            "{} You are not currently enrolled in the course: **{course_name}**.",
+            EMOJI.mminfo
+          ))
           .ephemeral(true),
       )
       .await?;

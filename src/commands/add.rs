@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{BloomBotEmbed, StreakRoles, TimeSumRoles, CHANNELS};
+use crate::config::{BloomBotEmbed, StreakRoles, TimeSumRoles, CHANNELS, EMOJI};
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -366,7 +366,7 @@ pub async fn add(
               Ok(()) => {}
               Err(e) => {
                 check.edit(ctx, CreateReply::default()
-                  .content("<:mminfo:1279517292455264359> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
+                  .content(format!("{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.", EMOJI.mminfo))
                   .ephemeral(privacy)).await?;
                 return Err(anyhow::anyhow!("Could not send message: {e}"));
               }
@@ -376,7 +376,7 @@ pub async fn add(
         Err(e) => {
           check
             .edit(ctx, CreateReply::default()
-              .content("<:mminfo:1279517292455264359> An error may have occurred. If your command failed, please contact staff for assistance.")
+              .content(format!("{} An error may have occurred. If your command failed, please contact staff for assistance.", EMOJI.mminfo))
                 .ephemeral(privacy)
             )
             .await?;
@@ -481,7 +481,7 @@ pub async fn add(
           Err(err) => {
             error!("Error removing role: {err}");
             ctx.send(CreateReply::default()
-              .content(":x: An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")
+              .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
               .allowed_mentions(serenity::CreateAllowedMentions::new())
               .ephemeral(privacy)).await?;
 
@@ -495,7 +495,7 @@ pub async fn add(
         Err(err) => {
           error!("Error adding role: {err}");
           ctx.send(CreateReply::default()
-            .content(":x: An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")
+            .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
             .allowed_mentions(serenity::CreateAllowedMentions::new())
             .ephemeral(privacy)).await?;
 
@@ -524,7 +524,7 @@ pub async fn add(
               error!("Error removing role: {err}");
 
               ctx.send(CreateReply::default()
-                .content(":x: An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")
+                .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
                 .allowed_mentions(serenity::CreateAllowedMentions::new())
                 .ephemeral(privacy)).await?;
 
@@ -539,7 +539,7 @@ pub async fn add(
             error!("Error adding role: {err}");
 
             ctx.send(CreateReply::default()
-              .content(":x: An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.")
+              .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
               .allowed_mentions(serenity::CreateAllowedMentions::new())
               .ephemeral(privacy)).await?;
 

@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::ENTRIES_PER_PAGE;
+use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
@@ -98,7 +98,8 @@ pub async fn list_keys(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
+          CreateInteractionResponseMessage::new()
+            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;
@@ -126,7 +127,7 @@ pub async fn add_key(
     ctx
       .send(
         CreateReply::default()
-          .content(":x: Key already exists.")
+          .content(format!("{} Key already exists.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -138,7 +139,7 @@ pub async fn add_key(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Key has been added.".to_string()),
+    MessageType::TextOnly(format!("{} Key has been added.", EMOJI.mmcheck)),
     true,
   )
   .await?;
@@ -165,7 +166,7 @@ pub async fn remove_key(
     ctx
       .send(
         CreateReply::default()
-          .content(":x: Key does not exist.")
+          .content(format!("{} Key does not exist.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -177,7 +178,7 @@ pub async fn remove_key(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Key has been removed.".to_string()),
+    MessageType::TextOnly(format!("{} Key has been removed.", EMOJI.mmcheck)),
     true,
   )
   .await?;
@@ -209,7 +210,8 @@ pub async fn use_key(ctx: Context<'_>) -> Result<()> {
       .send(
         CreateReply::default()
           .content(format!(
-            ":white_check_mark: Key retrieved and marked used: `{key}`"
+            "{} Key retrieved and marked used: `{key}`",
+            EMOJI.mmcheck
           ))
           .ephemeral(true),
       )
@@ -218,7 +220,7 @@ pub async fn use_key(ctx: Context<'_>) -> Result<()> {
     ctx
       .send(
         CreateReply::default()
-          .content(":x: No unused keys found.")
+          .content(format!("{} No unused keys found.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -311,7 +313,8 @@ pub async fn list_recipients(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
+          CreateInteractionResponseMessage::new()
+            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;
@@ -339,7 +342,10 @@ pub async fn update_recipient(
     ctx
       .send(
         CreateReply::default()
-          .content(":x: No input provided. Update aborted.")
+          .content(format!(
+            "{} No input provided. Update aborted.",
+            EMOJI.mminfo
+          ))
           .ephemeral(true),
       )
       .await?;
@@ -371,9 +377,10 @@ pub async fn update_recipient(
       commit_and_say(
         ctx,
         transaction,
-        MessageType::TextOnly(
-          ":white_check_mark: Recipient has been added to the database.".to_string(),
-        ),
+        MessageType::TextOnly(format!(
+          "{} Recipient has been added to the database.",
+          EMOJI.mmcheck
+        )),
         true,
       )
       .await?;
@@ -381,7 +388,7 @@ pub async fn update_recipient(
     }
 
     ctx
-      .send(CreateReply::default().content(":x: No existing record for recipient. Please specify a number of keys to create a new record.").ephemeral(true))
+      .send(CreateReply::default().content(format!("{} No existing record for recipient. Please specify a number of keys to create a new record.", EMOJI.mminfo)).ephemeral(true))
       .await?;
     DatabaseHandler::rollback_transaction(transaction).await?;
     return Ok(());
@@ -503,7 +510,7 @@ pub async fn update_recipient(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Recipient has been updated.".to_string()),
+    MessageType::TextOnly(format!("{} Recipient has been updated.", EMOJI.mmcheck)),
     true,
   )
   .await?;

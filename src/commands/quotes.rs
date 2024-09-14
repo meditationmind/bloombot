@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{ENTRIES_PER_PAGE, BloomBotEmbed};
+use crate::config::{ENTRIES_PER_PAGE, BloomBotEmbed, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
@@ -80,7 +80,7 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
     commit_and_say(
       poise::Context::Application(ctx),
       transaction,
-      MessageType::TextOnly(":white_check_mark: Quote has been added.".to_string()),
+      MessageType::TextOnly(format!("{} Quote has been added.", EMOJI.mmcheck)),
       true,
     )
     .await?;
@@ -110,7 +110,7 @@ pub async fn edit(
     ctx
       .send(
         CreateReply::default()
-          .content(":x: Invalid quote ID.")
+          .content(format!("{} Invalid quote ID.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -141,7 +141,7 @@ pub async fn edit(
     commit_and_say(
       poise::Context::Application(ctx),
       transaction,
-      MessageType::TextOnly(":white_check_mark: Quote has been edited.".to_string()),
+      MessageType::TextOnly(format!("{} Quote has been edited.", EMOJI.mmcheck)),
       true,
     )
     .await?;
@@ -169,7 +169,7 @@ pub async fn remove(
     ctx
       .send(
         CreateReply::default()
-          .content(":x: Quote does not exist.")
+          .content(format!("{} Quote does not exist.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -181,7 +181,7 @@ pub async fn remove(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Quote has been removed.".to_string()),
+    MessageType::TextOnly(format!("{} Quote has been removed.", EMOJI.mmcheck)),
     true,
   )
   .await?;
@@ -375,7 +375,7 @@ pub async fn show(
       ctx
         .send(
           CreateReply::default()
-            .content(":x: Invalid quote ID.")
+            .content(format!("{} Invalid quote ID.", EMOJI.mminfo))
             .ephemeral(true),
         )
         .await?;

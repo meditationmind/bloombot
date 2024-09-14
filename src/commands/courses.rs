@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, course_not_found, MessageType};
-use crate::config::ENTRIES_PER_PAGE;
+use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
@@ -48,20 +48,28 @@ pub async fn add(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if DatabaseHandler::course_exists(&mut transaction, &guild_id, course_name.as_str()).await? {
-    ctx.say(":x: Course already exists.").await?;
+    ctx
+      .say(format!("{} Course already exists.", EMOJI.mminfo))
+      .await?;
     return Ok(());
   }
 
   // Verify that the roles are in the guild
   if !participant_role.guild_id.eq(&guild_id) {
     ctx
-      .say(":x: The participant role must be in the same guild as the command.")
+      .say(format!(
+        "{} The participant role must be in the same guild as the command.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
   if !graduate_role.guild_id.eq(&guild_id) {
     ctx
-      .say(":x: The graduate role must be in the same guild as the command.")
+      .say(format!(
+        "{} The graduate role must be in the same guild as the command.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
@@ -69,13 +77,19 @@ pub async fn add(
   // Verify that the roles are not managed by an integration
   if participant_role.managed {
     ctx
-      .say(":x: The participant role must not be a bot role.")
+      .say(format!(
+        "{} The participant role must not be a bot role.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
   if graduate_role.managed {
     ctx
-      .say(":x: The graduate role must not be a bot role.")
+      .say(format!(
+        "{} The graduate role must not be a bot role.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
@@ -83,20 +97,29 @@ pub async fn add(
   // Verify that the roles are not privileged
   if participant_role.permissions.administrator() {
     ctx
-      .say(":x: The participant role must not be an administrator role.")
+      .say(format!(
+        "{} The participant role must not be an administrator role.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
   if graduate_role.permissions.administrator() {
     ctx
-      .say(":x: The graduate role must not be an administrator role.")
+      .say(format!(
+        "{} The graduate role must not be an administrator role.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
 
   if participant_role == graduate_role {
     ctx
-      .say(":x: The participant role and the graduate role must not be the same.")
+      .say(format!(
+        "{} The participant role and the graduate role must not be the same.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
@@ -113,7 +136,7 @@ pub async fn add(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Course has been added.".to_string()),
+    MessageType::TextOnly(format!("{} Course has been added.", EMOJI.mmcheck)),
     true,
   )
   .await?;
@@ -140,7 +163,7 @@ pub async fn edit(
     ctx
       .send(
         CreateReply::default()
-          .content(":x: No changes were provided.")
+          .content(format!("{} No changes were provided.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -169,19 +192,28 @@ pub async fn edit(
     Some(participant_role) => {
       if !participant_role.guild_id.eq(&guild_id) {
         ctx
-          .say(":x: The participant role must be in the same guild as the command.")
+          .say(format!(
+            "{} The participant role must be in the same guild as the command.",
+            EMOJI.mminfo
+          ))
           .await?;
         return Ok(());
       }
       if participant_role.managed {
         ctx
-          .say(":x: The participant role must not be a bot role.")
+          .say(format!(
+            "{} The participant role must not be a bot role.",
+            EMOJI.mminfo
+          ))
           .await?;
         return Ok(());
       }
       if participant_role.permissions.administrator() {
         ctx
-          .say(":x: The participant role must not be an administrator role.")
+          .say(format!(
+            "{} The participant role must not be an administrator role.",
+            EMOJI.mminfo
+          ))
           .await?;
         return Ok(());
       }
@@ -194,19 +226,28 @@ pub async fn edit(
     Some(graduate_role) => {
       if !graduate_role.guild_id.eq(&guild_id) {
         ctx
-          .say(":x: The graduate role must be in the same guild as the command.")
+          .say(format!(
+            "{} The graduate role must be in the same guild as the command.",
+            EMOJI.mminfo
+          ))
           .await?;
         return Ok(());
       }
       if graduate_role.managed {
         ctx
-          .say(":x: The graduate role must not be a bot role.")
+          .say(format!(
+            "{} The graduate role must not be a bot role.",
+            EMOJI.mminfo
+          ))
           .await?;
         return Ok(());
       }
       if graduate_role.permissions.administrator() {
         ctx
-          .say(":x: The graduate role must not be an administrator role.")
+          .say(format!(
+            "{} The graduate role must not be an administrator role.",
+            EMOJI.mminfo
+          ))
           .await?;
         return Ok(());
       }
@@ -218,7 +259,10 @@ pub async fn edit(
   // Verify that the roles are not the same
   if participant_role == graduate_role {
     ctx
-      .say(":x: The participant role and the graduate role must not be the same.")
+      .say(format!(
+        "{} The participant role and the graduate role must not be the same.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
@@ -234,7 +278,7 @@ pub async fn edit(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Course roles have been updated.".to_string()),
+    MessageType::TextOnly(format!("{} Course roles have been updated.", EMOJI.mmcheck)),
     true,
   )
   .await?;
@@ -342,7 +386,9 @@ pub async fn remove(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::course_exists(&mut transaction, &guild_id, course_name.as_str()).await? {
-    ctx.say(":x: Course does not exist.").await?;
+    ctx
+      .say(format!("{} Course does not exist.", EMOJI.mminfo))
+      .await?;
     return Ok(());
   }
 
@@ -351,7 +397,7 @@ pub async fn remove(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Course has been removed.".to_string()),
+    MessageType::TextOnly(format!("{} Course has been removed.", EMOJI.mmcheck)),
     true,
   )
   .await?;

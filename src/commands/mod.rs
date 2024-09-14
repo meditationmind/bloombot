@@ -1,4 +1,4 @@
-use crate::config::BloomBotEmbed;
+use crate::config::{BloomBotEmbed, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::Result;
@@ -85,7 +85,7 @@ async fn commit_and_say(
         Ok(()) => {}
         Err(e) => {
           _ = sent_message.edit(ctx, CreateReply::default()
-            .content("<:mminfo:1279517292455264359> A fatal error occurred while trying to save your changes. Please contact staff for assistance.")
+            .content(format!("{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.", EMOJI.mminfo))
             .ephemeral(true)).await;
           return Err(anyhow::anyhow!("Could not send message: {e}"));
         }
@@ -108,7 +108,7 @@ async fn commit_and_say(
       // We'll send a response to the channel to inform the user.
       _ = ctx
         .channel_id()
-        .say(&ctx, "<:mminfo:1279517292455264359> An error may have occurred. If your command failed, please contact staff for assistance.")
+        .say(&ctx, format!("{} An error may have occurred. If your command failed, please contact staff for assistance.", EMOJI.mminfo))
         .await;
 
       return Err(anyhow::anyhow!("Could not send message: {e}"));
@@ -138,8 +138,8 @@ pub async fn course_not_found(
         .send(
           poise::CreateReply::default()
             .content(format!(
-              "<:mminfo:1279517292455264359> Course does not exist. Did you mean `{}`?",
-              possible_course.course_name
+              "{} Course does not exist. Did you mean `{}`?",
+              EMOJI.mminfo, possible_course.course_name
             ))
             .ephemeral(true),
         )
@@ -148,7 +148,7 @@ pub async fn course_not_found(
       ctx
         .send(
           poise::CreateReply::default()
-            .content("<:mminfo:1279517292455264359> Course does not exist.")
+            .content(format!("{} Course does not exist.", EMOJI.mminfo))
             .ephemeral(true),
         )
         .await?;
@@ -157,7 +157,7 @@ pub async fn course_not_found(
     ctx
       .send(
         poise::CreateReply::default()
-          .content("<:mminfo:1279517292455264359> Course does not exist.")
+          .content(format!("{} Course does not exist.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;

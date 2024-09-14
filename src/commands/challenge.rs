@@ -1,6 +1,6 @@
 #![allow(clippy::cast_precision_loss)]
 
-use crate::config::{BloomBotEmbed, ROLES};
+use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::database::{ChallengeTimeframe, DatabaseHandler, TrackingProfile};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -95,10 +95,12 @@ pub async fn join(
           .add_role(ctx, ROLES.meditation_challenger_365)
           .await?;
 
-        ctx.say(format!(
-    "Awesome, <@{}>! You have successfully joined the 365-day challenge <:pepeglow:1279541855150673991>",
-    member.user.id,
-    )).await?;
+        ctx
+          .say(format!(
+            "Awesome, <@{}>! You have successfully joined the 365-day challenge {}",
+            member.user.id, EMOJI.pepeglow,
+          ))
+          .await?;
 
         return Ok(());
       }

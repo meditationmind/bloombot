@@ -1,4 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
+use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
@@ -60,7 +61,7 @@ pub async fn term_not_found(
       ctx
         .send(
           poise::CreateReply::default()
-            .content(":x: Term does not exist.")
+            .content(format!("{} Term does not exist.", EMOJI.mminfo))
             .ephemeral(true),
         )
         .await?;
@@ -74,8 +75,8 @@ pub async fn term_not_found(
         .send(
           poise::CreateReply::default()
             .content(format!(
-              ":x: Term does not exist. Did you mean `{}`?",
-              possible_term.name
+              "{} Term does not exist. Did you mean `{}`?",
+              EMOJI.mminfo, possible_term.name
             ))
             .ephemeral(true),
         )
@@ -86,7 +87,8 @@ pub async fn term_not_found(
         .send(
           poise::CreateReply::default()
             .content(format!(
-              ":x: Term does not exist. Did you mean one of these?\n{}",
+              "{} Term does not exist. Did you mean one of these?\n{}",
+              EMOJI.mminfo,
               possible_terms
                 .iter()
                 .map(|term| format!("`{}`", term.name))
@@ -178,7 +180,7 @@ pub async fn add(
     commit_and_say(
       poise::Context::Application(ctx),
       transaction,
-      MessageType::TextOnly(":white_check_mark: Term has been added.".to_string()),
+      MessageType::TextOnly(format!("{} Term has been added.", EMOJI.mmcheck)),
       true,
     )
     .await?;
@@ -274,7 +276,7 @@ pub async fn edit(
     commit_and_say(
       poise::Context::Application(ctx),
       transaction,
-      MessageType::TextOnly(":white_check_mark: Term has been edited.".to_string()),
+      MessageType::TextOnly(format!("{} Term has been edited.", EMOJI.mmcheck)),
       true,
     )
     .await?;
@@ -302,7 +304,7 @@ pub async fn remove(
     ctx
       .send(
         poise::CreateReply::default()
-          .content(":x: Term does not exist.")
+          .content(format!("{} Term does not exist.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -314,7 +316,7 @@ pub async fn remove(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Term has been removed.".to_string()),
+    MessageType::TextOnly(format!("{} Term has been removed.", EMOJI.mmcheck)),
     true,
   )
   .await?;
@@ -328,7 +330,7 @@ pub async fn remove(
 #[poise::command(slash_command)]
 pub async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
-  
+
   let data = ctx.data();
 
   let guild_id = ctx
@@ -373,7 +375,10 @@ pub async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Term embeddings have been updated.".to_string()),
+    MessageType::TextOnly(format!(
+      "{} Term embeddings have been updated.",
+      EMOJI.mmcheck
+    )),
     true,
   )
   .await?;

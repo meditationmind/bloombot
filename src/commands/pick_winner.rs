@@ -1,4 +1,4 @@
-use crate::config::{BloomBotEmbed, CHANNELS, ROLES};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -97,15 +97,15 @@ async fn finalize_winner(
     .await
   else {
     ctx
-      .send(CreateReply::default().content(":x: Could not send DM to member. Please run `/usekey` and copy a key manually if they want one.\n\n**No key has been used.**"))
+      .send(CreateReply::default().content(format!("{} Could not send DM to member. Please run `/usekey` and copy a key manually if they want one.\n\n**No key has been used.**", EMOJI.mminfo)))
       .await?;
     return Ok(());
   };
 
   ctx
     .send(CreateReply::default().content(format!(
-      ":white_check_mark: Sent DM to {} and sent announcement!",
-      winner.user
+      "{} Sent DM to {} and sent announcement!",
+      EMOJI.mmcheck, winner.user
     )))
     .await?;
 
@@ -281,7 +281,7 @@ pub async fn pick_winner(
     ctx
       .send(
         CreateReply::default()
-          .content(":x: No unused keys found.")
+          .content(format!("{} No unused keys found.", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -389,7 +389,7 @@ pub async fn pick_winner(
       DatabaseHandler::reserve_key(&mut transaction, &guild_id, &member.user.id).await?
     else {
       ctx
-      .send(CreateReply::default().content(":x: No unused keys found. Please add one and run `/usekey` to give them one if they want one."))
+      .send(CreateReply::default().content(format!("{} No unused keys found. Please add one and run `/usekey` to give them one if they want one.", EMOJI.mminfo)))
       .await?;
       return Ok(());
     };

@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{ENTRIES_PER_PAGE, ROLES};
+use crate::config::{EMOJI, ENTRIES_PER_PAGE, ROLES};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
@@ -55,7 +55,7 @@ pub async fn add_bookmark(
     ctx
       .send(
         CreateReply::default()
-          .content("<:mminfo:1279517292455264359> Sorry, you've reached the bookmark limit. Please remove one and try again.\n-# Subscription-based supporters can add unlimited bookmarks. [Learn more.](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>)")
+          .content(format!("{} Sorry, you've reached the bookmark limit. Please remove one and try again.\n-# Subscription-based supporters can add unlimited bookmarks. [Learn more.](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>)", EMOJI.mminfo))
           .ephemeral(true),
       )
       .await?;
@@ -80,7 +80,7 @@ pub async fn add_bookmark(
     commit_and_say(
       poise::Context::Application(ctx),
       transaction,
-      MessageType::TextOnly("<:mmcheck:1279517233877483601> Bookmark has been added.".to_string()),
+      MessageType::TextOnly(format!("{} Bookmark has been added.", EMOJI.mmcheck)),
       true,
     )
     .await?;
@@ -207,7 +207,7 @@ pub async fn remove(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly("<:mmcheck:1279517233877483601> Bookmark has been removed.".to_string()),
+    MessageType::TextOnly(format!("{} Bookmark has been removed.", EMOJI.mmcheck)),
     true,
   )
   .await?;

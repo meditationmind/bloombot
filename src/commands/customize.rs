@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{BloomBotEmbed, StreakRoles};
+use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -362,7 +362,10 @@ pub async fn offset(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: UTC offset successfully updated.".to_string()),
+    MessageType::TextOnly(format!(
+      "{} UTC offset successfully updated.",
+      EMOJI.mmcheck
+    )),
     true,
   )
   .await?;
@@ -447,7 +450,8 @@ pub async fn tracking(
     ctx,
     transaction,
     MessageType::TextOnly(format!(
-      ":white_check_mark: Anonymous tracking successfully turned **{}**.",
+      "{} Anonymous tracking successfully turned **{}**.",
+      EMOJI.mmcheck,
       anonymous.name()
     )),
     true,
@@ -540,7 +544,7 @@ pub async fn streak(
             error!("Error removing role: {err}");
 
             ctx.send(CreateReply::default()
-              .content(":x: An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+              .content(format!("{} An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
               .allowed_mentions(serenity::CreateAllowedMentions::new())
               .ephemeral(true)).await?;
           }
@@ -565,7 +569,7 @@ pub async fn streak(
               error!("Error adding role: {err}");
 
               ctx.send(CreateReply::default()
-                .content(":x: An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+                .content(format!("{} An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
                 .allowed_mentions(serenity::CreateAllowedMentions::new())
                 .ephemeral(true)).await?;
             }
@@ -618,7 +622,7 @@ pub async fn streak(
             error!("Error removing role: {err}");
 
             ctx.send(CreateReply::default()
-              .content(":x: An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+              .content(format!("{} An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
               .allowed_mentions(serenity::CreateAllowedMentions::new())
               .ephemeral(true)).await?;
           }
@@ -643,7 +647,7 @@ pub async fn streak(
               error!("Error adding role: {err}");
 
               ctx.send(CreateReply::default()
-                .content(":x: An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.")
+                .content(format!("{} An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
                 .allowed_mentions(serenity::CreateAllowedMentions::new())
                 .ephemeral(true)).await?;
             }
@@ -656,7 +660,10 @@ pub async fn streak(
   commit_and_say(
     ctx,
     transaction,
-    MessageType::TextOnly(":white_check_mark: Streak settings successfully updated.".to_string()),
+    MessageType::TextOnly(format!(
+      "{} Streak settings successfully updated.",
+      EMOJI.mmcheck
+    )),
     true,
   )
   .await?;
@@ -741,7 +748,8 @@ pub async fn stats(
     ctx,
     transaction,
     MessageType::TextOnly(format!(
-      ":white_check_mark: Stats successfully set to **{}**.",
+      "{} Stats successfully set to **{}**.",
+      EMOJI.mmcheck,
       privacy.name()
     )),
     true,

@@ -1,4 +1,4 @@
-use crate::config::{BloomBotEmbed, CHANNELS};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::Result;
@@ -28,7 +28,10 @@ pub async fn complete(
     DatabaseHandler::get_course_in_dm(&mut transaction, course_name.as_str()).await?
   else {
     ctx
-      .say("<:mminfo:1279517292455264359> Course not found. Please contact server staff for assistance.".to_string())
+      .say(format!(
+        "{} Course not found. Please contact server staff for assistance.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   };
@@ -37,16 +40,16 @@ pub async fn complete(
 
   if guild_id.to_guild_cached(&ctx).is_none() {
     ctx
-      .say(
-        "<:mminfo:1279517292455264359> Can't retrieve server information. Please contact server staff for assistance."
-          .to_string(),
-      )
+      .say(format!(
+        "{} Can't retrieve server information. Please contact server staff for assistance.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
 
   let Ok(member) = guild_id.member(ctx, ctx.author().id).await else {
-    ctx.say("<:mminfo:1279517292455264359> You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.".to_string()).await?;
+    ctx.say(format!("{} You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.", EMOJI.mminfo)).await?;
     return Ok(());
   };
 
@@ -56,7 +59,10 @@ pub async fn complete(
     .await?
   {
     ctx
-      .say(format!("<:mminfo:1279517292455264359> You are not in the course: **{course_name}**."))
+      .say(format!(
+        "{} You are not in the course: **{course_name}**.",
+        EMOJI.mminfo
+      ))
       .await?;
     return Ok(());
   }
@@ -68,7 +74,8 @@ pub async fn complete(
   {
     ctx
       .say(format!(
-        "<:mminfo:1279517292455264359> You have already claimed the graduate role for course: **{course_name}**."
+        "{} You have already claimed the graduate role for course: **{course_name}**.",
+        EMOJI.mminfo
       ))
       .await?;
     return Ok(());
