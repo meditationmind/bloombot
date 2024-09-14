@@ -1407,13 +1407,14 @@ impl DatabaseHandler {
   ) -> Result<()> {
     sqlx::query!(
       r#"
-        INSERT INTO streak (current_streak, longest_streak, guild_id, user_id) VALUES ($1, $2, $3, $4)
-        ON CONFLICT (user_id) DO UPDATE SET current_streak = $1, longest_streak = $2
+        INSERT INTO streak (record_id, user_id, guild_id, current_streak, longest_streak) VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (user_id) DO UPDATE SET current_streak = $4, longest_streak = $5
       "#,
+      Ulid::new().to_string(),
+      user_id.to_string(),
+      guild_id.to_string(),
       current,
       longest,
-      guild_id.to_string(),
-      user_id.to_string(),
     )
     .execute(&mut **transaction)
     .await?;
