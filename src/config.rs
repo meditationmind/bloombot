@@ -1,3 +1,4 @@
+use std::fmt;
 use poise::serenity_prelude::{self as serenity, Embed, RoleId};
 
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
@@ -67,6 +68,45 @@ pub const EMOTES: Emotes = Emotes {
   star: "⭐",
   report: 852463521894629376,
 };
+
+pub struct SimpleEmoji<'a> {
+  pub animated: bool,
+  pub id: u64,
+  pub name: &'a str,
+}
+
+#[allow(dead_code)]
+pub struct BloomEmoji<'a> {
+  pub pepeglow: SimpleEmoji<'a>,
+  pub aww: SimpleEmoji<'a>,
+  pub loveit: SimpleEmoji<'a>,
+  pub mminfo: SimpleEmoji<'a>,
+  pub mmx: SimpleEmoji<'a>,
+  pub mmcheck: SimpleEmoji<'a>,
+}
+
+pub const EMOJI: BloomEmoji = BloomEmoji {
+  pepeglow: SimpleEmoji { animated: false, id: 1279541855150673991, name: "pepeglow" },
+  aww: SimpleEmoji { animated: false, id: 1279541172049678438, name: "aww" },
+  loveit: SimpleEmoji { animated: false, id: 1279540710747672689, name: "loveit" },
+  mminfo: SimpleEmoji { animated: false, id: 1279517292455264359, name: "mminfo" },
+  mmx: SimpleEmoji { animated: false, id: 1279517275749089290, name: "mmx" },
+  mmcheck: SimpleEmoji { animated: false, id: 1279517233877483601, name: "mmcheck" },
+};
+
+impl fmt::Display for SimpleEmoji<'_> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      if self.animated {
+          f.write_str("<a:")?;
+      } else {
+          f.write_str("<:")?;
+      }
+      f.write_str(self.name)?;
+      fmt::Write::write_char(f, ':')?;
+      fmt::Display::fmt(&self.id, f)?;
+      fmt::Write::write_char(f, '>')
+  }
+}
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum TimeSumRoles {
