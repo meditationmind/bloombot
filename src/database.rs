@@ -1335,6 +1335,35 @@ impl DatabaseHandler {
     Ok(quotes)
   }
 
+  pub async fn search_quotes(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    keyword: &str,
+  ) -> Result<Vec<QuoteData>> {
+    let rows = sqlx::query!(
+      r#"
+        SELECT record_id, quote, author
+        FROM quote
+        WHERE guild_id = $1 AND (quote_tsv @@ websearch_to_tsquery('english', $2))
+      "#,
+      guild_id.to_string(),
+      keyword.to_string(),
+    )
+    .fetch_all(&mut **transaction)
+    .await?;
+
+    let quotes = rows
+      .into_iter()
+      .map(|row| QuoteData {
+        id: row.record_id,
+        quote: row.quote,
+        author: row.author,
+      })
+      .collect();
+
+    Ok(quotes)
+  }
+
   pub async fn get_quote(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
