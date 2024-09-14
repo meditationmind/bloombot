@@ -2245,6 +2245,37 @@ impl DatabaseHandler {
     Ok(quote)
   }
 
+  pub async fn get_random_quote_with_keyword(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    keyword: &str,
+  ) -> Result<Option<QuoteData>> {
+    let row = sqlx::query!(
+      r#"
+        SELECT record_id, quote, author
+        FROM quote
+        WHERE guild_id = $1 AND (quote_tsv @@ websearch_to_tsquery('english', $2))
+        ORDER BY RANDOM()
+        LIMIT 1
+      "#,
+      guild_id.to_string(),
+      keyword.to_string(),
+    )
+    .fetch_optional(&mut **transaction)
+    .await?;
+
+    let quote = match row {
+      Some(row) => Some(QuoteData {
+        id: row.record_id,
+        quote: row.quote,
+        author: row.author,
+      }),
+      None => None,
+    };
+
+    Ok(quote)
+  }
+
   pub async fn remove_course(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
