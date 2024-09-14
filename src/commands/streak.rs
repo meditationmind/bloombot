@@ -1,3 +1,4 @@
+use crate::commands::{commit_and_say, MessageType};
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::{config, Context};
 use anyhow::{Context as AnyhowContext, Result};
@@ -77,28 +78,20 @@ pub async fn streak(
           )
         };
 
-        ctx
-          .send(
-            poise::CreateReply::default()
-              .content(message)
-              .ephemeral(true)
-              .allowed_mentions(serenity::CreateAllowedMentions::new()),
-          )
-          .await?;
+        commit_and_say(ctx, transaction, MessageType::TextOnly(message), true).await?;
 
         return Ok(());
       }
 
-      ctx
-        .send(
-          poise::CreateReply::default()
-            .content(format!(
-              "Sorry, {user_nick_or_name}'s meditation streak is set to private."
-            ))
-            .ephemeral(true)
-            .allowed_mentions(serenity::CreateAllowedMentions::new()),
-        )
-        .await?;
+      commit_and_say(
+        ctx,
+        transaction,
+        MessageType::TextOnly(format!(
+          "Sorry, {user_nick_or_name}'s meditation streak is set to private."
+        )),
+        true,
+      )
+      .await?;
 
       return Ok(());
     }
@@ -115,14 +108,7 @@ pub async fn streak(
       )
     };
 
-    ctx
-      .send(
-        poise::CreateReply::default()
-          .content(message)
-          .ephemeral(privacy)
-          .allowed_mentions(serenity::CreateAllowedMentions::new()),
-      )
-      .await?;
+    commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
 
     return Ok(());
   }
@@ -139,13 +125,7 @@ pub async fn streak(
     )
   };
 
-  ctx
-    .send(
-      poise::CreateReply::default()
-        .content(message)
-        .ephemeral(privacy),
-    )
-    .await?;
+  commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
 
   Ok(())
 }
