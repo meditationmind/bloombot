@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{EMOJI, ENTRIES_PER_PAGE, ROLES};
+use crate::config::{EMOJI, ROLES};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
@@ -134,7 +134,9 @@ pub async fn list(
     .map(|bookmark| bookmark as PageRowRef)
     .collect();
   drop(transaction);
-  let pagination = Pagination::new("Your Bookmarks", bookmarks, ENTRIES_PER_PAGE).await?;
+
+  let bookmarks_per_page = 5;
+  let pagination = Pagination::new("Your Bookmarks", bookmarks, bookmarks_per_page).await?;
 
   if pagination.get_page(current_page).is_none() {
     current_page = pagination.get_last_page_number();
