@@ -1,5 +1,5 @@
 use crate::commands::{commit_and_say, MessageType};
-use crate::config::{ENTRIES_PER_PAGE, BloomBotEmbed, EMOJI};
+use crate::config::{BloomBotEmbed, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
@@ -298,6 +298,21 @@ pub async fn search(
   let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let quotes = DatabaseHandler::search_quotes(&mut transaction, &guild_id, &keyword).await?;
+
+  if quotes.is_empty() {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} No quotes match your search query.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+    return Ok(());
+  }
+
   let quotes: Vec<PageRowRef> = quotes.iter().map(|quote| quote as PageRowRef).collect();
   drop(transaction);
   let pagination = Pagination::new("Quotes", quotes, ENTRIES_PER_PAGE).await?;
