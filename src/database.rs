@@ -895,6 +895,41 @@ impl DatabaseHandler {
     Ok(bookmark_data)
   }
 
+  pub async fn search_bookmarks(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+    keyword: &str,
+  ) -> Result<Vec<BookmarkData>> {
+    let rows = sqlx::query!(
+      r#"
+        SELECT record_id, message_link, user_desc, occurred_at,
+        ts_rank(desc_tsv, websearch_to_tsquery('english', $3)) AS rank
+        FROM bookmarks
+        WHERE user_id = $1 AND guild_id = $2
+        AND (desc_tsv @@ websearch_to_tsquery('english', $3))
+        ORDER BY rank DESC
+      "#,
+      user_id.to_string(),
+      guild_id.to_string(),
+      keyword.to_string(),
+    )
+    .fetch_all(&mut **transaction)
+    .await?;
+
+    let bookmark_data = rows
+      .into_iter()
+      .map(|row| BookmarkData {
+        id: row.record_id,
+        link: row.message_link,
+        description: row.user_desc,
+        added: row.occurred_at,
+      })
+      .collect();
+
+    Ok(bookmark_data)
+  }
+
   pub async fn remove_bookmark(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     bookmark_id: &str,
