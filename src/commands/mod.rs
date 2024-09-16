@@ -8,6 +8,7 @@ pub mod add;
 pub mod bookmark;
 pub mod challenge;
 pub mod coffee;
+pub mod community_sit;
 pub mod complete;
 pub mod course;
 pub mod courses;
