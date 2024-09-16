@@ -8,10 +8,10 @@ use poise::serenity_prelude::{
 };
 use poise::CreateReply;
 
-async fn is_coleader(ctx: Context<'_>) -> Result<bool> {
-  let community_sit_coleader = serenity::RoleId::from(1285275266549158050);
+async fn is_helper(ctx: Context<'_>) -> Result<bool> {
+  let community_sit_helper = serenity::RoleId::from(1285275266549158050);
   let has_role = match ctx.author_member().await {
-    Some(member) => member.roles.contains(&community_sit_coleader),
+    Some(member) => member.roles.contains(&community_sit_helper),
     None => false,
   };
 
@@ -22,7 +22,7 @@ async fn is_coleader(ctx: Context<'_>) -> Result<bool> {
           .content(format!(
             "{} This command requires the {} role.",
             EMOJI.mminfo,
-            community_sit_coleader.mention()
+            community_sit_helper.mention()
           ))
           .allowed_mentions(CreateAllowedMentions::new().empty_roles())
           .ephemeral(true),
@@ -38,7 +38,7 @@ async fn is_coleader(ctx: Context<'_>) -> Result<bool> {
 /// Commands for managing community sit events. Requires Community Sit Co-Leader role.
 #[poise::command(
   slash_command,
-  check = "is_coleader",
+  check = "is_helper",
   category = "Secret",
   rename = "communitysit",
   subcommands("start", "end"),
@@ -126,10 +126,7 @@ pub async fn start(ctx: Context<'_>) -> Result<()> {
               ctx,
               CreateInteractionResponse::UpdateMessage(
                 CreateInteractionResponseMessage::new()
-                  .content(format!(
-                    "{} Event started. Enjoy your sit!",
-                    EMOJI.mminfo
-                  ))
+                  .content(format!("{} Event started. Enjoy your sit!", EMOJI.mminfo))
                   .ephemeral(true)
                   .embeds(Vec::new())
                   .components(Vec::new()),
@@ -146,9 +143,18 @@ pub async fn start(ctx: Context<'_>) -> Result<()> {
                 )
                 .await?;
 
+              let log_message = match event.channel_id {
+                Some(channel) => format!(
+                  "**Event**: {}\n**Channel:** {}",
+                  event.name,
+                  channel.mention()
+                ),
+                None => format!("**Event**: {}\n**Channel:** N/A", event.name),
+              };
+
               let log_embed = BloomBotEmbed::new()
                 .title("Event Started")
-                .description(format!("**Event**: {}", event.name))
+                .description(log_message)
                 .footer(
                   CreateEmbedFooter::new(format!(
                     "Started by {} ({})",
@@ -302,9 +308,18 @@ pub async fn end(ctx: Context<'_>) -> Result<()> {
                 )
                 .await?;
 
+              let log_message = match event.channel_id {
+                Some(channel) => format!(
+                  "**Event**: {}\n**Channel:** {}",
+                  event.name,
+                  channel.mention()
+                ),
+                None => format!("**Event**: {}\n**Channel:** N/A", event.name),
+              };
+
               let log_embed = BloomBotEmbed::new()
                 .title("Event Ended")
-                .description(format!("**Event**: {}", event.name))
+                .description(log_message)
                 .footer(
                   CreateEmbedFooter::new(format!(
                     "Ended by {} ({})",
