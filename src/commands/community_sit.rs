@@ -1,9 +1,10 @@
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
-use crate::{Context, Data as AppData, Error as AppError};
+use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::Duration;
 use poise::serenity_prelude::{
-  self as serenity, builder::*, FormattedTimestamp, FormattedTimestampStyle, ScheduledEventStatus,
+  self as serenity, builder::*, FormattedTimestamp, FormattedTimestampStyle, Mentionable,
+  ScheduledEventStatus,
 };
 use poise::CreateReply;
 
@@ -13,6 +14,21 @@ async fn is_coleader(ctx: Context<'_>) -> Result<bool> {
     Some(member) => member.roles.contains(&community_sit_coleader),
     None => false,
   };
+
+  if !has_role {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} This command requires the {} role.",
+            EMOJI.mminfo,
+            community_sit_coleader.mention()
+          ))
+          .allowed_mentions(CreateAllowedMentions::new().empty_roles())
+          .ephemeral(true),
+      )
+      .await?;
+  }
 
   Ok(has_role)
 }
@@ -31,15 +47,16 @@ async fn is_coleader(ctx: Context<'_>) -> Result<bool> {
   guild_only
 )]
 #[allow(clippy::unused_async)]
-pub async fn community_sit(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
+pub async fn community_sit(_: Context<'_>) -> Result<()> {
   Ok(())
 }
 
 /// Start a community sit event
 ///
 /// Starts a scheduled community sit event.
-#[poise::command(slash_command, check = "is_coleader")]
+#[poise::command(slash_command)]
 pub async fn start(ctx: Context<'_>) -> Result<()> {
+  ctx.defer_ephemeral().await?;
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -48,7 +65,7 @@ pub async fn start(ctx: Context<'_>) -> Result<()> {
   for event in events {
     if event.name.as_str().ends_with("Silent Sit")
       && event.status == ScheduledEventStatus::Scheduled
-      && event.start_time.to_utc() - chrono::Utc::now() < Duration::minutes(15)
+      && (event.start_time.to_utc() - chrono::Utc::now()).abs() < Duration::minutes(15)
     {
       let mut embed = BloomBotEmbed::new().description(format!(
         "Starting Event:\n## {}\n{}\n-# Scheduled to begin {}.",
@@ -110,7 +127,7 @@ pub async fn start(ctx: Context<'_>) -> Result<()> {
               CreateInteractionResponse::UpdateMessage(
                 CreateInteractionResponseMessage::new()
                   .content(format!(
-                    "{} Event started. May your practice be fruitful!",
+                    "{} Event started. Enjoy your sit!",
                     EMOJI.mminfo
                   ))
                   .ephemeral(true)
@@ -196,8 +213,9 @@ pub async fn start(ctx: Context<'_>) -> Result<()> {
 /// End a community sit event
 ///
 /// Ends an active community sit event.
-#[poise::command(slash_command, check = "is_coleader")]
+#[poise::command(slash_command)]
 pub async fn end(ctx: Context<'_>) -> Result<()> {
+  ctx.defer_ephemeral().await?;
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -209,10 +227,27 @@ pub async fn end(ctx: Context<'_>) -> Result<()> {
       let confirm_id = format!("{ctx_id}confirm");
       let cancel_id = format!("{ctx_id}cancel");
 
+      let mut embed = BloomBotEmbed::new().description(format!(
+        "Ending Event:\n## {}\n{}\n-# Event began {}.",
+        event.name,
+        event.description.unwrap_or(String::new()),
+        FormattedTimestamp::new(
+          event.start_time,
+          Some(FormattedTimestampStyle::RelativeTime)
+        )
+      ));
+
+      if let Some(image_hash) = event.image {
+        embed = embed.image(format!(
+          "https://cdn.discordapp.com/guild-events/{}/{}?size=2048",
+          event.id, image_hash
+        ));
+      }
+
       ctx
         .send(
           CreateReply::default()
-            .content(format!("Are you sure you want to end **{}**?", event.name))
+            .embed(embed)
             .ephemeral(true)
             .components(vec![CreateActionRow::Buttons(vec![
               CreateButton::new(confirm_id.clone())
@@ -248,10 +283,11 @@ pub async fn end(ctx: Context<'_>) -> Result<()> {
               CreateInteractionResponse::UpdateMessage(
                 CreateInteractionResponseMessage::new()
                   .content(format!(
-                    "{} Event ended. Thank you for your assistance with the community sits!",
+                    "{} Event ended. Thank you for your assistance!",
                     EMOJI.mminfo
                   ))
                   .ephemeral(true)
+                  .embeds(Vec::new())
                   .components(Vec::new()),
               ),
             )
@@ -304,6 +340,7 @@ pub async fn end(ctx: Context<'_>) -> Result<()> {
               CreateInteractionResponseMessage::new()
                 .content("Cancelled.")
                 .ephemeral(true)
+                .embeds(Vec::new())
                 .components(Vec::new()),
             ),
           )
@@ -319,7 +356,7 @@ pub async fn end(ctx: Context<'_>) -> Result<()> {
     .send(
       CreateReply::default()
         .content(format!(
-          "{} No eligible community sit event found. Please try again within 15 minutes of starting time.",
+          "{} No active community sit event found.",
           EMOJI.mminfo
         ))
         .ephemeral(true),
