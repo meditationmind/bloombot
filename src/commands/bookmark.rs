@@ -95,7 +95,7 @@ pub async fn add_bookmark(
 #[poise::command(
   slash_command,
   category = "Informational",
-  subcommands("list", "remove", "search"),
+  subcommands("list", "add", "remove", "search"),
   subcommand_required,
   guild_only
 )]
@@ -188,6 +188,68 @@ pub async fn list(
       )
       .await?;
   }
+
+  Ok(())
+}
+
+/// Add a message to your bookmarks
+///
+/// Adds a message to your bookmarks, with an optional short description.
+#[poise::command(slash_command)]
+pub async fn add(
+  ctx: Context<'_>,
+  #[description = "Message to bookmark (message link)"] message: serenity::Message,
+  #[max_length = 100]
+  #[description = "Include a short description (optional)"]
+  description: Option<String>,
+) -> Result<()> {
+  let data = ctx.data();
+  let guild_id = ctx
+    .guild_id()
+    .with_context(|| "Failed to retrieve guild ID from context")?;
+  let user_id = ctx.author().id;
+
+  let supporter = {
+    if let Some(member) = ctx.author_member().await {
+      member.roles.contains(&RoleId::from(ROLES.patreon))
+        || member.roles.contains(&RoleId::from(ROLES.kofi))
+        || member.roles.contains(&RoleId::from(ROLES.staff))
+    } else {
+      false
+    }
+  };
+
+  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let bookmark_count =
+    DatabaseHandler::get_bookmark_count(&mut transaction, &guild_id, &user_id).await?;
+
+  if !supporter && bookmark_count > 19 {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!("{} Sorry, you've reached the bookmark limit. Please remove one and try again.\n-# Subscription-based supporters can add unlimited bookmarks. [Learn more.](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>)", EMOJI.mminfo))
+          .ephemeral(true),
+      )
+      .await?;
+    return Ok(());
+  }
+
+  DatabaseHandler::add_bookmark(
+    &mut transaction,
+    &guild_id,
+    &user_id,
+    message.link().as_str(),
+    description.as_deref(),
+  )
+  .await?;
+
+  commit_and_say(
+    ctx,
+    transaction,
+    MessageType::TextOnly(format!("{} Bookmark has been added.", EMOJI.mmcheck)),
+    true,
+  )
+  .await?;
 
   Ok(())
 }
