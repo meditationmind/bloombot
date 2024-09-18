@@ -100,6 +100,7 @@ pub struct EraseData {
   pub id: String,
   pub user_id: serenity::UserId,
   pub message_link: String,
+  pub reason: String,
   pub occurred_at: chrono::DateTime<Utc>,
 }
 
@@ -125,9 +126,9 @@ impl PageRow for EraseData {
 
   fn body(&self) -> String {
     if self.message_link == "None" {
-      "Notification not available".to_owned()
+      format!("**Reason:** {}\n-# Notification not available", self.reason)
     } else {
-      format!("[Go to erase notification]({})", self.message_link)
+      format!("**Reason:** {}\n[Go to erase notification]({})", self.reason, self.message_link)
     }
   }
 }
@@ -952,16 +953,19 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
     message_link: &str,
+    reason: Option<&str>,
     occurred_at: chrono::DateTime<Utc>,
   ) -> Result<()> {
     sqlx::query!(
       r#"
-        INSERT INTO erases (record_id, user_id, guild_id, message_link, occurred_at) VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO erases (record_id, user_id, guild_id, message_link, reason, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (message_link) DO UPDATE SET reason = $5
       "#,
       Ulid::new().to_string(),
       user_id.to_string(),
       guild_id.to_string(),
       message_link,
+      reason,
       occurred_at,
     )
     .execute(&mut **transaction)
@@ -977,7 +981,7 @@ impl DatabaseHandler {
   ) -> Result<Vec<EraseData>> {
     let rows = sqlx::query!(
       r#"
-        SELECT record_id, user_id, message_link, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
+        SELECT record_id, user_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
       "#,
       user_id.to_string(),
       guild_id.to_string(),
@@ -997,6 +1001,7 @@ impl DatabaseHandler {
             .expect("parse should not fail since user_id is UserId.to_string()"),
         ),
         message_link: row.message_link.unwrap_or(String::from("None")),
+        reason: row.reason.unwrap_or(String::from("No reason provided.")),
         occurred_at: row.occurred_at.unwrap_or_default(),
       })
       .collect();

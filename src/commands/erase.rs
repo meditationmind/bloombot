@@ -2,10 +2,10 @@ use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
-use crate::Context;
+use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, MessageId};
-use poise::CreateReply;
+use poise::{CreateReply, Modal};
 
 #[derive(poise::ChoiceParameter)]
 pub enum DateFormat {
@@ -13,6 +13,202 @@ pub enum DateFormat {
   Ymd,
   #[name = "DD Month YYYY"]
   Dmy,
+}
+
+#[derive(Debug, Modal)]
+#[name = "Erase Message"]
+struct EraseMessageModal {
+  #[name = "Reason"]
+  #[paragraph]
+  #[placeholder = "The reason for deleting the message"]
+  #[max_length = 512]
+  reason: Option<String>,
+}
+
+/// Delete a message and notify the user
+///
+/// Deletes a message and notifies the user via DM or private thread with an optional reason.
+///
+/// To use, right-click the message that you want to bookmark, then go to "Apps" > "Erase Message".
+#[poise::command(
+  ephemeral,
+  required_permissions = "MANAGE_MESSAGES",
+  default_member_permissions = "MANAGE_MESSAGES",
+  context_menu_command = "Erase Message",
+  category = "Context Menu Commands",
+  guild_only
+)]
+pub async fn erase_message(
+  ctx: poise::ApplicationContext<'_, AppData, AppError>,
+  #[description = "The message to delete"] message: serenity::Message,
+) -> Result<()> {
+  let erase_data = EraseMessageModal::execute(ctx).await?;
+
+  if let Some(erase_data) = erase_data {
+    ctx.defer_ephemeral().await?;
+
+    let channel_id: ChannelId = message.channel_id;
+    let message_id: MessageId = message.id;
+    let reason = erase_data
+      .reason
+      .unwrap_or("No reason provided.".to_string());
+    let audit_log_reason: Option<&str> = Some(reason.as_str());
+
+    ctx
+      .http()
+      .delete_message(channel_id, message_id, audit_log_reason)
+      .await?;
+
+    let occurred_at = chrono::Utc::now();
+
+    let data = ctx.data();
+    let guild_id = ctx
+      .guild_id()
+      .with_context(|| "Failed to retrieve guild ID from context")?;
+    let user_id = message.author.id;
+
+    let mut transaction = data.db.start_transaction_with_retry(5).await?;
+    let erase_count = DatabaseHandler::get_erases(&mut transaction, &guild_id, &user_id)
+      .await?
+      .len()
+      + 1;
+    let erase_count_message = if erase_count == 1 {
+      "1 erase recorded".to_string()
+    } else {
+      format!("{erase_count} erases recorded")
+    };
+
+    let mut log_embed = BloomBotEmbed::new();
+    let mut dm_embed = BloomBotEmbed::new();
+
+    log_embed = log_embed.title("Message Deleted").description(format!(
+      "**Channel**: <#{}>\n**Author**: {} ({})\n**Reason**: {}",
+      message.channel_id, message.author, erase_count_message, reason,
+    ));
+    dm_embed = dm_embed
+      .title("A message you sent has been deleted.")
+      .description(format!("**Reason**: {reason}"));
+
+    if let Some(attachment) = message.attachments.first() {
+      log_embed = log_embed.field("Attachment", attachment.url.clone(), false);
+      dm_embed = dm_embed.field("Attachment", attachment.url.clone(), false);
+    }
+
+    if !message.content.is_empty() {
+      // If longer than 1024 - 6 characters for the embed, truncate to 1024 - 3 for "..."
+      let content = if message.content.len() > 1018 {
+        format!(
+          "{}...",
+          message.content.chars().take(1015).collect::<String>()
+        )
+      } else {
+        message.content.clone()
+      };
+
+      log_embed = log_embed.field("Message Content", format!("```{content}```"), false);
+      dm_embed = dm_embed.field("Message Content", format!("```{content}```"), false);
+    }
+
+    log_embed = log_embed.footer(
+      CreateEmbedFooter::new(format!(
+        "Deleted by {} ({})",
+        ctx.author().name,
+        ctx.author().id
+      ))
+      .icon_url(ctx.author().avatar_url().unwrap_or_default()),
+    );
+    dm_embed = dm_embed.footer(CreateEmbedFooter::new(
+    "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff."
+  ));
+
+    //let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+    let log_channel = serenity::ChannelId::new(1237301921488830517);
+
+    let log_message = log_channel
+      .send_message(ctx, CreateMessage::new().embed(log_embed))
+      .await?;
+
+    let message_link = log_message.link();
+
+    DatabaseHandler::add_erase(
+      &mut transaction,
+      &guild_id,
+      &user_id,
+      &message_link,
+      Some(&reason),
+      occurred_at,
+    )
+    .await?;
+
+    commit_and_say(
+      poise::Context::Application(ctx),
+      transaction,
+      MessageType::TextOnly(format!(
+        "{} Message deleted. User will be notified via DM or private thread.",
+        EMOJI.mmcheck
+      )),
+      true,
+    )
+    .await?;
+
+    if message
+      .author
+      .direct_message(ctx, CreateMessage::new().embed(dm_embed.clone()))
+      .await
+      .is_ok()
+    {
+    } else {
+      let thread_channel = match message.channel_id.to_channel(&ctx).await {
+        Ok(channel) => {
+          if let Some(guild_channel) = channel.guild() {
+            if guild_channel.kind == serenity::ChannelType::Text {
+              // If message channel is text channel, we can create thread there
+              message.channel_id
+            } else {
+              // If not a text channel, then create private thread in lounge to avoid failure
+              ChannelId::from(501464482996944909)
+            }
+          } else {
+            // If we couldn't convert to GuildChannel, then just default to lounge
+            ChannelId::from(501464482996944909)
+          }
+        }
+        Err(_e) => {
+          // Default to lounge if channel retrieval request failed
+          ChannelId::from(501464482996944909)
+        }
+      };
+
+      let mut notification_thread = thread_channel
+        .create_thread(
+          ctx,
+          CreateThread::new("Private Notification: Message Deleted".to_string()),
+        )
+        .await?;
+
+      notification_thread
+        .edit_thread(ctx, EditThread::new().invitable(false).locked(true))
+        .await?;
+
+      dm_embed = dm_embed.footer(CreateEmbedFooter::new(
+      "If you have any questions or concerns regarding this action, please contact staff via ModMail."
+      ));
+
+      let thread_initial_message = format!("Private notification for <@{}>:", message.author.id);
+
+      notification_thread
+        .send_message(
+          ctx,
+          CreateMessage::new()
+            .content(thread_initial_message)
+            .embed(dm_embed.clone())
+            .allowed_mentions(CreateAllowedMentions::new().users([message.author.id])),
+        )
+        .await?;
+    }
+  }
+
+  Ok(())
 }
 
 /// Commands for erasing and erase logs
@@ -132,6 +328,7 @@ pub async fn message(
     &guild_id,
     &user_id,
     &message_link,
+    Some(&reason),
     occurred_at,
   )
   .await?;
@@ -323,7 +520,8 @@ pub async fn list(
 pub async fn populate(
   ctx: Context<'_>,
   #[description = "The user to populate erase data for"] user: serenity::User,
-  #[description = "The link for the erase notification message"] message_link: String,
+  #[description = "The link for the erase notification message"] message: serenity::Message,
+  #[description = "The reason for the erasure"] reason: Option<String>,
   #[description = "The date of the erasure (YYYY-MM-DD)"]
   #[rename = "date"]
   erase_date: chrono::NaiveDate,
@@ -349,7 +547,8 @@ pub async fn populate(
     &mut transaction,
     &guild_id,
     &user.id,
-    &message_link,
+    &message.link(),
+    reason.as_deref(),
     datetime,
   )
   .await?;

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT record_id, user_id, message_link, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC\n      ",
+  "query": "\n        SELECT record_id, user_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC\n      ",
   "describe": {
     "columns": [
       {
@@ -20,6 +20,11 @@
       },
       {
         "ordinal": 3,
+        "name": "reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
         "name": "occurred_at",
         "type_info": "Timestamptz"
       }
@@ -34,8 +39,9 @@
       false,
       false,
       true,
+      true,
       true
     ]
   },
-  "hash": "006ec8b04972f273cf31df528084ed74e3cab10f4e0948396984819dc71dde6d"
+  "hash": "a5d3dffe3595262e4a3ee25961b2023d459a84df38be1bac48e2d6269219dfc7"
 }
