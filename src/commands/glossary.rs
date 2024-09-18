@@ -30,7 +30,10 @@ pub async fn glossary(_: Context<'_>) -> Result<()> {
 ///
 /// Shows a list of all glossary entries.
 #[poise::command(slash_command)]
-pub async fn list(ctx: Context<'_>) -> Result<()> {
+pub async fn list(
+  ctx: Context<'_>,
+  #[description = "The page to show"] page: Option<usize>,
+) -> Result<()> {
   let data = ctx.data();
 
   let guild_id = ctx
@@ -39,40 +42,147 @@ pub async fn list(ctx: Context<'_>) -> Result<()> {
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let term_names = DatabaseHandler::get_term_list(&mut transaction, &guild_id).await?;
-  let term_count = term_names.len();
 
-  let mut term_list = String::new();
-  for (i, term) in term_names.iter().enumerate() {
-    term_list.push_str(&term.term_name);
+  let term_count = term_names.len();
+  let mut sorted_terms = Vec::<(String, String)>::with_capacity(term_count);
+
+  for term in term_names {
+    let char = match term.term_name.chars().next() {
+      Some(char) => char.to_string(),
+      None => String::new(),
+    };
+    let mut full_term = term.term_name.clone();
     let aliases = term.aliases.clone().unwrap_or(Vec::new());
     if !aliases.is_empty() {
-      term_list.push_str(" (");
+      full_term.push_str(" (");
       let alias_count = aliases.len();
       for (i, alias) in aliases.iter().enumerate() {
-        term_list.push_str(alias);
+        full_term.push_str(alias);
         if i < (alias_count - 1) {
-          term_list.push_str(", ");
+          full_term.push_str(", ");
         }
       }
-      term_list.push(')');
+      full_term.push(')');
     }
-    if i < (term_count - 1) {
-      term_list.push_str(", ");
-    }
+    sorted_terms.push((char, full_term));
   }
 
-  ctx
-    .send(CreateReply::default()
-      .embed(BloomBotEmbed::new()
+  let terms_per_page = 15;
+  let mut pages: Vec<Vec<(String, String)>> = vec![];
+  while !sorted_terms.is_empty() {
+    let mut page = vec![];
+    for _i in 1..=terms_per_page {
+      if sorted_terms.is_empty() {
+        break;
+      }
+      if let Some(term) = sorted_terms.pop() {
+        page.push(term);
+      }
+    }
+    pages.push(page);
+  }
+
+  let mut letter: &str;
+  let mut page_text: String;
+  let mut all_pages = vec![];
+  let mut total_pages = 0;
+
+  for page in pages {
+    letter = &page[0].0;
+    page_text = format!("-# Terms in parentheses are aliases for the preceding term. Use </glossary info:1135659962308243479> with any term or alias to read the full entry.\n\n-# {letter}\n");
+    for entry in &page {
+      if entry.0 == letter {
+        page_text.push_str(format!("- {}\n", entry.1).as_str());
+      } else {
+        page_text.push_str(format!("-# {}\n- {}\n", entry.0, entry.1).as_str());
+        letter = &entry.0;
+      }
+    }
+    page_text.push_str("** **\n\n");
+    all_pages.push(page_text);
+    total_pages += 1;
+  }
+
+  let ctx_id = ctx.id();
+  let prev_button_id = format!("{ctx_id}prev");
+  let next_button_id = format!("{ctx_id}next");
+
+  let mut current_page = page.unwrap_or(0).saturating_sub(1);
+
+  // Send the embed with the first page as content
+  let reply = {
+    let components = serenity::CreateActionRow::Buttons(vec![
+      serenity::CreateButton::new(&prev_button_id).label("Previous"),
+      serenity::CreateButton::new(&next_button_id).label("Next"),
+    ]);
+
+    CreateReply::default()
+      .embed(
+        BloomBotEmbed::new()
           .title("List of Glossary Terms")
-          .description(format!(
-            "Use `/glossary info` with any of the following terms to read the full entry. Terms in parentheses are aliases for the preceding term.\n```{term_list}```",
-          ))
-          // Will not reach char limit for a while. Can add pagination later.
-          .footer(CreateEmbedFooter::new(format!("Showing {term_count} of {term_count} terms.")))
+          .description(&all_pages[current_page])
+          .footer(CreateEmbedFooter::new(format!(
+            "Page {} of {total_pages}・Terms {}-{}・Total Terms: {term_count}",
+            current_page + 1,
+            current_page * terms_per_page + 1,
+            if (term_count / ((current_page + 1) * terms_per_page)) > 0 {
+              (current_page + 1) * terms_per_page
+            } else {
+              term_count
+            },
+          ))),
       )
-    )
-    .await?;
+      .components(vec![components])
+  };
+
+  ctx.send(reply).await?;
+
+  // Loop through incoming interactions with the navigation buttons
+  while let Some(press) = serenity::collector::ComponentInteractionCollector::new(ctx)
+    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
+    // button was pressed
+    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
+    // Timeout when no navigation button has been pressed for 24 hours
+    .timeout(std::time::Duration::from_secs(3600 * 24))
+    .await
+  {
+    // Depending on which button was pressed, go to next or previous page
+    if press.data.custom_id == next_button_id {
+      current_page += 1;
+      if current_page >= all_pages.len() {
+        current_page = 0;
+      }
+    } else if press.data.custom_id == prev_button_id {
+      current_page = current_page.checked_sub(1).unwrap_or(all_pages.len() - 1);
+    } else {
+      // This is an unrelated button interaction
+      continue;
+    }
+
+    // Update the message with the new page contents
+    press
+      .create_response(
+        ctx.serenity_context(),
+        serenity::CreateInteractionResponse::UpdateMessage(
+          serenity::CreateInteractionResponseMessage::new().embed(
+            BloomBotEmbed::new()
+              .title("List of Glossary Terms")
+              .description(&all_pages[current_page])
+              .footer(CreateEmbedFooter::new(format!(
+                "Page {} of {total_pages}・Terms {}-{}・Total Terms: {term_count}",
+                current_page + 1,
+                current_page * terms_per_page + 1,
+                if (term_count / ((current_page + 1) * terms_per_page)) > 0 {
+                  (current_page + 1) * terms_per_page
+                } else {
+                  term_count
+                },
+              ))),
+          ),
+        ),
+      )
+      .await?;
+  }
 
   Ok(())
 }

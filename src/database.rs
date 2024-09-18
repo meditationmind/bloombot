@@ -351,6 +351,7 @@ pub struct TermSearchResult {
   pub distance_score: Option<f64>,
 }
 
+#[derive(Debug)]
 pub struct TermNames {
   pub term_name: String,
   pub aliases: Option<Vec<String>>,
@@ -2166,7 +2167,7 @@ impl DatabaseHandler {
         SELECT term_name, aliases
         FROM term
         WHERE guild_id = $1
-        ORDER BY term_name ASC
+        ORDER BY term_name DESC
       "#,
       guild_id.to_string(),
     )
