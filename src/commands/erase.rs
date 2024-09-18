@@ -121,8 +121,7 @@ pub async fn erase_message(
     "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff."
   ));
 
-    //let log_channel = serenity::ChannelId::new(CHANNELS.logs);
-    let log_channel = serenity::ChannelId::new(1237301921488830517);
+    let log_channel = serenity::ChannelId::new(CHANNELS.logs);
 
     let log_message = log_channel
       .send_message(ctx, CreateMessage::new().embed(log_embed))
