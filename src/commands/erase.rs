@@ -519,7 +519,7 @@ pub async fn list(
 pub async fn populate(
   ctx: Context<'_>,
   #[description = "The user to populate erase data for"] user: serenity::User,
-  #[description = "The link for the erase notification message"] message: serenity::Message,
+  #[description = "The link for the erase notification message"] message_link: String,
   #[description = "The reason for the erasure"] reason: Option<String>,
   #[description = "The date of the erasure (YYYY-MM-DD)"]
   #[rename = "date"]
@@ -546,7 +546,7 @@ pub async fn populate(
     &mut transaction,
     &guild_id,
     &user.id,
-    &message.link(),
+    &message_link,
     reason.as_deref(),
     datetime,
   )
