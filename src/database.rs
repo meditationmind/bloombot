@@ -935,17 +935,15 @@ impl DatabaseHandler {
   pub async fn remove_bookmark(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     bookmark_id: &str,
-  ) -> Result<()> {
-    sqlx::query!(
+  ) -> Result<u64> {
+    Ok(sqlx::query!(
       r#"
         DELETE FROM bookmarks WHERE record_id = $1
       "#,
       bookmark_id,
     )
     .execute(&mut **transaction)
-    .await?;
-
-    Ok(())
+    .await?.rows_affected())    
   }
 
   pub async fn add_erase(

@@ -263,18 +263,31 @@ pub async fn remove(
   #[description = "The ID of the bookmark to remove"] id: String,
 ) -> Result<()> {
   let data = ctx.data();
+  let bookmark_id = id.to_ascii_uppercase().clone();
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  DatabaseHandler::remove_bookmark(&mut transaction, id.as_str()).await?;
-
-  commit_and_say(
-    ctx,
-    transaction,
-    MessageType::TextOnly(format!("{} Bookmark has been removed.", EMOJI.mmcheck)),
-    true,
-  )
-  .await?;
+  let result = DatabaseHandler::remove_bookmark(&mut transaction, bookmark_id.as_str()).await?;
+  if result > 0 {
+    commit_and_say(
+      ctx,
+      transaction,
+      MessageType::TextOnly(format!("{} Bookmark has been removed.", EMOJI.mmcheck)),
+      true,
+    )
+    .await?;
+  } else {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} Bookmark not found. Please verify the ID and try again.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+  }
 
   Ok(())
 }
