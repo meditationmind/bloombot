@@ -104,6 +104,107 @@ pub enum Privacy {
   Public,
 }
 
+async fn update_time_roles(
+  ctx: Context<'_>,
+  member: &serenity::Member,
+  sum: i64,
+  privacy: bool,
+) -> Result<()> {
+  let current_time_roles = TimeSumRoles::get_users_current_roles(&member.roles);
+  let updated_time_role = TimeSumRoles::from_sum(sum);
+
+  if let Some(updated_time_role) = updated_time_role {
+    if !current_time_roles.contains(&updated_time_role.to_role_id()) {
+      for role in current_time_roles {
+        match member.remove_role(ctx, role).await {
+          Ok(()) => {}
+          Err(err) => {
+            error!("Error removing role: {err}");
+            ctx.send(CreateReply::default()
+              .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
+              .allowed_mentions(serenity::CreateAllowedMentions::new())
+              .ephemeral(true)).await?;
+
+            return Ok(());
+          }
+        }
+      }
+
+      match member.add_role(ctx, updated_time_role.to_role_id()).await {
+        Ok(()) => {}
+        Err(err) => {
+          error!("Error adding role: {err}");
+          ctx.send(CreateReply::default()
+            .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
+            .allowed_mentions(serenity::CreateAllowedMentions::new())
+            .ephemeral(true)).await?;
+
+          return Ok(());
+        }
+      }
+
+      ctx.send(CreateReply::default()
+        .content(format!(":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!", member.mention(), updated_time_role.to_role_id()))
+        .allowed_mentions(serenity::CreateAllowedMentions::new())
+        .ephemeral(privacy)).await?;
+    }
+  }
+
+  Ok(())
+}
+
+async fn update_streak_roles(
+  ctx: Context<'_>,
+  member: &serenity::Member,
+  streak: i32,
+  privacy: bool,
+) -> Result<()> {
+  let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
+  #[allow(clippy::cast_sign_loss)]
+  let updated_streak_role = StreakRoles::from_streak(streak as u64);
+
+  if let Some(updated_streak_role) = updated_streak_role {
+    if !current_streak_roles.contains(&updated_streak_role.to_role_id()) {
+      for role in current_streak_roles {
+        match member.remove_role(ctx, role).await {
+          Ok(()) => {}
+          Err(err) => {
+            error!("Error removing role: {err}");
+
+            ctx.send(CreateReply::default()
+                .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
+                .allowed_mentions(serenity::CreateAllowedMentions::new())
+                .ephemeral(true)).await?;
+
+                return Ok(());
+          }
+        }
+      }
+
+      match member.add_role(ctx, updated_streak_role.to_role_id()).await {
+        Ok(()) => {}
+        Err(err) => {
+          error!("Error adding role: {err}");
+
+          ctx.send(CreateReply::default()
+              .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
+              .allowed_mentions(serenity::CreateAllowedMentions::new())
+              .ephemeral(true)).await?;
+
+          return Ok(());
+        }
+      }
+
+      ctx.send(CreateReply::default()
+          .content(format!(":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!", member.mention(), streak, updated_streak_role.to_role_id()))
+          .allowed_mentions(serenity::CreateAllowedMentions::new())
+          .ephemeral(privacy)).await?;
+    }
+  }
+
+  Ok(())
+}
+
 /// Add a meditation entry
 ///
 /// Adds a specified number of minutes to your meditation time. You can add minutes each time you meditate or add the combined minutes for multiple sessions.
@@ -469,90 +570,9 @@ pub async fn add(
   }
 
   let member = guild_id.member(ctx, user_id).await?;
-
-  let current_time_roles = TimeSumRoles::get_users_current_roles(&member.roles);
-  let updated_time_role = TimeSumRoles::from_sum(user_sum);
-
-  if let Some(updated_time_role) = updated_time_role {
-    if !current_time_roles.contains(&updated_time_role.to_role_id()) {
-      for role in current_time_roles {
-        match member.remove_role(ctx, role).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error removing role: {err}");
-            ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(privacy)).await?;
-
-            return Ok(());
-          }
-        }
-      }
-
-      match member.add_role(ctx, updated_time_role.to_role_id()).await {
-        Ok(()) => {}
-        Err(err) => {
-          error!("Error adding role: {err}");
-          ctx.send(CreateReply::default()
-            .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-            .allowed_mentions(serenity::CreateAllowedMentions::new())
-            .ephemeral(privacy)).await?;
-
-          return Ok(());
-        }
-      }
-
-      ctx.send(CreateReply::default()
-        .content(format!(":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!", member.mention(), updated_time_role.to_role_id()))
-        .allowed_mentions(serenity::CreateAllowedMentions::new())
-        .ephemeral(privacy)).await?;
-    }
-  }
-
+  update_time_roles(ctx, &member, user_sum, privacy).await?;
   if tracking_profile.streaks_active {
-    let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
-    #[allow(clippy::cast_sign_loss)]
-    let updated_streak_role = StreakRoles::from_streak(user_streak as u64);
-
-    if let Some(updated_streak_role) = updated_streak_role {
-      if !current_streak_roles.contains(&updated_streak_role.to_role_id()) {
-        for role in current_streak_roles {
-          match member.remove_role(ctx, role).await {
-            Ok(()) => {}
-            Err(err) => {
-              error!("Error removing role: {err}");
-
-              ctx.send(CreateReply::default()
-                .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-                .allowed_mentions(serenity::CreateAllowedMentions::new())
-                .ephemeral(privacy)).await?;
-
-              return Ok(());
-            }
-          }
-        }
-
-        match member.add_role(ctx, updated_streak_role.to_role_id()).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error adding role: {err}");
-
-            ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(privacy)).await?;
-
-            return Ok(());
-          }
-        }
-
-        ctx.send(CreateReply::default()
-          .content(format!(":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!", member.mention(), user_streak, updated_streak_role.to_role_id()))
-          .allowed_mentions(serenity::CreateAllowedMentions::new())
-          .ephemeral(privacy)).await?;
-      }
-    }
+    update_streak_roles(ctx, &member, user_streak, privacy).await?;
   }
 
   Ok(())
