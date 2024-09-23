@@ -936,14 +936,17 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     bookmark_id: &str,
   ) -> Result<u64> {
-    Ok(sqlx::query!(
-      r#"
-        DELETE FROM bookmarks WHERE record_id = $1
-      "#,
-      bookmark_id,
+    Ok(
+      sqlx::query!(
+        r#"
+          DELETE FROM bookmarks WHERE record_id = $1
+        "#,
+        bookmark_id,
+      )
+      .execute(&mut **transaction)
+      .await?
+      .rows_affected(),
     )
-    .execute(&mut **transaction)
-    .await?.rows_affected())    
   }
 
   pub async fn add_erase(
@@ -1051,6 +1054,18 @@ impl DatabaseHandler {
     Ok(())
   }
 
+  pub async fn add_meditation_entry_batch(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    batch_query: &str,
+  ) -> Result<u64> {
+    Ok(
+      sqlx::query(batch_query)
+        .execute(&mut **transaction)
+        .await?
+        .rows_affected(),
+    )
+  }
+
   pub async fn get_user_meditation_entries(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
@@ -1085,6 +1100,48 @@ impl DatabaseHandler {
     Ok(meditation_entries)
   }
 
+  /*pub async fn get_user_meditation_entries_between(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+    start_time: chrono::DateTime<Utc>,
+    end_time: chrono::DateTime<Utc>,
+  ) -> Result<Vec<MeditationData>> {
+    let rows = sqlx::query!(
+      r#"
+        SELECT record_id, user_id, meditation_minutes, occurred_at
+        FROM meditation
+        WHERE user_id = $1 AND guild_id = $2
+        AND occurred_at >= $3 AND occurred_at <= $4
+        ORDER BY occurred_at DESC
+      "#,
+      user_id.to_string(),
+      guild_id.to_string(),
+      start_time,
+      end_time,
+    )
+    .fetch_all(&mut **transaction)
+    .await?;
+
+    #[allow(clippy::expect_used)]
+    let meditation_entries = rows
+      .into_iter()
+      .map(|row| MeditationData {
+        id: row.record_id,
+        user_id: serenity::UserId::new(
+          row
+            .user_id
+            .parse::<u64>()
+            .expect("parse should not fail since user_id is UserId.to_string()"),
+        ),
+        meditation_minutes: row.meditation_minutes,
+        occurred_at: row.occurred_at,
+      })
+      .collect();
+
+    Ok(meditation_entries)
+  }*/
+
   pub async fn get_meditation_entry(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
@@ -1095,6 +1152,38 @@ impl DatabaseHandler {
         SELECT record_id, user_id, meditation_minutes, occurred_at FROM meditation WHERE record_id = $1 AND guild_id = $2
       "#,
       meditation_id,
+      guild_id.to_string(),
+    )
+    .fetch_optional(&mut **transaction)
+    .await?;
+
+    let meditation_entry = match row {
+      Some(row) => Some(MeditationData {
+        id: row.record_id,
+        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
+        meditation_minutes: row.meditation_minutes,
+        occurred_at: row.occurred_at,
+      }),
+      None => None,
+    };
+
+    Ok(meditation_entry)
+  }
+
+  pub async fn get_latest_meditation_entry(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    user_id: &serenity::UserId,
+  ) -> Result<Option<MeditationData>> {
+    let row = sqlx::query!(
+      r#"
+        SELECT record_id, user_id, meditation_minutes, occurred_at
+        FROM meditation
+        WHERE user_id = $1 AND guild_id = $2
+        ORDER BY occurred_at DESC
+        LIMIT 1
+      "#,
+      user_id.to_string(),
       guild_id.to_string(),
     )
     .fetch_optional(&mut **transaction)

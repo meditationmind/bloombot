@@ -17,6 +17,7 @@ pub mod erase;
 pub mod glossary;
 pub mod hello;
 pub mod help;
+pub mod import;
 pub mod keys;
 pub mod manage;
 pub mod pick_winner;

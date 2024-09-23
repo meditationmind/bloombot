@@ -1,6 +1,7 @@
 use std::fmt;
-use poise::serenity_prelude::{self as serenity, Embed, RoleId};
+use poise::serenity_prelude::{self as serenity, Embed, RoleId, GuildId};
 
+pub const MEDITATION_MIND: GuildId = GuildId::new(244917432383176705);
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
 pub const ENTRIES_PER_PAGE: usize = 10;
 pub const MIN_STARS: u64 = 5;
@@ -46,6 +47,7 @@ pub struct Channels {
   pub reportchannel: u64,
   pub donators: u64,
   pub suggestion: u64,
+  pub tracking: u64,
 }
 
 pub const CHANNELS: Channels = Channels {
@@ -57,6 +59,7 @@ pub const CHANNELS: Channels = Channels {
   reportchannel: 855894610001395743,
   donators: 551895169532952578,
   suggestion: 553676378621476887,
+  tracking: 440556997364940801,
 };
 
 pub struct Emotes<'a> {

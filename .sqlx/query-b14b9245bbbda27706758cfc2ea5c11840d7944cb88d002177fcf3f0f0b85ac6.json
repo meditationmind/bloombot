@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        DELETE FROM bookmarks WHERE record_id = $1\n      ",
+  "query": "\n          DELETE FROM bookmarks WHERE record_id = $1\n        ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "f60b59c7d4b54e43ab6d21a8f04bb6bac018c9cf4a3213d59c4a7d480779973a"
+  "hash": "b14b9245bbbda27706758cfc2ea5c11840d7944cb88d002177fcf3f0f0b85ac6"
 }

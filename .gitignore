@@ -1,3 +1,5 @@
 /target
 .env
 /.idea
+/src/config_testing.rs
+/src/config_backup.rs
