@@ -255,6 +255,7 @@ pub async fn import(
   }
 
   let data = ctx.data();
+  let dm = ctx.guild_id().is_none();
   let guild_id = ctx.guild_id().unwrap_or(MEDITATION_MIND);
   let user_id = &ctx.author().id;
 
@@ -360,7 +361,9 @@ pub async fn import(
         }
       }
       import_source.push_str("Insight Timer");
-      message.delete(ctx).await?;
+      if !dm {
+        message.delete(ctx).await?;
+      }
     }
     Ok(ImportSource::MindfulnessCoach) => {
       'result: for result in rdr.deserialize() {
@@ -393,7 +396,9 @@ pub async fn import(
         }
       }
       import_source.push_str("VA Mindfulness Coach");
-      message.delete(ctx).await?;
+      if !dm {
+        message.delete(ctx).await?;
+      }
     }
     Ok(ImportSource::WakingUp) => {
       'result: for result in rdr.deserialize() {
@@ -426,7 +431,9 @@ pub async fn import(
         }
       }
       import_source.push_str("Waking Up");
-      message.delete(ctx).await?;
+      if !dm {
+        message.delete(ctx).await?;
+      }
     }
     Ok(ImportSource::Unknown) => {
       ctx
@@ -615,7 +622,14 @@ pub async fn import(
     .await?;
 
   if guild_time_in_hours != "skip" {
-    ctx.say(format!("Awesome sauce! This server has collectively generated {guild_time_in_hours} hours of realmbreaking meditation!")).await?;
+    ChannelId::new(CHANNELS.tracking)
+    .send_message(
+      &ctx,
+      CreateMessage::new()
+        .content(format!("Awesome sauce! This server has collectively generated {guild_time_in_hours} hours of realmbreaking meditation!"))
+        .allowed_mentions(CreateAllowedMentions::new()),
+    )
+    .await?;
   }
 
   let member = guild_id.member(ctx, user_id).await?;
