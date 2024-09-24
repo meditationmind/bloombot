@@ -128,15 +128,38 @@ async fn update_time_roles(
         }
       }
 
-      if privacy {
-        ctx.send(CreateReply::default()
-          .content(format!(":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!", member.mention(), updated_time_role.to_role_id()))
-          .allowed_mentions(serenity::CreateAllowedMentions::new())
-          .ephemeral(privacy)).await?;
+      let congrats = if ctx.guild_id().is_some() {
+        format!(
+          ":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!",
+          member.mention(),
+          updated_time_role.to_role_id()
+        )
       } else {
-        ChannelId::new(CHANNELS.tracking).send_message(&ctx, CreateMessage::new()
-          .content(format!(":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!", member.mention(), updated_time_role.to_role_id()))
-          .allowed_mentions(serenity::CreateAllowedMentions::new())).await?;
+        format!(
+          ":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the @{} role!",
+          member.mention(),
+          updated_time_role.to_role_icon()
+        )
+      };
+
+      if privacy {
+        ctx
+          .send(
+            CreateReply::default()
+              .content(congrats)
+              .allowed_mentions(serenity::CreateAllowedMentions::new())
+              .ephemeral(privacy),
+          )
+          .await?;
+      } else {
+        ChannelId::new(CHANNELS.tracking)
+          .send_message(
+            &ctx,
+            CreateMessage::new()
+              .content(congrats)
+              .allowed_mentions(serenity::CreateAllowedMentions::new()),
+          )
+          .await?;
       }
     }
   }
@@ -186,15 +209,40 @@ async fn update_streak_roles(
         }
       }
 
-      if privacy {
-        ctx.send(CreateReply::default()
-            .content(format!(":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!", member.mention(), streak, updated_streak_role.to_role_id()))
-            .allowed_mentions(serenity::CreateAllowedMentions::new())
-            .ephemeral(privacy)).await?;
+      let congrats = if ctx.guild_id().is_some() {
+        format!(
+          ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!",
+          member.mention(),
+          streak,
+          updated_streak_role.to_role_id()
+        )
       } else {
-        ChannelId::new(CHANNELS.tracking).send_message(&ctx, CreateMessage::new()
-            .content(format!(":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!", member.mention(), streak, updated_streak_role.to_role_id()))
-            .allowed_mentions(serenity::CreateAllowedMentions::new())).await?;
+        format!(
+          ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the @{} role!",
+          member.mention(),
+          streak,
+          updated_streak_role.to_role_icon()
+        )
+      };
+
+      if privacy {
+        ctx
+          .send(
+            CreateReply::default()
+              .content(congrats)
+              .allowed_mentions(serenity::CreateAllowedMentions::new())
+              .ephemeral(privacy),
+          )
+          .await?;
+      } else {
+        ChannelId::new(CHANNELS.tracking)
+          .send_message(
+            &ctx,
+            CreateMessage::new()
+              .content(congrats)
+              .allowed_mentions(serenity::CreateAllowedMentions::new()),
+          )
+          .await?;
       }
     }
   }

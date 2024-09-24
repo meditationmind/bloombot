@@ -171,6 +171,25 @@ impl TimeSumRoles {
       _ => None,
     }
   }
+  pub fn to_role_icon<'a>(&self) -> &'a str {
+    match self {
+      TimeSumRoles::One => "⭐",
+      TimeSumRoles::Two => "⭐⭐",
+      TimeSumRoles::Three => "⭐⭐⭐",
+      TimeSumRoles::Four => "🌟",
+      TimeSumRoles::Five => "🌟🌟",
+      TimeSumRoles::Six => "🌟🌟🌟",
+      TimeSumRoles::Seven => "✨",
+      TimeSumRoles::Eight => "✨✨",
+      TimeSumRoles::Nine => "✨✨✨",
+      TimeSumRoles::Ten => "💫",
+      TimeSumRoles::Eleven => "💫💫",
+      TimeSumRoles::Twelve => "💫💫💫",
+      TimeSumRoles::Thirteen => "🔥",
+      TimeSumRoles::Fourteen => "🔥🔥",
+      TimeSumRoles::Fifteen => "🔥🔥🔥",
+    }
+  }
 
   pub fn get_users_current_roles(
     member_roles: &Vec<RoleId>,
@@ -238,6 +257,21 @@ impl StreakRoles {
       StreakRoles::Alien => 857242155784863754,
       StreakRoles::SpaceInvader => 1226730813190836367,
     })
+  }
+
+  pub fn to_role_icon<'a>(&self) -> &'a str {
+    match self {
+      StreakRoles::Egg => "🥚",
+      StreakRoles::HatchingChick => "🐣",
+      StreakRoles::BabyChick => "🐤",
+      StreakRoles::Chicken => "🐔",
+      StreakRoles::Dove => "🕊️",
+      StreakRoles::Owl => "🦉",
+      StreakRoles::Eagle => "🦅",
+      StreakRoles::Dragon => "🐉",
+      StreakRoles::Alien => "👽",
+      StreakRoles::SpaceInvader => "👾",
+    }
   }
 
   pub fn from_streak(streak: u64) -> Option<StreakRoles> {
