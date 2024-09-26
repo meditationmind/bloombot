@@ -31,17 +31,28 @@ pub async fn remove_entry(
     DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, id.as_str()).await?
   else {
     ctx
-      .say(format!("{} No entry found with that ID.", EMOJI.mminfo))
+      .send(
+        poise::CreateReply::default()
+        .content(format!(
+          "{} No entry found with that ID.\n-# Use </recent:1135659962580865128> to view a list of your entries and their IDs.",
+          EMOJI.mminfo
+        )).
+        ephemeral(true)
+      )
       .await?;
     return Ok(());
   };
 
   if entry.user_id != ctx.author().id {
     ctx
-      .say(format!(
-        "{} You can only remove your own entries.",
-        EMOJI.mminfo
-      ))
+      .send(
+        poise::CreateReply::default()
+          .content(format!(
+            "{} You can only remove your own entries.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true),
+      )
       .await?;
     return Ok(());
   }
