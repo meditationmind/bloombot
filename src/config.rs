@@ -1,5 +1,5 @@
+use poise::serenity_prelude::{self as serenity, Embed, GuildId, RoleId};
 use std::fmt;
-use poise::serenity_prelude::{self as serenity, Embed, RoleId, GuildId};
 
 pub const MEDITATION_MIND: GuildId = GuildId::new(244917432383176705);
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
@@ -89,25 +89,49 @@ pub struct BloomEmoji<'a> {
 }
 
 pub const EMOJI: BloomEmoji = BloomEmoji {
-  pepeglow: SimpleEmoji { animated: false, id: 1279541855150673991, name: "pepeglow" },
-  aww: SimpleEmoji { animated: false, id: 1279541172049678438, name: "aww" },
-  loveit: SimpleEmoji { animated: false, id: 1279540710747672689, name: "loveit" },
-  mminfo: SimpleEmoji { animated: false, id: 1279517292455264359, name: "mminfo" },
-  mmx: SimpleEmoji { animated: false, id: 1279517275749089290, name: "mmx" },
-  mmcheck: SimpleEmoji { animated: false, id: 1279517233877483601, name: "mmcheck" },
+  pepeglow: SimpleEmoji {
+    animated: false,
+    id: 1279541855150673991,
+    name: "pepeglow",
+  },
+  aww: SimpleEmoji {
+    animated: false,
+    id: 1279541172049678438,
+    name: "aww",
+  },
+  loveit: SimpleEmoji {
+    animated: false,
+    id: 1279540710747672689,
+    name: "loveit",
+  },
+  mminfo: SimpleEmoji {
+    animated: false,
+    id: 1279517292455264359,
+    name: "mminfo",
+  },
+  mmx: SimpleEmoji {
+    animated: false,
+    id: 1279517275749089290,
+    name: "mmx",
+  },
+  mmcheck: SimpleEmoji {
+    animated: false,
+    id: 1279517233877483601,
+    name: "mmcheck",
+  },
 };
 
 impl fmt::Display for SimpleEmoji<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-      if self.animated {
-          f.write_str("<a:")?;
-      } else {
-          f.write_str("<:")?;
-      }
-      f.write_str(self.name)?;
-      fmt::Write::write_char(f, ':')?;
-      fmt::Display::fmt(&self.id, f)?;
-      fmt::Write::write_char(f, '>')
+    if self.animated {
+      f.write_str("<a:")?;
+    } else {
+      f.write_str("<:")?;
+    }
+    f.write_str(self.name)?;
+    fmt::Write::write_char(f, ':')?;
+    fmt::Display::fmt(&self.id, f)?;
+    fmt::Write::write_char(f, '>')
   }
 }
 
@@ -171,6 +195,7 @@ impl TimeSumRoles {
       _ => None,
     }
   }
+
   pub fn to_role_icon<'a>(&self) -> &'a str {
     match self {
       TimeSumRoles::One => "⭐",
@@ -191,9 +216,7 @@ impl TimeSumRoles {
     }
   }
 
-  pub fn get_users_current_roles(
-    member_roles: &Vec<RoleId>,
-  ) -> Vec<RoleId> {
+  pub fn get_users_current_roles(member_roles: &Vec<RoleId>) -> Vec<RoleId> {
     let mut roles = Vec::new();
 
     for user_role in member_roles {
@@ -290,9 +313,7 @@ impl StreakRoles {
     }
   }
 
-  pub fn get_users_current_roles(
-    member_roles: &Vec<RoleId>,
-  ) -> Vec<RoleId> {
+  pub fn get_users_current_roles(member_roles: &Vec<RoleId>) -> Vec<RoleId> {
     let mut roles = Vec::new();
 
     for user_role in member_roles {
