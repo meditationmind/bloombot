@@ -49,6 +49,17 @@ struct MindfulnessCoachRecord {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, PartialEq, Deserialize)]
+struct AppleHealthRecord {
+  #[serde(rename = "App Name")]
+  app_name: String,
+  #[serde(rename = "Start Time")]
+  occurred_at: chrono::DateTime<Utc>,
+  #[serde(rename = "Duration")]
+  meditation_minutes: i32,
+}
+
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct BloomRecord {
   occurred_at: chrono::DateTime<Utc>,
@@ -57,6 +68,8 @@ struct BloomRecord {
 
 #[derive(poise::ChoiceParameter)]
 pub enum ImportSource {
+  #[name = "Apple Health"]
+  AppleHealth,
   #[name = "Insight Timer"]
   InsightTimer,
   #[name = "VA Mindfulness Coach"]
@@ -76,6 +89,9 @@ pub enum ImportType {
 
 fn autodetect_source(rdr: &mut csv::Reader<&[u8]>) -> Result<ImportSource> {
   let headers = rdr.headers()?;
+  if headers == vec!["App Name", "Start Time", "Duration"] {
+    return Ok(ImportSource::AppleHealth);
+  }
   if headers == vec!["Started At", "Duration", "Preset", "Activity"] {
     return Ok(ImportSource::InsightTimer);
   }
@@ -375,6 +391,42 @@ pub async fn import(
   let mut rdr = csv::ReaderBuilder::new().from_reader(content.as_slice());
 
   match autodetect_source(&mut rdr) {
+    Ok(ImportSource::AppleHealth) => {
+      let mut sources: Vec<String> = vec![];
+      'result: for result in rdr.deserialize() {
+        let row: AppleHealthRecord = result?;
+        if !sources.contains(&row.app_name) {
+          sources.push(row.app_name);
+        }
+        let datetime_utc = row.occurred_at;
+        if new_entries_only && datetime_utc.le(&latest_meditation_time) {
+          continue;
+        }
+        let minutes = row.meditation_minutes;
+        for entry in &current_data {
+          if entry.occurred_at.date_naive() == datetime_utc.date_naive()
+            && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
+              < datetime_utc)
+              || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
+          {
+            continue 'result;
+          }
+        }
+        total_minutes += minutes;
+        user_data.push(BloomRecord {
+          occurred_at: datetime_utc,
+          meditation_minutes: minutes,
+        });
+      }
+      import_source.push_str("Apple Health Mindful Sessions (");
+      for (i, source) in sources.iter().enumerate() {
+        import_source.push_str(source);
+        import_source.push_str(if i + 1 < sources.len() { ", " } else { ")" });
+      }
+      if !dm {
+        message.delete(ctx).await?;
+      }
+    }
     Ok(ImportSource::InsightTimer) => {
       'result: for result in rdr.deserialize::<InsightTimerRecord>().flatten() {
         if result.activity == "PracticeType.Meditation" {
@@ -451,32 +503,33 @@ pub async fn import(
     Ok(ImportSource::WakingUp) => {
       'result: for result in rdr.deserialize() {
         let row: WakingUpRecord = result?;
-        if row.title.starts_with("Course") {
-          if let Ok(valid_datetime) = chrono::NaiveDateTime::parse_from_str(
-            format!("{} 00:00:00", &row.date).as_str(),
-            "%m/%d/%Y %H:%M:%S",
-          ) {
-            let datetime_utc = valid_datetime.and_utc();
-            if new_entries_only && datetime_utc.le(&latest_meditation_time) {
-              continue;
-            }
-            let minutes = <i32 as std::str::FromStr>::from_str(&row.duration)? / 60;
-            for entry in &current_data {
-              if entry.occurred_at.date_naive() == datetime_utc.date_naive()
-                && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
-                  < datetime_utc)
-                  || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
-              {
-                continue 'result;
-              }
-            }
-            total_minutes += minutes;
-            user_data.push(BloomRecord {
-              occurred_at: datetime_utc,
-              meditation_minutes: minutes,
-            });
+        // Tried to filter talks out, but no consistent naming scheme so including all entries.
+        // if row.title.starts_with("Course") {
+        if let Ok(valid_datetime) = chrono::NaiveDateTime::parse_from_str(
+          format!("{} 00:00:00", &row.date).as_str(),
+          "%m/%d/%Y %H:%M:%S",
+        ) {
+          let datetime_utc = valid_datetime.and_utc();
+          if new_entries_only && datetime_utc.le(&latest_meditation_time) {
+            continue;
           }
+          let minutes = <i32 as std::str::FromStr>::from_str(&row.duration)? / 60;
+          for entry in &current_data {
+            if entry.occurred_at.date_naive() == datetime_utc.date_naive()
+              && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
+                < datetime_utc)
+                || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
+            {
+              continue 'result;
+            }
+          }
+          total_minutes += minutes;
+          user_data.push(BloomRecord {
+            occurred_at: datetime_utc,
+            meditation_minutes: minutes,
+          });
         }
+        // }
       }
       import_source.push_str("Waking Up");
       if !dm {
