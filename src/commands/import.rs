@@ -278,6 +278,7 @@ pub async fn import(
   #[description = "The type of import (Defaults to new entries)"]
   #[rename = "type"]
   import_type: Option<ImportType>,
+  #[description = "The user to import for (staff only)"] user: Option<serenity::User>,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
@@ -293,17 +294,47 @@ pub async fn import(
     return Ok(());
   }
 
-  let attachment = message
-    .attachments
-    .first()
-    .with_context(|| "Failed to assign attachment")?;
+  let data = ctx.data();
+  let dm = ctx.guild_id().is_none();
+  let guild_id = ctx.guild_id().unwrap_or(MEDITATION_MIND);
 
   let staff = match ctx.author_member().await {
     Some(member) => member.roles.contains(&RoleId::from(ROLES.staff)),
     None => false,
   };
 
-  if attachment.size > 524288 && !staff {
+  let user_id = match user {
+    Some(user) => {
+      if staff {
+        user.id
+      } else {
+        message.author.id
+      }
+    }
+    None => message.author.id,
+  };
+
+  if message.author.id != ctx.author().id && !staff {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} You cannot import files uploaded by other users.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+
+    return Ok(());
+  }
+
+  let attachment = message
+    .attachments
+    .first()
+    .with_context(|| "Failed to assign attachment")?;
+
+  if attachment.size > 262144 && !staff {
     ctx
       .send(
         CreateReply::default()
@@ -318,15 +349,10 @@ pub async fn import(
     return Ok(());
   }
 
-  let data = ctx.data();
-  let dm = ctx.guild_id().is_none();
-  let guild_id = ctx.guild_id().unwrap_or(MEDITATION_MIND);
-  let user_id = &ctx.author().id;
-
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
   let tracking_profile =
-    match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, user_id).await? {
+    match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
       Some(tracking_profile) => tracking_profile,
       None => TrackingProfile {
         ..Default::default()
@@ -339,7 +365,7 @@ pub async fn import(
 
   let latest_meditation = match import_type {
     ImportType::NewEntries => {
-      DatabaseHandler::get_latest_meditation_entry(&mut transaction, &guild_id, user_id).await?
+      DatabaseHandler::get_latest_meditation_entry(&mut transaction, &guild_id, &user_id).await?
     }
     ImportType::AllEntries => None,
   };
@@ -385,7 +411,7 @@ pub async fn import(
       occurred_at: chrono::DateTime::UNIX_EPOCH,
     })]
   } else {
-    DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, user_id).await?
+    DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &user_id).await?
   };
 
   let mut rdr = csv::ReaderBuilder::new().from_reader(content.as_slice());
@@ -633,7 +659,7 @@ pub async fn import(
 
   let random_quote = DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await?;
   let user_sum =
-    DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, user_id).await?;
+    DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, &user_id).await?;
 
   let response = match random_quote {
     Some(quote) => {
@@ -674,7 +700,7 @@ pub async fn import(
   };
 
   let user_streak = if tracking_profile.streaks_active {
-    let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, user_id).await?;
+    let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
     streak.current
   } else {
     0
@@ -749,11 +775,7 @@ pub async fn import(
   let log_embed = BloomBotEmbed::new()
     .title("Meditation Tracking Data Import")
     .description(format!(
-      "**User**: {}\n**Entries Added**: {}\n**Total Time**: {} minutes\n**Source**: {}",
-      ctx.author(),
-      result,
-      total_minutes,
-      import_source
+      "**User**: <@{user_id}>\n**Entries Added**: {result}\n**Total Time**: {total_minutes} minutes\n**Source**: {import_source}"
     ))
     .footer(
       CreateEmbedFooter::new(format!(
