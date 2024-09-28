@@ -270,7 +270,7 @@ async fn update_streak_roles(
 ///
 /// Imports meditation entries from a CSV file uploaded by the user.
 ///
-/// Supported apps include Insight Timer, VA Mindfulness Coach, and Waking Up.
+/// Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, and Apple Health (requires pre-processing with Bloom Parser).
 #[poise::command(slash_command, category = "Meditation Tracking")]
 pub async fn import(
   ctx: Context<'_>,
@@ -492,7 +492,7 @@ pub async fn import(
       }
     }
     Ok(ImportSource::MindfulnessCoach) => {
-      'result: for result in rdr.deserialize() {
+      for result in rdr.deserialize() {
         let row: MindfulnessCoachRecord = result?;
         if let Ok(valid_datetime) = chrono::NaiveDateTime::parse_from_str(
           format!("{} 00:00:00", &row.date).as_str(),
@@ -504,15 +504,6 @@ pub async fn import(
           }
           if let Some(duration) = row.duration.split_whitespace().next() {
             let minutes = <i32 as std::str::FromStr>::from_str(duration)?;
-            for entry in &current_data {
-              if entry.occurred_at.date_naive() == datetime_utc.date_naive()
-                && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
-                  < datetime_utc)
-                  || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
-              {
-                continue 'result;
-              }
-            }
             total_minutes += minutes;
             user_data.push(BloomRecord {
               occurred_at: datetime_utc,
@@ -527,10 +518,8 @@ pub async fn import(
       }
     }
     Ok(ImportSource::WakingUp) => {
-      'result: for result in rdr.deserialize() {
+      for result in rdr.deserialize() {
         let row: WakingUpRecord = result?;
-        // Tried to filter talks out, but no consistent naming scheme so including all entries.
-        // if row.title.starts_with("Course") {
         if let Ok(valid_datetime) = chrono::NaiveDateTime::parse_from_str(
           format!("{} 00:00:00", &row.date).as_str(),
           "%m/%d/%Y %H:%M:%S",
@@ -540,22 +529,12 @@ pub async fn import(
             continue;
           }
           let minutes = <i32 as std::str::FromStr>::from_str(&row.duration)? / 60;
-          for entry in &current_data {
-            if entry.occurred_at.date_naive() == datetime_utc.date_naive()
-              && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
-                < datetime_utc)
-                || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
-            {
-              continue 'result;
-            }
-          }
           total_minutes += minutes;
           user_data.push(BloomRecord {
             occurred_at: datetime_utc,
             meditation_minutes: minutes,
           });
         }
-        // }
       }
       import_source.push_str("Waking Up");
       if !dm {
