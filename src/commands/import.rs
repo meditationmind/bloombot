@@ -12,6 +12,7 @@ use poise::serenity_prelude::{
 };
 use poise::CreateReply;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use tokio::io::AsyncWriteExt;
 use ulid::Ulid;
 
@@ -60,6 +61,40 @@ struct AppleHealthRecord {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct FinchTimerSessionRecord {
+  #[serde(rename = "timerTypeIndex")]
+  timer_type: i32,
+  #[serde(rename = "selectedDurationSeconds")]
+  selected_duration: i32,
+  #[serde(rename = "startTime")]
+  start_time: String,
+  #[serde(rename = "completedTime")]
+  completed_time: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct FinchTimerSession {
+  data: Vec<FinchTimerSessionRecord>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct FinchBreathingSessionRecord {
+  breathing_type: String,
+  duration: i32,
+  start_time: String,
+  completed_time: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct FinchBreathingSession {
+  data: Vec<FinchBreathingSessionRecord>,
+}
+
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct BloomRecord {
   occurred_at: chrono::DateTime<Utc>,
@@ -70,6 +105,10 @@ struct BloomRecord {
 pub enum ImportSource {
   #[name = "Apple Health"]
   AppleHealth,
+  #[name = "Finch Breathing Sessions"]
+  FinchBreathing,
+  #[name = "Finch Meditation Sessions"]
+  FinchMeditation,
   #[name = "Insight Timer"]
   InsightTimer,
   #[name = "VA Mindfulness Coach"]
@@ -101,8 +140,51 @@ fn autodetect_source(rdr: &mut csv::Reader<&[u8]>) -> Result<ImportSource> {
   if headers == vec!["Finished On", "Title", "Duration"] {
     return Ok(ImportSource::WakingUp);
   }
+  if headers
+    == vec![
+      "timerTypeIndex",
+      "selectedDurationSeconds",
+      "startTime",
+      "completedTime",
+    ]
+  {
+    return Ok(ImportSource::FinchMeditation);
+  }
+  if headers == vec!["breathing_type", "duration", "start_time", "completed_time"] {
+    return Ok(ImportSource::FinchBreathing);
+  }
   info!("Unrecognized headers: {:?}", headers);
   Ok(ImportSource::Unknown)
+}
+
+fn process_finch_timer(content: &Vec<u8>) -> Result<Vec<u8>> {
+  let mut entries: Vec<FinchTimerSessionRecord> = vec![];
+  let records: FinchTimerSession = serde_json::from_slice(content.as_slice())?;
+  for record in records.data {
+    entries.push(record);
+  }
+  let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+  for entry in entries {
+    wtr.serialize(entry)?;
+  }
+  let csv = wtr.into_inner()?;
+
+  Ok(csv)
+}
+
+fn process_finch_breathing(content: &Vec<u8>) -> Result<Vec<u8>> {
+  let mut entries: Vec<FinchBreathingSessionRecord> = vec![];
+  let records: FinchBreathingSession = serde_json::from_slice(content.as_slice())?;
+  for record in records.data {
+    entries.push(record);
+  }
+  let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+  for entry in entries {
+    wtr.serialize(entry)?;
+  }
+  let csv = wtr.into_inner()?;
+
+  Ok(csv)
 }
 
 async fn update_time_roles(
@@ -268,13 +350,13 @@ async fn update_streak_roles(
 
 /// Import meditation entries from an app
 ///
-/// Imports meditation entries from a CSV file uploaded by the user.
+/// Imports meditation entries from a CSV or JSON file uploaded by the user.
 ///
-/// Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, and Apple Health (requires pre-processing with Bloom Parser).
+/// Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser).
 #[poise::command(slash_command, category = "Meditation Tracking")]
 pub async fn import(
   ctx: Context<'_>,
-  #[description = "The message with the CSV file"] message: serenity::Message,
+  #[description = "The message with the CSV/JSON file"] message: serenity::Message,
   #[description = "The type of import (Defaults to new entries)"]
   #[rename = "type"]
   import_type: Option<ImportType>,
@@ -377,7 +459,15 @@ pub async fn import(
   };
 
   let content = match attachment.download().await {
-    Ok(content) => content,
+    Ok(content) => {
+      if attachment.filename == *"TimerSession.json" {
+        process_finch_timer(&content).unwrap_or(content)
+      } else if attachment.filename == *"BreathingSession.json" {
+        process_finch_breathing(&content).unwrap_or(content)
+      } else {
+        content
+      }
+    }
     Err(why) => {
       info!("Error downloading attachment for import: {:?}", why);
       ctx
@@ -449,6 +539,87 @@ pub async fn import(
         import_source.push_str(source);
         import_source.push_str(if i + 1 < sources.len() { ", " } else { ")" });
       }
+      if !dm {
+        message.delete(ctx).await?;
+      }
+    }
+    Ok(ImportSource::FinchBreathing) => {
+      'result: for result in rdr.deserialize::<FinchBreathingSessionRecord>().flatten() {
+        if !result.completed_time.is_empty() {
+          if let Ok(valid_starttime) =
+            chrono::NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
+          {
+            let datetime_utc = valid_starttime.and_utc()
+              - chrono::Duration::minutes(i64::from(tracking_profile.utc_offset));
+            if new_entries_only && datetime_utc.le(&latest_meditation_time) {
+              continue;
+            }
+            let minutes = result.duration / 60;
+            if minutes < 1 {
+              continue;
+            }
+            for entry in &current_data {
+              if entry.occurred_at.date_naive() == datetime_utc.date_naive()
+                && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
+                  < datetime_utc)
+                  || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
+              {
+                continue 'result;
+              }
+            }
+            total_minutes += minutes;
+            user_data.push(BloomRecord {
+              occurred_at: datetime_utc,
+              meditation_minutes: minutes,
+            });
+          }
+        }
+      }
+      import_source.push_str("Finch Breathing Sessions");
+      if !dm {
+        message.delete(ctx).await?;
+      }
+    }
+    Ok(ImportSource::FinchMeditation) => {
+      'result: for result in rdr.deserialize::<FinchTimerSessionRecord>().flatten() {
+        if result.timer_type == 0 {
+          if let Ok(valid_starttime) =
+            chrono::NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
+          {
+            let datetime_utc = valid_starttime.and_utc()
+              - chrono::Duration::minutes(i64::from(tracking_profile.utc_offset));
+            if new_entries_only && datetime_utc.le(&latest_meditation_time) {
+              continue;
+            }
+            #[allow(clippy::cast_possible_truncation)]
+            let minutes = if let Ok(valid_endtime) =
+              chrono::NaiveDateTime::parse_from_str(&result.completed_time, "%a, %d %b %Y %H:%M:%S")
+            {
+              (valid_endtime - valid_starttime).num_minutes() as i32
+            } else {
+              result.selected_duration / 60
+            };
+            if minutes < 1 {
+              continue;
+            }
+            for entry in &current_data {
+              if entry.occurred_at.date_naive() == datetime_utc.date_naive()
+                && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
+                  < datetime_utc)
+                  || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
+              {
+                continue 'result;
+              }
+            }
+            total_minutes += minutes;
+            user_data.push(BloomRecord {
+              occurred_at: datetime_utc,
+              meditation_minutes: minutes,
+            });
+          }
+        }
+      }
+      import_source.push_str("Finch Meditation Sessions");
       if !dm {
         message.delete(ctx).await?;
       }
@@ -545,7 +716,7 @@ pub async fn import(
       ctx
         .send(
           CreateReply::default()
-            .content(format!("{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, and Waking Up. If you would like support for another format, please contact staff.", EMOJI.mminfo))
+            .content(format!("{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser). If you would like support for another format, please contact staff.", EMOJI.mminfo))
             .ephemeral(true),
         )
         .await?;
@@ -563,7 +734,7 @@ pub async fn import(
       ctx
         .send(
           CreateReply::default()
-            .content(format!("{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, and Waking Up. If you would like support for another format, please contact staff.", EMOJI.mminfo))
+            .content(format!("{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser). If you would like support for another format, please contact staff.", EMOJI.mminfo))
             .ephemeral(true),
         )
         .await?;
