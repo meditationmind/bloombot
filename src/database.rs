@@ -2548,16 +2548,16 @@ impl DatabaseHandler {
     timeframe: &ChallengeTimeframe,
   ) -> Result<UserStats> {
     // Get total count, total sum, and count/sum for timeframe
-    let end_time = chrono::Utc::now();
+    let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
     let start_time = match timeframe {
-      ChallengeTimeframe::Monthly => end_time
+      ChallengeTimeframe::Monthly => chrono::Utc::now()
         .with_day(1)
         .unwrap_or_default()
         .with_hour(0)
         .unwrap_or_default()
         .with_minute(0)
         .unwrap_or_default(),
-      ChallengeTimeframe::YearRound => end_time
+      ChallengeTimeframe::YearRound => chrono::Utc::now()
         .with_month(1)
         .unwrap_or_default()
         .with_day(1)

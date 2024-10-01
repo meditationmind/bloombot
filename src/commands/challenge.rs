@@ -309,7 +309,8 @@ pub async fn stats(
           .unwrap_or_default()
           .with_minute(0)
           .unwrap_or_default();
-        (end_time - start_time).num_days()
+        let days = (end_time - start_time).num_days();
+        if days == 0 { 1 } else { days }
       };
 
       let total_time = stats.timeframe_stats.sum.unwrap_or(0) as f64;
@@ -460,7 +461,8 @@ pub async fn stats(
         .unwrap_or_default()
         .with_minute(0)
         .unwrap_or_default();
-      (end_time - start_time).num_days()
+      let days = (end_time - start_time).num_days();
+      if days == 0 { 1 } else { days }
     };
 
     let total_time = stats.timeframe_stats.sum.unwrap_or(0) as f64;
