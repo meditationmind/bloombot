@@ -56,8 +56,10 @@ struct AppleHealthRecord {
   app_name: String,
   #[serde(rename = "Start Time")]
   occurred_at: chrono::DateTime<Utc>,
-  #[serde(rename = "Duration")]
+  #[serde(rename = "Minutes")]
   meditation_minutes: i32,
+  #[serde(rename = "Seconds")]
+  meditation_seconds: i32,
 }
 
 #[allow(dead_code)]
@@ -99,6 +101,7 @@ struct FinchBreathingSession {
 struct BloomRecord {
   occurred_at: chrono::DateTime<Utc>,
   meditation_minutes: i32,
+  meditation_seconds: i32,
 }
 
 #[derive(poise::ChoiceParameter)]
@@ -128,7 +131,7 @@ pub enum ImportType {
 
 fn autodetect_source(rdr: &mut csv::Reader<&[u8]>) -> Result<ImportSource> {
   let headers = rdr.headers()?;
-  if headers == vec!["App Name", "Start Time", "Duration"] {
+  if headers == vec!["App Name", "Start Time", "Minutes", "Seconds"] {
     return Ok(ImportSource::AppleHealth);
   }
   if headers == vec!["Started At", "Duration", "Preset", "Activity"] {
@@ -484,6 +487,7 @@ pub async fn import(
 
   let mut user_data: Vec<BloomRecord> = vec![];
   let mut total_minutes = 0;
+  let mut total_seconds = 0;
   let mut import_source = String::new();
   let latest_meditation_time = match &latest_meditation {
     Some(entry) => entry.occurred_at,
@@ -529,9 +533,11 @@ pub async fn import(
           }
         }
         total_minutes += minutes;
+        total_seconds += row.meditation_seconds;
         user_data.push(BloomRecord {
           occurred_at: datetime_utc,
           meditation_minutes: minutes,
+          meditation_seconds: row.meditation_seconds,
         });
       }
       import_source.push_str("Apple Health Mindful Sessions (");
@@ -568,9 +574,11 @@ pub async fn import(
               }
             }
             total_minutes += minutes;
+            total_seconds += result.duration % 60;
             user_data.push(BloomRecord {
               occurred_at: datetime_utc,
               meditation_minutes: minutes,
+              meditation_seconds: result.duration % 60,
             });
           }
         }
@@ -592,12 +600,13 @@ pub async fn import(
               continue;
             }
             #[allow(clippy::cast_possible_truncation)]
-            let minutes = if let Ok(valid_endtime) =
+            let (minutes, seconds) = if let Ok(valid_endtime) =
               chrono::NaiveDateTime::parse_from_str(&result.completed_time, "%a, %d %b %Y %H:%M:%S")
             {
-              (valid_endtime - valid_starttime).num_minutes() as i32
+              let num_seconds = (valid_endtime - valid_starttime).num_seconds() as i32;
+              (num_seconds / 60, num_seconds % 60)
             } else {
-              result.selected_duration / 60
+              (result.selected_duration / 60, result.selected_duration % 60)
             };
             if minutes < 1 {
               continue;
@@ -612,9 +621,11 @@ pub async fn import(
               }
             }
             total_minutes += minutes;
+            total_seconds += seconds;
             user_data.push(BloomRecord {
               occurred_at: datetime_utc,
               meditation_minutes: minutes,
+              meditation_seconds: seconds,
             });
           }
         }
@@ -634,11 +645,12 @@ pub async fn import(
             if new_entries_only && datetime_utc.le(&latest_meditation_time) {
               continue;
             }
-            let minutes = {
+            let (minutes, seconds) = {
               let h_m_s: Vec<&str> = result.duration.split(':').collect();
               let hours = <i32 as std::str::FromStr>::from_str(h_m_s[0])?;
               let minutes = <i32 as std::str::FromStr>::from_str(h_m_s[1])?;
-              (hours * 60) + minutes
+              let seconds = <i32 as std::str::FromStr>::from_str(h_m_s[2])?;
+              ((hours * 60) + minutes, seconds)
             };
             for entry in &current_data {
               if entry.occurred_at.date_naive() == datetime_utc.date_naive()
@@ -650,9 +662,11 @@ pub async fn import(
               }
             }
             total_minutes += minutes;
+            total_seconds += seconds;
             user_data.push(BloomRecord {
               occurred_at: datetime_utc,
               meditation_minutes: minutes,
+              meditation_seconds: seconds,
             });
           }
         }
@@ -679,6 +693,7 @@ pub async fn import(
             user_data.push(BloomRecord {
               occurred_at: datetime_utc,
               meditation_minutes: minutes,
+              meditation_seconds: 0,
             });
           }
         }
@@ -700,10 +715,13 @@ pub async fn import(
             continue;
           }
           let minutes = <i32 as std::str::FromStr>::from_str(&row.duration)? / 60;
+          let seconds = <i32 as std::str::FromStr>::from_str(&row.duration)? % 60;
           total_minutes += minutes;
+          total_seconds += seconds;
           user_data.push(BloomRecord {
             occurred_at: datetime_utc,
             meditation_minutes: minutes,
+            meditation_seconds: seconds,
           });
         }
       }
@@ -765,7 +783,7 @@ pub async fn import(
   }
 
   let mut sql_query =
-    "INSERT INTO meditation (record_id, user_id, meditation_minutes, guild_id, occurred_at) VALUES"
+    "INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES"
       .to_owned();
   let mut reversal_query = "DELETE FROM meditation WHERE record_id IN (".to_owned();
   for (i, record) in user_data.iter().enumerate() {
@@ -778,6 +796,8 @@ pub async fn import(
     sql_query.push_str(&user_id.to_string());
     sql_query.push_str("', '");
     sql_query.push_str(&record.meditation_minutes.to_string());
+    sql_query.push_str("', '");
+    sql_query.push_str(&record.meditation_seconds.to_string());
     sql_query.push_str("', '");
     sql_query.push_str(&guild_id.to_string());
     sql_query.push_str("', '");
@@ -868,15 +888,16 @@ pub async fn import(
     }
   };
 
+  let h = (total_minutes + (total_seconds / 60)) / 60;
+  let m = (total_minutes + (total_seconds / 60)) % 60;
+  let s = total_seconds % 60;
+
   let success_response = format!(
-    "{} Successfully added a total of {} {} from {} {} imported from {}.",
+    "{} Successfully added a total of {}h {}m {}s from {} {} imported from {}.",
     EMOJI.mmcheck,
-    total_minutes,
-    if total_minutes == 1 {
-      "minute"
-    } else {
-      "minutes"
-    },
+    h,
+    m,
+    s,
     result,
     if result == 1 { "entry" } else { "entries" },
     import_source,
