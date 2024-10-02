@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT record_id, user_id, meditation_minutes, occurred_at FROM meditation WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC\n      ",
+  "query": "\n        SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE record_id = $1 AND guild_id = $2\n      ",
   "describe": {
     "columns": [
       {
@@ -20,6 +20,11 @@
       },
       {
         "ordinal": 3,
+        "name": "meditation_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
         "name": "occurred_at",
         "type_info": "Timestamptz"
       }
@@ -34,8 +39,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "481382d6ff7728dcfbf88635c4c1d2866e5ecb4f57ff9dfb6cabb7f4db75ce97"
+  "hash": "75726c26c7e1a2c9b88e4bdd00c3495221cde600ad5a4fd69e516ea60d2878a5"
 }

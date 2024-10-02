@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT SUM(meditation_minutes) AS guild_total FROM meditation WHERE guild_id = $1\n      ",
+  "query": "\n        SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS guild_total FROM meditation WHERE guild_id = $1\n      ",
   "describe": {
     "columns": [
       {
@@ -18,5 +18,5 @@
       null
     ]
   },
-  "hash": "6531eaf3f4bf25f6b0b5007bc7863081d915f8b9dbcc56300b3f9df669bf5884"
+  "hash": "fa289f4cbb05dcdda9709a3dff71fec60d55e57477592002f936882abc3b26cc"
 }

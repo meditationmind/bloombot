@@ -128,7 +128,10 @@ impl PageRow for EraseData {
     if self.message_link == "None" {
       format!("**Reason:** {}\n-# Notification not available", self.reason)
     } else {
-      format!("**Reason:** {}\n[Go to erase notification]({})", self.reason, self.message_link)
+      format!(
+        "**Reason:** {}\n[Go to erase notification]({})",
+        self.reason, self.message_link
+      )
     }
   }
 }
@@ -137,12 +140,39 @@ pub struct MeditationData {
   pub id: String,
   pub user_id: serenity::UserId,
   pub meditation_minutes: i32,
+  pub meditation_seconds: i32,
   pub occurred_at: chrono::DateTime<Utc>,
 }
 
 impl PageRow for MeditationData {
   fn title(&self, _page_type: PageType) -> String {
-    format!("{} minutes", self.meditation_minutes)
+    if self.meditation_seconds > 0 {
+      format!(
+        "{} {} {} {}",
+        self.meditation_minutes,
+        if self.meditation_minutes == 1 {
+          "minute"
+        } else {
+          "minutes"
+        },
+        self.meditation_seconds,
+        if self.meditation_seconds == 1 {
+          "second"
+        } else {
+          "seconds"
+        },
+      )
+    } else {
+      format!(
+        "{} {}",
+        self.meditation_minutes,
+        if self.meditation_minutes == 1 {
+          "minute"
+        } else {
+          "minutes"
+        },
+      )
+    }
   }
 
   fn body(&self) -> String {
@@ -1073,7 +1103,7 @@ impl DatabaseHandler {
   ) -> Result<Vec<MeditationData>> {
     let rows = sqlx::query!(
       r#"
-        SELECT record_id, user_id, meditation_minutes, occurred_at FROM meditation WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
+        SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
       "#,
       user_id.to_string(),
       guild_id.to_string(),
@@ -1093,6 +1123,7 @@ impl DatabaseHandler {
             .expect("parse should not fail since user_id is UserId.to_string()"),
         ),
         meditation_minutes: row.meditation_minutes,
+        meditation_seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
       })
       .collect();
@@ -1149,7 +1180,7 @@ impl DatabaseHandler {
   ) -> Result<Option<MeditationData>> {
     let row = sqlx::query!(
       r#"
-        SELECT record_id, user_id, meditation_minutes, occurred_at FROM meditation WHERE record_id = $1 AND guild_id = $2
+        SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE record_id = $1 AND guild_id = $2
       "#,
       meditation_id,
       guild_id.to_string(),
@@ -1162,6 +1193,7 @@ impl DatabaseHandler {
         id: row.record_id,
         user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
         meditation_minutes: row.meditation_minutes,
+        meditation_seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
       }),
       None => None,
@@ -1177,7 +1209,7 @@ impl DatabaseHandler {
   ) -> Result<Option<MeditationData>> {
     let row = sqlx::query!(
       r#"
-        SELECT record_id, user_id, meditation_minutes, occurred_at
+        SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at
         FROM meditation
         WHERE user_id = $1 AND guild_id = $2
         ORDER BY occurred_at DESC
@@ -1194,6 +1226,7 @@ impl DatabaseHandler {
         id: row.record_id,
         user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
         meditation_minutes: row.meditation_minutes,
+        meditation_seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
       }),
       None => None,
@@ -1311,7 +1344,7 @@ impl DatabaseHandler {
   ) -> Result<i64> {
     let row = sqlx::query!(
       r#"
-        SELECT SUM(meditation_minutes) AS winner_candidate_total FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
+        SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS winner_candidate_total FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
       "#,
       user_id.to_string(),
       guild_id.to_string(),
@@ -1361,7 +1394,7 @@ impl DatabaseHandler {
   ) -> Result<i64> {
     let row = sqlx::query!(
       r#"
-        SELECT SUM(meditation_minutes) AS user_total FROM meditation WHERE user_id = $1 AND guild_id = $2
+        SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS user_total FROM meditation WHERE user_id = $1 AND guild_id = $2
       "#,
       user_id.to_string(),
       guild_id.to_string(),
@@ -1404,7 +1437,7 @@ impl DatabaseHandler {
   ) -> Result<i64> {
     let row = sqlx::query!(
       r#"
-        SELECT SUM(meditation_minutes) AS guild_total FROM meditation WHERE guild_id = $1
+        SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS guild_total FROM meditation WHERE guild_id = $1
       "#,
       guild_id.to_string(),
     )
@@ -2571,7 +2604,7 @@ impl DatabaseHandler {
     let timeframe_data = sqlx::query_as!(
       TimeframeStats,
       r#"
-        SELECT COUNT(record_id) AS count, SUM(meditation_minutes) AS sum
+        SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
         FROM meditation
         WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
       "#,
@@ -2610,7 +2643,7 @@ impl DatabaseHandler {
 
     let total_data = sqlx::query!(
       r#"
-        SELECT COUNT(record_id) AS total_count, SUM(meditation_minutes) AS total_sum
+        SELECT COUNT(record_id) AS total_count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS total_sum
         FROM meditation
         WHERE guild_id = $1 AND user_id = $2
       "#,
@@ -2623,7 +2656,7 @@ impl DatabaseHandler {
     let timeframe_data = sqlx::query_as!(
       TimeframeStats,
       r#"
-        SELECT COUNT(record_id) AS count, SUM(meditation_minutes) AS sum
+        SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
         FROM meditation
         WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
       "#,
@@ -2661,7 +2694,7 @@ impl DatabaseHandler {
 
     let total_data = sqlx::query!(
       r#"
-        SELECT COUNT(record_id) AS total_count, SUM(meditation_minutes) AS total_sum
+        SELECT COUNT(record_id) AS total_count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS total_sum
         FROM meditation
         WHERE guild_id = $1
       "#,
@@ -2673,7 +2706,7 @@ impl DatabaseHandler {
     let timeframe_data = sqlx::query_as!(
       TimeframeStats,
       r#"
-        SELECT COUNT(record_id) AS count, SUM(meditation_minutes) AS sum
+        SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
         FROM meditation
         WHERE guild_id = $1 AND occurred_at >= $2 AND occurred_at <= $3
       "#,
@@ -2725,10 +2758,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "daily_data" AS (
-            SELECT date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago, meditation_minutes
+            SELECT date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago, meditation_minutes, meditation_seconds
             FROM meditation
             WHERE guild_id = $1 AND user_id = $2
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
           FROM "daily_data"
           WHERE "times_ago" <= 12
           GROUP BY "times_ago";"#,
@@ -2740,10 +2773,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "weekly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes
+            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes, meditation_seconds
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
             FROM "weekly_data"
             WHERE "times_ago" <= 12
         GROUP BY "times_ago";"#,
@@ -2755,10 +2788,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "monthly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes
+            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes, meditation_seconds
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
             FROM "monthly_data"
             WHERE "times_ago" <= 12
         GROUP BY "times_ago";"#,
@@ -2770,10 +2803,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "yearly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes
+            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes, meditation_seconds
             FROM meditation
             WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
             FROM "yearly_data"
             WHERE "times_ago" <= 12
         GROUP BY "times_ago";"#,
@@ -2827,10 +2860,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "daily_data" AS (
-            SELECT date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago, meditation_minutes
+            SELECT date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago, meditation_minutes, meditation_seconds
             FROM meditation
             WHERE guild_id = $1
-          ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+          ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
           FROM "daily_data"
           WHERE "times_ago" <= 12
           GROUP BY "times_ago";"#,
@@ -2841,10 +2874,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "weekly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes
+            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes, meditation_seconds
             FROM meditation
             WHERE "guild_id" = $1
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
             FROM "weekly_data"
             WHERE "times_ago" <= 12
         GROUP BY "times_ago";"#,
@@ -2855,10 +2888,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "monthly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes
+            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes, meditation_seconds
             FROM meditation
             WHERE "guild_id" = $1
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
             FROM "monthly_data"
             WHERE "times_ago" <= 12
         GROUP BY "times_ago";"#,
@@ -2869,10 +2902,10 @@ impl DatabaseHandler {
         sqlx::query_as!(
           Res,
           r#"WITH "yearly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes
+            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes, meditation_seconds
             FROM meditation
             WHERE "guild_id" = $1
-        ) SELECT "times_ago", SUM(meditation_minutes) AS meditation_minutes, COUNT(*) AS meditation_count
+        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
             FROM "yearly_data"
             WHERE "times_ago" <= 12
         GROUP BY "times_ago";"#,

@@ -502,6 +502,7 @@ pub async fn import(
       id: String::new(),
       user_id: UserId::default(),
       meditation_minutes: 0,
+      meditation_seconds: 0,
       occurred_at: chrono::DateTime::UNIX_EPOCH,
     })]
   } else {
