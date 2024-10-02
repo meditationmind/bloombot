@@ -1045,14 +1045,16 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
     minutes: i32,
+    seconds: i32,
   ) -> Result<()> {
     sqlx::query!(
       r#"
-        INSERT INTO meditation (record_id, user_id, meditation_minutes, guild_id) VALUES ($1, $2, $3, $4)
+        INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id) VALUES ($1, $2, $3, $4, $5)
       "#,
       Ulid::new().to_string(),
       user_id.to_string(),
       minutes,
+      seconds,
       guild_id.to_string(),
     )
     .execute(&mut **transaction)
@@ -1066,15 +1068,17 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
     minutes: i32,
+    seconds: i32,
     occurred_at: chrono::DateTime<Utc>,
   ) -> Result<()> {
     sqlx::query!(
       r#"
-        INSERT INTO meditation (record_id, user_id, meditation_minutes, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)
       "#,
       Ulid::new().to_string(),
       user_id.to_string(),
       minutes,
+      seconds,
       guild_id.to_string(),
       occurred_at,
     )
@@ -1239,13 +1243,15 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     meditation_id: &str,
     minutes: i32,
+    seconds: i32,
     occurred_at: chrono::DateTime<Utc>,
   ) -> Result<()> {
     sqlx::query!(
       r#"
-        UPDATE meditation SET meditation_minutes = $1, occurred_at = $2 WHERE record_id = $3
+        UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4
       "#,
       minutes,
+      seconds,
       occurred_at,
       meditation_id,
     )

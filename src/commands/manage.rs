@@ -48,6 +48,9 @@ pub async fn create(
   #[description = "The number of minutes for the entry"]
   #[min = 0]
   minutes: i32,
+  #[description = "The number of seconds for the entry (defaults to 0)"]
+  #[min = 0]
+  seconds: Option<i32>,
   // Message will not be older than Discord itself
   #[min = 2015]
   #[description = "The year of the entry"]
@@ -107,6 +110,7 @@ pub async fn create(
   };
 
   let datetime = chrono::NaiveDateTime::new(entry_date, entry_time).and_utc();
+  let seconds = seconds.unwrap_or(0);
 
   let data = ctx.data();
   let guild_id = ctx
@@ -120,18 +124,31 @@ pub async fn create(
     &guild_id,
     &user.id,
     minutes,
+    seconds,
     datetime,
   )
   .await?;
 
-  let success_embed = BloomBotEmbed::new()
-    .title("Meditation Entry Created")
-    .description(format!(
+  let description = if seconds > 0 {
+    format!(
+      "**User**: <@{}>\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
+      user.id,
+      datetime.format("%B %d, %Y"),
+      minutes,
+      seconds,
+    )
+  } else {
+    format!(
       "**User**: <@{}>\n**Date**: {}\n**Time**: {} minute(s)",
       user.id,
       datetime.format("%B %d, %Y"),
-      minutes
-    ))
+      minutes,
+    )
+  };
+
+  let success_embed = BloomBotEmbed::new()
+    .title("Meditation Entry Created")
+    .description(&description)
     .clone();
 
   commit_and_say(
@@ -144,12 +161,7 @@ pub async fn create(
 
   let log_embed = BloomBotEmbed::new()
     .title("Meditation Entry Created")
-    .description(format!(
-      "**User**: <@{}>\n**Date**: {}\n**Time**: {} minute(s)",
-      user.id,
-      datetime.format("%B %d, %Y"),
-      minutes
-    ))
+    .description(description)
     .footer(
       CreateEmbedFooter::new(format!(
         "Created by {} ({})",
@@ -242,7 +254,8 @@ pub async fn list(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
+          CreateInteractionResponseMessage::new()
+            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;
@@ -261,6 +274,9 @@ pub async fn update(
   #[description = "The number of minutes for the entry"]
   #[min = 0]
   minutes: Option<i32>,
+  #[description = "The number of seconds for the entry"]
+  #[min = 0]
+  seconds: Option<i32>,
   #[description = "The year of the entry"] year: Option<i32>,
   #[description = "The month of the entry"]
   #[min = 1]
@@ -291,6 +307,7 @@ pub async fn update(
   };
 
   if minutes.is_none()
+    && seconds.is_none()
     && year.is_none()
     && month.is_none()
     && day.is_none()
@@ -314,6 +331,7 @@ pub async fn update(
 
   if let Some(existing_entry) = existing_entry {
     let minutes = minutes.unwrap_or(existing_entry.meditation_minutes);
+    let seconds = seconds.unwrap_or(existing_entry.meditation_seconds);
 
     let existing_date = existing_entry.occurred_at;
     let year = year.unwrap_or(existing_date.year());
@@ -360,21 +378,44 @@ pub async fn update(
 
     let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-    DatabaseHandler::update_meditation_entry(&mut transaction, &entry_id, minutes, datetime)
-      .await?;
+    DatabaseHandler::update_meditation_entry(
+      &mut transaction,
+      &entry_id,
+      minutes,
+      seconds,
+      datetime,
+    )
+    .await?;
+
+    let description = if existing_entry.meditation_seconds > 0 || seconds > 0 {
+      format!(
+      "**User**: <@{}>\n**ID**: {}\n\n__**Before**__\n**Date**: {}\n**Time**: {} minute(s) {} second(s)\n\n__**After**__\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
+      existing_entry.user_id,
+      entry_id,
+      existing_date.format("%B %d, %Y at %l:%M %P"),
+      existing_entry.meditation_minutes,
+      existing_entry.meditation_seconds,
+      datetime.format("%B %d, %Y at %l:%M %P"),
+      minutes,
+      seconds,
+      )
+    } else {
+      format!(
+        "**User**: <@{}>\n**ID**: {}\n\n__**Before**__\n**Date**: {}\n**Time**: {} minute(s)\n\n__**After**__\n**Date**: {}\n**Time**: {} minute(s)",
+        existing_entry.user_id,
+        entry_id,
+        existing_date.format("%B %d, %Y at %l:%M %P"),
+        existing_entry.meditation_minutes,
+        datetime.format("%B %d, %Y at %l:%M %P"),
+        minutes,
+        )
+    };
 
     let success_embed = BloomBotEmbed::new()
       .title("Meditation Entry Updated")
-      .description(format!(
-    "**User**: <@{}>\n**ID**: {}\n\n**Before:** {} minute(s) on {}\n**After:** {} minute(s) on {}",
-    existing_entry.user_id,
-    entry_id,
-    existing_entry.meditation_minutes,
-    existing_date.format("%B %d, %Y at %l:%M %P"),
-    minutes,
-    datetime.format("%B %d, %Y at %l:%M %P")
-    ))
+      .description(&description)
       .clone();
+
     commit_and_say(
       ctx,
       transaction,
@@ -384,20 +425,17 @@ pub async fn update(
     .await?;
 
     let log_embed = BloomBotEmbed::new()
-    .title("Meditation Entry Updated")
-    .description(format!(
-    "**User**: <@{}>\n**ID**: {}\n\n__**Before**__\n**Date**: {}\n**Time**: {} minute(s)\n\n__**After**__\n**Date**: {}\n**Time**: {} minute(s)",
-    existing_entry.user_id,
-    entry_id,
-    existing_date.format("%B %d, %Y at %l:%M %P"),
-    existing_entry.meditation_minutes,
-    datetime.format("%B %d, %Y at %l:%M %P"),
-    minutes
-    ))
-    .footer(CreateEmbedFooter::new(format!("Updated by {} ({})", ctx.author().name, ctx.author().id))
-    .icon_url(ctx.author().avatar_url().unwrap_or_default())
-    )
-    .clone();
+      .title("Meditation Entry Updated")
+      .description(description)
+      .footer(
+        CreateEmbedFooter::new(format!(
+          "Updated by {} ({})",
+          ctx.author().name,
+          ctx.author().id
+        ))
+        .icon_url(ctx.author().avatar_url().unwrap_or_default()),
+      )
+      .clone();
 
     let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
 
@@ -465,15 +503,28 @@ pub async fn delete(
 
   DatabaseHandler::delete_meditation_entry(&mut transaction, &entry_id).await?;
 
-  let success_embed = BloomBotEmbed::new()
-    .title("Meditation Entry Deleted")
-    .description(format!(
+  let description = if entry.meditation_seconds > 0 {
+    format!(
+      "**User**: <@{}>\n**ID**: {}\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
+      entry.user_id,
+      entry.id,
+      entry.occurred_at.format("%B %d, %Y"),
+      entry.meditation_minutes,
+      entry.meditation_seconds,
+    )
+  } else {
+    format!(
       "**User**: <@{}>\n**ID**: {}\n**Date**: {}\n**Time**: {} minute(s)",
       entry.user_id,
       entry.id,
       entry.occurred_at.format("%B %d, %Y"),
-      entry.meditation_minutes
-    ))
+      entry.meditation_minutes,
+    )
+  };
+
+  let success_embed = BloomBotEmbed::new()
+    .title("Meditation Entry Deleted")
+    .description(&description)
     .clone();
 
   commit_and_say(
@@ -486,13 +537,7 @@ pub async fn delete(
 
   let log_embed = BloomBotEmbed::new()
     .title("Meditation Entry Deleted")
-    .description(format!(
-      "**User**: <@{}>\n**ID**: {}\n**Date**: {}\n**Time**: {} minute(s)",
-      entry.user_id,
-      entry.id,
-      entry.occurred_at.format("%B %d, %Y"),
-      entry.meditation_minutes
-    ))
+    .description(description)
     .footer(
       CreateEmbedFooter::new(format!(
         "Deleted by {} ({})",

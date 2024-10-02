@@ -67,15 +67,28 @@ pub async fn remove_entry(
   )
   .await?;
 
-  let log_embed = BloomBotEmbed::new()
-    .title("Meditation Entry Removed")
-    .description(format!(
+  let description = if entry.meditation_seconds > 0 {
+    format!(
+      "**User**: {}\n**ID**: {}\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
+      ctx.author(),
+      entry.id,
+      entry.occurred_at.format("%B %d, %Y"),
+      entry.meditation_minutes,
+      entry.meditation_seconds,
+    )
+  } else {
+    format!(
       "**User**: {}\n**ID**: {}\n**Date**: {}\n**Time**: {} minute(s)",
       ctx.author(),
       entry.id,
       entry.occurred_at.format("%B %d, %Y"),
-      entry.meditation_minutes
-    ))
+      entry.meditation_minutes,
+    )
+  };
+
+  let log_embed = BloomBotEmbed::new()
+    .title("Meditation Entry Removed")
+    .description(description)
     .footer(
       CreateEmbedFooter::new(format!(
         "Removed by {} ({})",

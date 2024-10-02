@@ -176,7 +176,7 @@ async fn update_streak_roles(
                 .allowed_mentions(serenity::CreateAllowedMentions::new())
                 .ephemeral(true)).await?;
 
-                return Ok(());
+            return Ok(());
           }
         }
       }
@@ -218,13 +218,16 @@ pub async fn add(
   #[description = "Number of minutes to add"]
   #[min = 1]
   minutes: i32,
+  #[description = "Number of seconds to add (defaults to 0)"]
+  #[min = 0]
+  seconds: Option<i32>,
   #[description = "Specify a UTC offset for a Western Hemisphere time zone"]
   #[rename = "western_hemisphere_offset"]
   minus_offset: Option<MinusOffsetChoices>,
   #[description = "Specify a UTC offset for an Eastern Hemisphere time zone"]
   #[rename = "eastern_hemisphere_offset"]
   plus_offset: Option<PlusOffsetChoices>,
-  #[description = "Set visibility of response (Defaults to public)"] privacy: Option<Privacy>,
+  #[description = "Set visibility of response (defaults to public)"] privacy: Option<Privacy>,
 ) -> Result<()> {
   let data = ctx.data();
 
@@ -303,13 +306,15 @@ pub async fn add(
     None => 0,
   };
 
+  let seconds = seconds.unwrap_or(0);
+
   // If no offset is specified in the command or tracking profile, add using UTC.
   // Check for this first since it's the most common usage. Otherwise, check if multiple
   // offsets were specified in the command and abort if so. Then, add using the specified
   // offset. Prioritize command parameters so that the user can override their tracking
   // profile offset, if they choose to do so.
   if minus_offset == 0 && plus_offset == 0 && tracking_profile.utc_offset == 0 {
-    DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes).await?;
+    DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes, seconds).await?;
   } else if minus_offset != 0 && plus_offset != 0 {
     ctx
       .send(
@@ -329,6 +334,7 @@ pub async fn add(
       &guild_id,
       &user_id,
       minutes,
+      seconds,
       adjusted_datetime,
     )
     .await?;
@@ -339,6 +345,7 @@ pub async fn add(
       &guild_id,
       &user_id,
       minutes,
+      seconds,
       adjusted_datetime,
     )
     .await?;
@@ -350,6 +357,7 @@ pub async fn add(
       &guild_id,
       &user_id,
       minutes,
+      seconds,
       adjusted_datetime,
     )
     .await?;
@@ -494,13 +502,19 @@ pub async fn add(
 
       if confirm {
         // Log large add in Bloom logs channel
+        let description = if seconds > 0 {
+          format!(
+            "**User**: {}\n**Time**: {} minutes {} second(s)",
+            ctx.author(),
+            minutes,
+            seconds,
+          )
+        } else {
+          format!("**User**: {}\n**Time**: {} minutes", ctx.author(), minutes,)
+        };
         let log_embed = BloomBotEmbed::new()
           .title("Large Meditation Entry Added")
-          .description(format!(
-            "**User**: {}\n**Time**: {} minutes",
-            ctx.author(),
-            minutes
-          ))
+          .description(description)
           .footer(
             CreateEmbedFooter::new(format!(
               "Added by {} ({})",
