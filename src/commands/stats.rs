@@ -172,11 +172,11 @@ pub async fn user(
     || user.has_role(&ctx, guild_id, config::ROLES.kofi).await?
   {
     match guild_id.member(&ctx, user.id).await?.colour(ctx) {
-      Some(color) => (color.r(), color.g(), color.b(), 1.0),
-      None => (253, 172, 46, 1.0),
+      Some(color) => (color.r(), color.g(), color.b(), 1),
+      None => (253, 172, 46, 1),
     }
   } else {
-    (253, 172, 46, 1.0)
+    (253, 172, 46, 1)
   };
 
   // Role-based bar color for all users
@@ -196,13 +196,22 @@ pub async fn user(
   let chart_stats =
     DatabaseHandler::get_user_chart_stats(&mut transaction, &guild_id, &user.id, &timeframe)
       .await?;
-  let chart_drawer = charts::ChartDrawer::new()?;
-  let chart = chart_drawer
-    .draw(&chart_stats, &timeframe, &stats_type, bar_color, light_mode)
-    .await?;
-  let file_path = chart.get_file_path();
 
-  embed = embed.image(chart.get_attachment_url());
+  let chart = charts::Chart::new()
+    .await?
+    .stats(
+      &chart_stats,
+      &timeframe,
+      &stats_type,
+      bar_color,
+      light_mode,
+      false,
+    )
+    .await?;
+
+  let file_path = chart.path();
+
+  embed = embed.image(chart.url());
 
   let average = match stats_type {
     StatsType::MeditationMinutes => stats.timeframe_stats.sum.unwrap_or(0) / 12,
@@ -244,6 +253,8 @@ pub async fn user(
       f
     })
     .await?;
+
+  chart.remove().await?;
 
   Ok(())
 }
@@ -331,7 +342,7 @@ pub async fn server(
     }
   }
 
-  let bar_color = (253, 172, 46, 1.0);
+  let bar_color = (253, 172, 46, 1);
   let light_mode = match theme {
     Some(theme) => match theme {
       Theme::LightMode => true,
@@ -342,13 +353,22 @@ pub async fn server(
 
   let chart_stats =
     DatabaseHandler::get_guild_chart_stats(&mut transaction, &guild_id, &timeframe).await?;
-  let chart_drawer = charts::ChartDrawer::new()?;
-  let chart = chart_drawer
-    .draw(&chart_stats, &timeframe, &stats_type, bar_color, light_mode)
-    .await?;
-  let file_path = chart.get_file_path();
 
-  embed = embed.image(chart.get_attachment_url());
+  let chart = charts::Chart::new()
+    .await?
+    .stats(
+      &chart_stats,
+      &timeframe,
+      &stats_type,
+      bar_color,
+      light_mode,
+      false,
+    )
+    .await?;
+
+  let file_path = chart.path();
+
+  embed = embed.image(chart.url());
 
   ctx
     .send({
@@ -359,6 +379,8 @@ pub async fn server(
       f
     })
     .await?;
+
+  chart.remove().await?;
 
   Ok(())
 }
