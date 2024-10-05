@@ -180,8 +180,8 @@ impl PageRow for MeditationData {
 
     if now - self.occurred_at < chrono::Duration::days(1) {
       format!(
-        "Date: {}\nID: `{}`",
-        chrono_humanize::HumanTime::from(self.occurred_at),
+        "Date: <t:{}:R>\nID: `{}`",
+        self.occurred_at.timestamp(),
         self.id
       )
     } else {
