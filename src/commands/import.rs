@@ -639,7 +639,9 @@ pub async fn import(
     Ok(ImportSource::InsightTimer) => {
       'result: for result in rdr.deserialize::<InsightTimerRecord>().flatten() {
         if result.activity == "PracticeType.Meditation"
-        || result.activity == "Meditation" {
+          || result.activity == "Meditation"
+          || result.activity == "瞑想"
+        {
           if let Ok(valid_datetime) =
             chrono::NaiveDateTime::parse_from_str(&result.start_time, "%m/%d/%Y %H:%M:%S")
           {
