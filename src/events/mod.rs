@@ -9,6 +9,7 @@ mod guild_member_update;
 mod message_delete;
 mod reaction_add;
 mod reaction_remove;
+pub mod leaderboards;
 
 // pub use guild_member_addition::guild_member_addition;
 pub use guild_member_removal::guild_member_removal;

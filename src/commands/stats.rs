@@ -1,12 +1,14 @@
 #![allow(clippy::unused_async)]
 
-use crate::config::{BloomBotEmbed, ROLES};
+use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::database::Timeframe;
 use crate::database::{DatabaseHandler, TrackingProfile};
+use crate::events::leaderboards::LEADERBOARDS;
 use crate::Context;
 use crate::{charts, config};
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*};
+use log::info;
+use poise::serenity_prelude::{self as serenity, builder::*, UserId};
 use poise::ChoiceParameter;
 
 #[derive(poise::ChoiceParameter)]
@@ -15,6 +17,24 @@ pub enum StatsType {
   MeditationMinutes,
   #[name = "Count"]
   MeditationCount,
+}
+
+#[derive(poise::ChoiceParameter)]
+pub enum SortBy {
+  #[name = "Minutes"]
+  Minutes,
+  #[name = "Sessions"]
+  Sessions,
+  #[name = "Streak"]
+  Streak,
+}
+
+#[derive(poise::ChoiceParameter)]
+pub enum LeaderboardType {
+  #[name = "Top 5"]
+  Top5,
+  #[name = "Top 10"]
+  Top10,
 }
 
 #[derive(poise::ChoiceParameter)]
@@ -39,7 +59,7 @@ pub enum Theme {
 #[poise::command(
   slash_command,
   category = "Meditation Tracking",
-  subcommands("user", "server"),
+  subcommands("user", "server", "leaderboard"),
   subcommand_required,
   guild_only
 )]
@@ -378,6 +398,236 @@ pub async fn server(
 
       f
     })
+    .await?;
+
+  chart.remove().await?;
+
+  Ok(())
+}
+
+/// Show stats for a user
+///
+/// Shows stats for yourself or a specified user.
+///
+/// Defaults to daily minutes for yourself. Optionally specify the user, type (minutes or session count), and/or timeframe (daily, weekly, monthly, or yearly).
+#[poise::command(slash_command)]
+pub async fn leaderboard(
+  ctx: Context<'_>,
+  #[description = "The leaderboard timeframe (Defaults to monthly)"] timeframe: Option<Timeframe>,
+  #[description = "The stat to sort by (Defaults to minutes)"] sort: Option<SortBy>,
+  #[description = "The leaderboard type (Defaults to Top 5)"]
+  #[rename = "type"]
+  leaderboard_type: Option<LeaderboardType>,
+  #[description = "Toggle between light mode and dark mode (Defaults to dark mode)"] theme: Option<
+    Theme,
+  >,
+) -> Result<()> {
+  ctx.defer().await?;
+
+  let timeframe = timeframe.unwrap_or(Timeframe::Monthly);
+  let sort_by = sort.unwrap_or(SortBy::Minutes);
+  let leaderboard_type = leaderboard_type.unwrap_or(LeaderboardType::Top5);
+
+  let light_mode = match theme {
+    Some(theme) => match theme {
+      Theme::LightMode => true,
+      Theme::DarkMode => false,
+    },
+    None => false,
+  };
+
+  if !light_mode {
+    let chart = match timeframe {
+      Timeframe::Yearly => match sort_by {
+        SortBy::Minutes => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.year_min_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.year_min_top10_dark).await?,
+        },
+        SortBy::Sessions => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.year_ses_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.year_ses_top10_dark).await?,
+        },
+        SortBy::Streak => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.year_str_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.year_str_top10_dark).await?,
+        },
+      },
+      Timeframe::Monthly => match sort_by {
+        SortBy::Minutes => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.month_min_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.month_min_top10_dark).await?,
+        },
+        SortBy::Sessions => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.month_ses_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.month_ses_top10_dark).await?,
+        },
+        SortBy::Streak => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.month_str_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.month_str_top10_dark).await?,
+        },
+      },
+      Timeframe::Weekly => match sort_by {
+        SortBy::Minutes => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.week_min_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.week_min_top10_dark).await?,
+        },
+        SortBy::Sessions => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.week_ses_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.week_ses_top10_dark).await?,
+        },
+        SortBy::Streak => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.week_str_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.week_str_top10_dark).await?,
+        },
+      },
+      Timeframe::Daily => match sort_by {
+        SortBy::Minutes => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.day_min_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.day_min_top10_dark).await?,
+        },
+        SortBy::Sessions => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.day_ses_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.day_ses_top10_dark).await?,
+        },
+        SortBy::Streak => match leaderboard_type {
+          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.day_str_top5_dark).await?,
+          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.day_str_top10_dark).await?,
+        },
+      },
+    };
+
+    let file_path = chart.path();
+
+    let embed = BloomBotEmbed::new().image(chart.url());
+
+    if let Err(err) = ctx
+      .send(
+        poise::CreateReply::default()
+          .embed(embed)
+          .ephemeral(false)
+          .attachment(CreateAttachment::path(&file_path).await?),
+      )
+      .await
+    {
+      info!("Failed to send pre-generated leaderboard file: {:?}", err);
+      ctx
+        .send(
+          poise::CreateReply::default()
+            .content(format!(
+              "{} Sorry, no leaderboard data available.",
+              EMOJI.mminfo
+            ))
+            .ephemeral(true)
+            .allowed_mentions(serenity::CreateAllowedMentions::new()),
+        )
+        .await?;
+    }
+    return Ok(());
+  }
+
+  let guild_id = ctx
+    .guild_id()
+    .with_context(|| "Failed to retrieve guild ID from context")?;
+  let data = ctx.data();
+  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+
+  let stats = DatabaseHandler::get_leaderboard_stats(
+    &mut transaction,
+    &guild_id,
+    &timeframe,
+    &sort_by,
+    &leaderboard_type,
+  )
+  .await?;
+
+  let mut leaderboard_data: Vec<Vec<String>> = vec![vec![
+    "Name".to_string(),
+    "Minutes".to_string(),
+    "Sessions".to_string(),
+    "Streak".to_string(),
+  ]];
+
+  let mut rank = 1;
+  for record in stats {
+    if let Some(user_id) = record.name {
+      let user_nick_or_name = if record.anonymous_tracking.unwrap_or(false) {
+        "Anonymous".to_string()
+      } else {
+        let user = UserId::new(user_id.parse::<u64>()?).to_user(&ctx).await?;
+        let name = user
+          .nick_in(&ctx, guild_id)
+          .await
+          .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
+        if name
+          .chars()
+          .all(|c| c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c.is_ascii_whitespace())
+        {
+          name
+        } else {
+          name
+            .chars()
+            .map(|c| {
+              if c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c.is_ascii_whitespace() {
+                c.to_string()
+              } else {
+                String::new()
+              }
+            })
+            .collect::<String>()
+        }
+      };
+      leaderboard_data.push(vec![
+        format!("{}. {}", rank, user_nick_or_name),
+        record.minutes.unwrap_or(0).to_string(),
+        record.sessions.unwrap_or(0).to_string(),
+        if record.streaks_active.unwrap_or(true) && !record.streaks_private.unwrap_or(false) {
+          record.streak.unwrap_or(0).to_string()
+        } else {
+          "N/A".to_string()
+        },
+      ]);
+      rank += 1;
+    }
+  }
+
+  if leaderboard_data.len() == 1 {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(format!(
+            "{} Sorry, no leaderboard data available.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true)
+          .allowed_mentions(serenity::CreateAllowedMentions::new()),
+      )
+      .await?;
+
+    return Ok(());
+  }
+
+  let chart = charts::Chart::new()
+    .await?
+    .leaderboard(
+      leaderboard_data,
+      &timeframe,
+      &sort_by,
+      &leaderboard_type,
+      light_mode,
+    )
+    .await?;
+
+  let file_path = chart.path();
+
+  let embed = BloomBotEmbed::new().image(chart.url());
+
+  ctx
+    .send(
+      poise::CreateReply::default()
+        .embed(embed)
+        .ephemeral(false)
+        .attachment(CreateAttachment::path(&file_path).await?),
+    )
     .await?;
 
   chart.remove().await?;

@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private\n                FROM monthly_leaderboard\n                WHERE guild = $1\n                ORDER BY sessions DESC\n                LIMIT $2\n              ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "minutes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "sessions",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "streak",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "anonymous_tracking",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "streaks_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "streaks_private",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "78beefaabc65e065a561e38a0b892ec908ca0af1194f62ac939cad840b97b0b0"
+}

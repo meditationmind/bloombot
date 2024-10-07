@@ -6,7 +6,10 @@
 )]
 #![cfg_attr(any(), rustfmt::skip::macros(query, query_as))]
 
-use crate::pagination::{PageRow, PageType};
+use crate::{
+  commands::stats::{LeaderboardType, SortBy},
+  pagination::{PageRow, PageType},
+};
 use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
@@ -66,6 +69,17 @@ pub struct UserStats {
   pub all_count: u64,
   pub timeframe_stats: TimeframeStats,
   pub streak: Streak,
+}
+
+#[derive(Debug)]
+pub struct LeaderboardUserStats {
+  pub name: Option<String>,
+  pub minutes: Option<i64>,
+  pub sessions: Option<i64>,
+  pub streak: Option<i32>,
+  pub anonymous_tracking: Option<bool>,
+  pub streaks_active: Option<bool>,
+  pub streaks_private: Option<bool>,
 }
 
 pub struct GuildStats {
@@ -2632,6 +2646,260 @@ impl DatabaseHandler {
     Ok(user_stats)
   }
 
+  pub async fn get_leaderboard_stats(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
+    //user_id: &serenity::UserId,
+    timeframe: &Timeframe,
+    sort_by: &SortBy,
+    leaderboard_type: &LeaderboardType,
+  ) -> Result<Vec<LeaderboardUserStats>> {
+    let limit = match leaderboard_type {
+      LeaderboardType::Top5 => 5,
+      LeaderboardType::Top10 => 10,
+    };
+    match timeframe {
+      Timeframe::Daily => {
+        let leaderboard_data = match sort_by {
+          SortBy::Minutes => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM daily_leaderboard
+                WHERE guild = $1
+                ORDER BY minutes DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Sessions => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM daily_leaderboard
+                WHERE guild = $1
+                ORDER BY sessions DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Streak => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM daily_leaderboard
+                WHERE guild = $1
+                ORDER BY streak DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+        };
+
+        Ok(leaderboard_data)
+      }
+      Timeframe::Weekly => {
+        let leaderboard_data = match sort_by {
+          SortBy::Minutes => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM weekly_leaderboard
+                WHERE guild = $1
+                ORDER BY minutes DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Sessions => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM weekly_leaderboard
+                WHERE guild = $1
+                ORDER BY sessions DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Streak => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM weekly_leaderboard
+                WHERE guild = $1
+                ORDER BY streak DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+        };
+
+        Ok(leaderboard_data)
+      }
+      Timeframe::Monthly => {
+        let leaderboard_data = match sort_by {
+          SortBy::Minutes => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM monthly_leaderboard
+                WHERE guild = $1
+                ORDER BY minutes DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Sessions => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM monthly_leaderboard
+                WHERE guild = $1
+                ORDER BY sessions DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Streak => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM monthly_leaderboard
+                WHERE guild = $1
+                ORDER BY streak DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+        };
+
+        Ok(leaderboard_data)
+      }
+      Timeframe::Yearly => {
+        let leaderboard_data = match sort_by {
+          SortBy::Minutes => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM yearly_leaderboard
+                WHERE guild = $1
+                ORDER BY minutes DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Sessions => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM yearly_leaderboard
+                WHERE guild = $1
+                ORDER BY sessions DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+          SortBy::Streak => sqlx::query_as!(
+              LeaderboardUserStats,
+              r#"
+                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
+                FROM yearly_leaderboard
+                WHERE guild = $1
+                ORDER BY streak DESC
+                LIMIT $2
+              "#,
+              guild_id.to_string(),
+              limit,
+            )
+            .fetch_all(&mut **transaction)
+            .await?,
+        };
+
+        Ok(leaderboard_data)
+      }
+    }
+  }
+
+  pub async fn refresh_leaderboard(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    timeframe: &Timeframe,
+  ) -> Result<()> {
+    match timeframe {
+      Timeframe::Yearly => {
+        sqlx::query!(
+          r#"
+            REFRESH MATERIALIZED VIEW CONCURRENTLY yearly_leaderboard;
+          "#
+        )
+        .execute(&mut **transaction)
+        .await?;
+      }
+      Timeframe::Monthly => {
+        sqlx::query!(
+          r#"
+            REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_leaderboard;
+          "#
+        )
+        .execute(&mut **transaction)
+        .await?;
+      }
+      Timeframe::Weekly => {
+        sqlx::query!(
+          r#"
+            REFRESH MATERIALIZED VIEW CONCURRENTLY weekly_leaderboard;
+          "#
+        )
+        .execute(&mut **transaction)
+        .await?;
+      }
+      Timeframe::Daily => {
+        sqlx::query!(
+          r#"
+            REFRESH MATERIALIZED VIEW CONCURRENTLY daily_leaderboard;
+          "#
+        )
+        .execute(&mut **transaction)
+        .await?;
+      }
+    }
+
+    Ok(())
+  }
+
   pub async fn get_user_stats(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
@@ -2639,7 +2907,7 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
   ) -> Result<UserStats> {
     // Get total count, total sum, and count/sum for timeframe
-    let end_time = chrono::Utc::now();
+    let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
     let start_time = match timeframe {
       Timeframe::Daily => end_time - chrono::Duration::days(12),
       Timeframe::Weekly => end_time - chrono::Duration::weeks(12),
@@ -2690,7 +2958,7 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
   ) -> Result<GuildStats> {
     // Get total count, total sum, and count/sum for timeframe
-    let end_time = chrono::Utc::now();
+    let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
     let start_time = match timeframe {
       Timeframe::Daily => end_time - chrono::Duration::days(12),
       Timeframe::Weekly => end_time - chrono::Duration::weeks(12),

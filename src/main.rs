@@ -22,7 +22,9 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use serenity::FullEvent as Event;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
+use tokio::time::sleep;
 
 mod charts;
 mod commands;
@@ -33,7 +35,7 @@ mod events;
 mod pagination;
 
 pub struct Data {
-  pub db: database::DatabaseHandler,
+  pub db: Arc<database::DatabaseHandler>,
   pub rng: Arc<Mutex<SmallRng>>,
   pub embeddings: Arc<embeddings::OpenAIHandler>,
   pub bloom_start_time: std::time::Instant,
@@ -112,7 +114,7 @@ async fn main() -> Result<()> {
           poise::builtins::register_globally(ctx, &framework.options().commands).await?;
         }
         Ok(Data {
-          db: database::DatabaseHandler::new().await?,
+          db: Arc::new(database::DatabaseHandler::new().await?),
           rng: Arc::new(Mutex::new(SmallRng::from_entropy())),
           embeddings: Arc::new(embeddings::OpenAIHandler::new()?),
           bloom_start_time: std::time::Instant::now(),
@@ -125,6 +127,15 @@ async fn main() -> Result<()> {
     .framework(framework)
     .await
     .map_err(|e| anyhow::anyhow!(e))?;
+
+  let shard_manager = client.shard_manager.clone();
+
+  tokio::spawn(async move {
+    wait_until_shutdown().await;
+
+    info!("Received shutdown request. Until next time!");
+    shard_manager.shutdown_all().await;
+  });
 
   client
     .start()
@@ -224,6 +235,29 @@ async fn event_handler(
     // Event::GuildMemberAddition { new_member } => {
     //   events::guild_member_addition(ctx, new_member).await?;
     // }
+    Event::GuildCreate { guild, .. } => {
+      let task_http = ctx.http.clone();
+      let task_conn = data.db.clone();
+      let guild_id = guild.id;
+      let update_leaderboards = tokio::task::spawn(async move {
+        info!("Refreshing leaderboard views...");
+        let refresh_start = std::time::Instant::now();
+        if let Err(err) = events::leaderboards::refresh(&task_conn).await {
+          error!("Error refreshing leaderboard views: {:?}", err);
+        }
+        info!("Refresh completed in: {:#?}", refresh_start.elapsed());
+
+        sleep(Duration::from_secs(10)).await;
+
+        info!("Generating leaderboard images...");
+        let generation_start = std::time::Instant::now();
+        if let Err(err) = events::leaderboards::generate(&task_http, &task_conn, &guild_id).await {
+          error!("Error generating leaderboard images: {:?}", err);
+        }
+        info!("Generation completed in: {:#?}", generation_start.elapsed());
+      });
+      update_leaderboards.await?;
+    }
     Event::GuildMemberRemoval { user, .. } => {
       events::guild_member_removal(ctx, user).await?;
     }
@@ -256,4 +290,36 @@ async fn event_handler(
     _ => {}
   }
   Ok(())
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(unix)]
+async fn wait_until_shutdown() {
+  use tokio::signal::unix as signal;
+
+  let [mut s1, mut s2, mut s3] = [
+    signal::signal(signal::SignalKind::hangup()).unwrap(),
+    signal::signal(signal::SignalKind::interrupt()).unwrap(),
+    signal::signal(signal::SignalKind::terminate()).unwrap(),
+  ];
+
+  tokio::select!(
+      v = s1.recv() => v.unwrap(),
+      v = s2.recv() => v.unwrap(),
+      v = s3.recv() => v.unwrap(),
+  );
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(windows)]
+async fn wait_until_shutdown() {
+  let (mut s1, mut s2) = (
+    tokio::signal::windows::ctrl_c().unwrap(),
+    tokio::signal::windows::ctrl_break().unwrap(),
+  );
+
+  tokio::select!(
+      v = s1.recv() => v.unwrap(),
+      v = s2.recv() => v.unwrap(),
+  );
 }

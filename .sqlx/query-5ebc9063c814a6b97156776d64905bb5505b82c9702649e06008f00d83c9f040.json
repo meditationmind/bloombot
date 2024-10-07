@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_leaderboard;\n          ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "5ebc9063c814a6b97156776d64905bb5505b82c9702649e06008f00d83c9f040"
+}
