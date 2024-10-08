@@ -282,10 +282,12 @@ async fn event_handler(
     Event::Ready { .. } => {
       info!("Connected!");
 
-      info!("Setting default activity text");
-      ctx.set_activity(Some(serenity::ActivityData::custom(
-        "Tracking your meditations",
-      )));
+      let default_activity_text = "Tracking your meditations";
+      info!(
+        "Setting default activity text: \"{}\"",
+        default_activity_text
+      );
+      ctx.set_activity(Some(serenity::ActivityData::custom(default_activity_text)));
     }
     _ => {}
   }
