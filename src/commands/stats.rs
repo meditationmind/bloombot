@@ -20,6 +20,14 @@ pub enum StatsType {
 }
 
 #[derive(poise::ChoiceParameter)]
+pub enum ChartStyle {
+  #[name = "Bar Chart"]
+  BarChart,
+  #[name = "Area Chart"]
+  AreaChart,
+}
+
+#[derive(poise::ChoiceParameter)]
 pub enum SortBy {
   #[name = "Minutes"]
   Minutes,
@@ -82,6 +90,7 @@ pub async fn user(
   #[description = "The timeframe to get the stats for (Defaults to daily)"] timeframe: Option<
     Timeframe,
   >,
+  #[description = "The style of chart (Defaults to bar chart)"] style: Option<ChartStyle>,
   #[description = "Set visibility of response (Defaults to public)"] privacy: Option<Privacy>,
   #[description = "Toggle between light mode and dark mode (Defaults to dark mode)"] theme: Option<
     Theme,
@@ -140,6 +149,7 @@ pub async fn user(
     return Ok(());
   }
 
+  let chart_style = style.unwrap_or(ChartStyle::BarChart);
   let stats_type = stats_type.unwrap_or(StatsType::MeditationMinutes);
   let timeframe = timeframe.unwrap_or(Timeframe::Daily);
 
@@ -223,9 +233,9 @@ pub async fn user(
       &chart_stats,
       &timeframe,
       &stats_type,
+      &chart_style,
       bar_color,
       light_mode,
-      false,
     )
     .await?;
 
@@ -287,10 +297,13 @@ pub async fn user(
 #[poise::command(slash_command)]
 pub async fn server(
   ctx: Context<'_>,
-  #[description = "The type of stats to get (Defaults to minutes)"] stats_type: Option<StatsType>,
+  #[description = "The type of stats to get (Defaults to minutes)"]
+  #[rename = "type"]
+  stats_type: Option<StatsType>,
   #[description = "The timeframe to get the stats for (Defaults to daily)"] timeframe: Option<
     Timeframe,
   >,
+  #[description = "The style of chart (Defaults to bar chart)"] style: Option<ChartStyle>,
   #[description = "Toggle between light mode and dark mode (Defaults to dark mode)"] theme: Option<
     Theme,
   >,
@@ -314,6 +327,7 @@ pub async fn server(
     }
   };
 
+  let chart_style = style.unwrap_or(ChartStyle::BarChart);
   let stats_type = stats_type.unwrap_or(StatsType::MeditationMinutes);
   let timeframe = timeframe.unwrap_or(Timeframe::Daily);
 
@@ -380,9 +394,9 @@ pub async fn server(
       &chart_stats,
       &timeframe,
       &stats_type,
+      &chart_style,
       bar_color,
       light_mode,
-      false,
     )
     .await?;
 

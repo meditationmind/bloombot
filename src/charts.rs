@@ -57,9 +57,9 @@ impl<'a> Chart<'a> {
     stats: &[TimeframeStats],
     timeframe: &Timeframe,
     stats_type: &StatsType,
+    chart_style: &ChartStyle,
     bar_color: (u8, u8, u8, u8),
     light_mode: bool,
-    labels: bool,
   ) -> Result<Self> {
     let header = match stats_type {
       StatsType::MeditationMinutes => String::from("Meditation Minutes"),
@@ -139,15 +139,6 @@ impl<'a> Chart<'a> {
     };
     bar_chart.grid_stroke_width = 0.5;
     bar_chart.legend_show = Some(false);
-    //bar_chart.legend_category = LegendCategory::Rect;
-    //bar_chart.legend_align = Align::Left;
-    //bar_chart.legend_font_size = 18.0;
-    //bar_chart.legend_margin = Some(Box {
-    //  top: 35.0,
-    //  left: 25.0,
-    //  bottom: 25.0,
-    //  ..Default::default()
-    //});
     bar_chart.title_text = header;
     bar_chart.title_font_size = 30.0;
     bar_chart.title_height = 35.0;
@@ -165,10 +156,7 @@ impl<'a> Chart<'a> {
     bar_chart.y_axis_configs[0].axis_font_size = 22.0;
     bar_chart.y_axis_configs[0].axis_split_number = 7;
     bar_chart.series_colors = vec![(bar_color.0, bar_color.1, bar_color.2).into()];
-    bar_chart.series_list[0].label_show = labels;
-    //bar_chart.series_list[1].category = Some(SeriesCategory::Line);
-    //bar_chart.series_list[1].y_axis_index = 1;
-    //bar_chart.series_list[1].label_show = true;
+    bar_chart.series_list[0].label_show = false;
 
     if light_mode {
       bar_chart.background_color = (227, 229, 232).into();
@@ -190,22 +178,38 @@ impl<'a> Chart<'a> {
       bar_chart.y_axis_configs[0].axis_font_color = (216, 217, 218).into();
     }
 
-    /* Line fill chart
-    bar_chart.series_fill = true;
-    bar_chart.series_smooth = true;
-    bar_chart.series_list[0].category = Some(charts_rs::SeriesCategory::Line);
-    bar_chart.x_boundary_gap = Some(false);
-    bar_chart.series_list[0].label_show = true;
-    bar_chart.series_label_font_size = 20.0;
-    bar_chart.series_label_font_weight = Some("bold".to_string());
-    bar_chart.y_axis_hidden = true;
-    bar_chart.margin = Box {
-      left: 45.0,
-      top: 15.0,
-      right: 45.0,
-      bottom: 15.0,
-    };
-    */
+    if let ChartStyle::AreaChart = chart_style {
+      bar_chart.series_fill = true;
+      bar_chart.series_smooth = true;
+      bar_chart.series_list[0].category = Some(charts_rs::SeriesCategory::Line);
+      bar_chart.series_list[0].label_show = true;
+      bar_chart.series_label_font_size = 16.0;
+      bar_chart.series_label_font_weight = Some("bold".to_string());
+      bar_chart.series_label_formatter = "{t}".to_string();
+      bar_chart.x_boundary_gap = Some(false);
+      bar_chart.y_axis_hidden = true;
+      bar_chart.margin = Box {
+        left: 45.0,
+        top: 15.0,
+        right: 45.0,
+        bottom: 15.0,
+      };
+      /* Add a second line
+      bar_chart.series_list[1].category = Some(SeriesCategory::Line);
+      bar_chart.series_list[1].y_axis_index = 1;
+      bar_chart.series_list[1].label_show = true;*/
+    }
+
+    /* Enable legend
+    bar_chart.legend_category = LegendCategory::Rect;
+    bar_chart.legend_align = Align::Left;
+    bar_chart.legend_font_size = 18.0;
+    bar_chart.legend_margin = Some(Box {
+      top: 35.0,
+      left: 25.0,
+      bottom: 25.0,
+      ..Default::default()
+    });*/
 
     let svg = bar_chart.svg()?;
     let webp = svg_to_webp(&svg)?;
