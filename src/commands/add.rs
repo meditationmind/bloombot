@@ -254,8 +254,27 @@ pub async fn add(
     None => tracking_profile.anonymous_tracking,
   };
 
-  let minus_offset = match minus_offset {
-    Some(minus_offset) => match minus_offset {
+  // If no offset is specified in the command or tracking profile, add using UTC.
+  // Check for this first since it's the most common usage. Otherwise, check if multiple
+  // offsets were specified in the command and abort if so. Then, add using the specified
+  // offset. Prioritize command parameters so that the user can override their tracking
+  // profile offset, if they choose to do so.
+  let mut offset = match (minus_offset, plus_offset) {
+    (None, None) => i64::from(tracking_profile.utc_offset),
+    (Some(minus_offset), Some(plus_offset)) => {
+      ctx
+        .send(
+          CreateReply::default()
+            .content(
+              "Cannot specify multiple time zones. Please try again with only one offset."
+                .to_string(),
+            )
+            .ephemeral(true),
+        )
+        .await?;
+      return Ok(());
+    },
+    (Some(minus_offset), None) => match minus_offset {
       MinusOffsetChoices::UTCMinus12 => -720,
       MinusOffsetChoices::UTCMinus11 => -660,
       MinusOffsetChoices::UTCMinus10 => -600,
@@ -273,11 +292,7 @@ pub async fn add(
       MinusOffsetChoices::UTCMinus2 => -120,
       MinusOffsetChoices::UTCMinus1 => -60,
     },
-    None => 0,
-  };
-
-  let plus_offset = match plus_offset {
-    Some(plus_offset) => match plus_offset {
+    (None, Some(plus_offset)) => match plus_offset {
       PlusOffsetChoices::UTCPlus1 => 60,
       PlusOffsetChoices::UTCPlus2 => 120,
       PlusOffsetChoices::UTCPlus3 => 180,
@@ -303,55 +318,18 @@ pub async fn add(
       PlusOffsetChoices::UTCPlus13_45 => 825,
       PlusOffsetChoices::UTCPlus14 => 840,
     },
-    None => 0,
   };
 
   let seconds = seconds.unwrap_or(0);
 
-  // If no offset is specified in the command or tracking profile, add using UTC.
-  // Check for this first since it's the most common usage. Otherwise, check if multiple
-  // offsets were specified in the command and abort if so. Then, add using the specified
-  // offset. Prioritize command parameters so that the user can override their tracking
-  // profile offset, if they choose to do so.
-  if minus_offset == 0 && plus_offset == 0 && tracking_profile.utc_offset == 0 {
+  if offset == 0 && tracking_profile.utc_offset != 0 {
+    offset = i64::from(tracking_profile.utc_offset);
+  }
+
+  if offset == 0 {
     DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes, seconds).await?;
-  } else if minus_offset != 0 && plus_offset != 0 {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(
-            "Cannot specify multiple time zones. Please try again with only one offset."
-              .to_string(),
-          )
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
-  } else if minus_offset != 0 {
-    let adjusted_datetime = chrono::Utc::now() + Duration::minutes(minus_offset);
-    DatabaseHandler::create_meditation_entry(
-      &mut transaction,
-      &guild_id,
-      &user_id,
-      minutes,
-      seconds,
-      adjusted_datetime,
-    )
-    .await?;
-  } else if plus_offset != 0 {
-    let adjusted_datetime = chrono::Utc::now() + Duration::minutes(plus_offset);
-    DatabaseHandler::create_meditation_entry(
-      &mut transaction,
-      &guild_id,
-      &user_id,
-      minutes,
-      seconds,
-      adjusted_datetime,
-    )
-    .await?;
   } else {
-    let adjusted_datetime =
-      chrono::Utc::now() + Duration::minutes(i64::from(tracking_profile.utc_offset));
+    let adjusted_datetime = chrono::Utc::now() + Duration::minutes(offset);
     DatabaseHandler::create_meditation_entry(
       &mut transaction,
       &guild_id,
