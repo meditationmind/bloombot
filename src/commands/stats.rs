@@ -22,9 +22,11 @@ pub enum StatsType {
 #[derive(poise::ChoiceParameter)]
 pub enum ChartStyle {
   #[name = "Bar Chart"]
-  BarChart,
+  Bar,
   #[name = "Area Chart"]
-  AreaChart,
+  Area,
+  #[name = "Bar Chart (Combined Data)"]
+  BarCombined,
 }
 
 #[derive(poise::ChoiceParameter)]
@@ -149,7 +151,7 @@ pub async fn user(
     return Ok(());
   }
 
-  let chart_style = style.unwrap_or(ChartStyle::BarChart);
+  let chart_style = style.unwrap_or(ChartStyle::Bar);
   let stats_type = stats_type.unwrap_or(StatsType::MeditationMinutes);
   let timeframe = timeframe.unwrap_or(Timeframe::Daily);
 
@@ -202,11 +204,11 @@ pub async fn user(
     || user.has_role(&ctx, guild_id, config::ROLES.kofi).await?
   {
     match guild_id.member(&ctx, user.id).await?.colour(ctx) {
-      Some(color) => (color.r(), color.g(), color.b(), 1),
-      None => (253, 172, 46, 1),
+      Some(color) => (color.r(), color.g(), color.b(), 255),
+      None => (253, 172, 46, 255),
     }
   } else {
-    (253, 172, 46, 1)
+    (253, 172, 46, 255)
   };
 
   // Role-based bar color for all users
@@ -327,7 +329,7 @@ pub async fn server(
     }
   };
 
-  let chart_style = style.unwrap_or(ChartStyle::BarChart);
+  let chart_style = style.unwrap_or(ChartStyle::Bar);
   let stats_type = stats_type.unwrap_or(StatsType::MeditationMinutes);
   let timeframe = timeframe.unwrap_or(Timeframe::Daily);
 
@@ -376,7 +378,7 @@ pub async fn server(
     }
   }
 
-  let bar_color = (253, 172, 46, 1);
+  let bar_color = (253, 172, 46, 255);
   let light_mode = match theme {
     Some(theme) => match theme {
       Theme::LightMode => true,

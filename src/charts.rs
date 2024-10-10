@@ -7,7 +7,10 @@
 use crate::commands::stats::{ChartStyle, LeaderboardType, SortBy, StatsType};
 use crate::database::{Timeframe, TimeframeStats};
 use anyhow::Result;
-use charts_rs::{svg_to_webp, Align, BarChart, Box, Series, TableCellStyle, TableChart};
+use charts_rs::{
+  svg_to_webp, Align, BarChart, Box, LegendCategory, Series, TableCellStyle, TableChart,
+};
+use chrono::{Datelike, NaiveDate};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -61,50 +64,53 @@ impl<'a> Chart<'a> {
     bar_color: (u8, u8, u8, u8),
     light_mode: bool,
   ) -> Result<Self> {
-    let header = match stats_type {
-      StatsType::MeditationMinutes => String::from("Meditation Minutes"),
-      StatsType::MeditationCount => String::from("Meditation Sessions"),
-    };
-
-    let series_name = match stats_type {
-      StatsType::MeditationMinutes => String::from("Minutes"),
-      StatsType::MeditationCount => String::from("Sessions"),
-    };
-
-    let now = chrono::Utc::now();
-
     if stats.len() != 12 {
       return Err(anyhow::anyhow!("Not enough stats to draw chart"));
     }
 
-    let stats = match stats_type {
-      StatsType::MeditationMinutes => stats
-        .iter()
-        .map(|x| x.sum.unwrap_or(0) as f32)
-        .collect::<Vec<f32>>(),
-      StatsType::MeditationCount => stats
-        .iter()
-        .map(|x| x.count.unwrap_or(0) as f32)
-        .collect::<Vec<f32>>(),
+    let title = if let ChartStyle::BarCombined = chart_style {
+      String::new()
+    } else {
+      match stats_type {
+        StatsType::MeditationMinutes => String::from("Meditation Minutes"),
+        StatsType::MeditationCount => String::from("Meditation Sessions"),
+      }
     };
 
-    /*
-    let minutes = stats
-      .iter()
-      .map(|x| x.sum.unwrap_or(0) as f32)
-      .collect::<Vec<f32>>();
-    let sessions = stats
-      .iter()
-      .map(|x| x.count.unwrap_or(0) as f32)
-      .collect::<Vec<f32>>();
-    */
+    let series_data = if let ChartStyle::BarCombined = chart_style {
+      let minutes = stats
+        .iter()
+        .map(|x| x.sum.unwrap_or(0) as f32)
+        .collect::<Vec<f32>>();
+      let sessions = stats
+        .iter()
+        .map(|x| x.count.unwrap_or(0) as f32)
+        .collect::<Vec<f32>>();
+      vec![
+        Series::new("Minutes".to_string(), minutes),
+        Series::new("Sessions".to_string(), sessions),
+      ]
+    } else {
+      let (series_name, stats) = match stats_type {
+        StatsType::MeditationMinutes => (
+          String::from("Minutes"),
+          stats
+            .iter()
+            .map(|x| x.sum.unwrap_or(0) as f32)
+            .collect::<Vec<f32>>(),
+        ),
+        StatsType::MeditationCount => (
+          String::from("Sessions"),
+          stats
+            .iter()
+            .map(|x| x.count.unwrap_or(0) as f32)
+            .collect::<Vec<f32>>(),
+        ),
+      };
+      vec![Series::new(series_name, stats)]
+    };
 
-    let series_data = vec![
-      Series::new(series_name, stats),
-      //Series::new("Minutes".to_string(), minutes),
-      //Series::new("Sessions".to_string(), sessions),
-    ];
-
+    let now = chrono::Utc::now();
     let mut x_labels: Vec<String> = vec![];
     for n in 1..13 {
       let label = match timeframe {
@@ -154,7 +160,7 @@ impl<'a> Chart<'a> {
     };
     bar_chart.grid_stroke_width = 0.5;
     bar_chart.legend_show = Some(false);
-    bar_chart.title_text = header;
+    bar_chart.title_text = title;
     bar_chart.title_font_size = 30.0;
     bar_chart.title_height = 35.0;
     bar_chart.title_margin = Some(Box {
@@ -170,7 +176,10 @@ impl<'a> Chart<'a> {
     bar_chart.x_axis_height = 40.0;
     bar_chart.y_axis_configs[0].axis_font_size = 22.0;
     bar_chart.y_axis_configs[0].axis_split_number = 7;
-    bar_chart.series_colors = vec![(bar_color.0, bar_color.1, bar_color.2).into()];
+    bar_chart.series_colors = vec![
+      (bar_color.0, bar_color.1, bar_color.2, bar_color.3).into(),
+      (bar_color.0, bar_color.1, bar_color.2, 190).into(),
+    ];
     bar_chart.series_list[0].label_show = false;
 
     if light_mode {
@@ -193,7 +202,8 @@ impl<'a> Chart<'a> {
       bar_chart.y_axis_configs[0].axis_font_color = (216, 217, 218).into();
     }
 
-    if let ChartStyle::AreaChart = chart_style {
+    if let ChartStyle::Bar = chart_style {
+    } else {
       bar_chart.series_fill = true;
       bar_chart.series_smooth = true;
       bar_chart.series_list[0].category = Some(charts_rs::SeriesCategory::Line);
@@ -209,22 +219,26 @@ impl<'a> Chart<'a> {
         right: 45.0,
         bottom: 15.0,
       };
-      /* Add a second line
-      bar_chart.series_list[1].category = Some(SeriesCategory::Line);
-      bar_chart.series_list[1].y_axis_index = 1;
-      bar_chart.series_list[1].label_show = true;*/
+      // Add a second line
+      if let ChartStyle::BarCombined = chart_style {
+        bar_chart.y_axis_hidden = false;
+        bar_chart.y_axis_configs[0].axis_width = Some(0.0);
+        bar_chart.series_list[0].category = Some(charts_rs::SeriesCategory::Bar);
+        bar_chart.series_list[1].category = Some(charts_rs::SeriesCategory::Bar);
+        bar_chart.series_list[1].y_axis_index = 1;
+        bar_chart.series_list[1].label_show = true;
+        bar_chart.legend_show = Some(true);
+        bar_chart.legend_category = LegendCategory::Rect;
+        bar_chart.legend_align = Align::Left;
+        bar_chart.legend_font_size = 16.0;
+        bar_chart.legend_margin = Some(Box {
+          top: 10.0,
+          left: 0.0,
+          bottom: 30.0,
+          right: 0.0,
+        });
+      }
     }
-
-    /* Enable legend
-    bar_chart.legend_category = LegendCategory::Rect;
-    bar_chart.legend_align = Align::Left;
-    bar_chart.legend_font_size = 18.0;
-    bar_chart.legend_margin = Some(Box {
-      top: 35.0,
-      left: 25.0,
-      bottom: 25.0,
-      ..Default::default()
-    });*/
 
     let svg = bar_chart.svg()?;
     let webp = svg_to_webp(&svg)?;
