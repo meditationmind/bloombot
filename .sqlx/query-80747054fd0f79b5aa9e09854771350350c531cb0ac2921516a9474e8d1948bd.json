@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            REFRESH MATERIALIZED VIEW monthly_data;\n          ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "80747054fd0f79b5aa9e09854771350350c531cb0ac2921516a9474e8d1948bd"
+}

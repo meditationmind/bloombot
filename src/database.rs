@@ -3248,7 +3248,6 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
   ) -> Result<Vec<TimeframeStats>> {
     let mut fresh_data: Option<Res> = None;
-    let bench_begin = std::time::Instant::now();
 
     // Calculate data for last 12 days
     let rows: Vec<Res> = match timeframe {
@@ -3454,13 +3453,45 @@ impl DatabaseHandler {
       });
     }
 
-    println!(
-      "\nTime for {:?}: {:?} (ordered by Bloom)\n\n{stats:?}",
-      poise::ChoiceParameter::name(timeframe),
-      bench_begin.elapsed()
-    );
-
     Ok(stats)
+  }
+
+  pub async fn refresh_chart_stats(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    timeframe: &Timeframe,
+  ) -> Result<()> {
+    match timeframe {
+      Timeframe::Yearly => {
+        sqlx::query!(
+          r#"
+            REFRESH MATERIALIZED VIEW yearly_data;
+          "#
+        )
+        .execute(&mut **transaction)
+        .await?;
+      }
+      Timeframe::Monthly => {
+        sqlx::query!(
+          r#"
+            REFRESH MATERIALIZED VIEW monthly_data;
+          "#
+        )
+        .execute(&mut **transaction)
+        .await?;
+      }
+      Timeframe::Weekly => {
+        sqlx::query!(
+          r#"
+            REFRESH MATERIALIZED VIEW weekly_data;
+          "#
+        )
+        .execute(&mut **transaction)
+        .await?;
+      }
+      Timeframe::Daily => {}
+    }
+
+    Ok(())
   }
 
   pub async fn get_star_message_by_message_id(

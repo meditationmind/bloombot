@@ -257,6 +257,24 @@ async fn event_handler(
         info!("Generation completed in: {:#?}", generation_start.elapsed());
       });
       update_leaderboards.await?;
+
+      sleep(Duration::from_secs(60 * 5)).await;
+
+      let task_conn = data.db.clone();
+      let update_chart_stats = tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60 * 60 * 12));
+        loop {
+          interval.tick().await;
+
+          info!("Refreshing chart stat views...");
+          let refresh_start = std::time::Instant::now();
+          if let Err(err) = events::refresh_chart_stats(&task_conn).await {
+            error!("Error refreshing chart stat views: {:?}", err);
+          }
+          info!("Refresh completed in: {:#?}", refresh_start.elapsed());
+        }
+      });
+      update_chart_stats.await?;
     }
     Event::GuildMemberRemoval { user, .. } => {
       events::guild_member_removal(ctx, user).await?;

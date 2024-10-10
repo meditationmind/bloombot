@@ -1,5 +1,5 @@
 use crate::config::{self, CHANNELS};
-use crate::database::DatabaseHandler;
+use crate::database::{DatabaseHandler, Timeframe};
 use anyhow::Result;
 use poise::serenity_prelude::{builder::*, ChannelId, Context, MessageFlags, Reaction};
 
@@ -146,6 +146,16 @@ pub async fn create_star_message(
     )
     .await?;
   }
+
+  Ok(())
+}
+
+pub async fn refresh_chart_stats(db: &DatabaseHandler) -> Result<()> {
+  let mut transaction = db.start_transaction().await?;
+  DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Weekly).await?;
+  DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Monthly).await?;
+  DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Yearly).await?;
+  transaction.commit().await?;
 
   Ok(())
 }
