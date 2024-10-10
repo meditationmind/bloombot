@@ -113,15 +113,30 @@ impl<'a> Chart<'a> {
           date.format("%m/%d").to_string()
         }
         Timeframe::Weekly => {
-          let date = now - chrono::Duration::weeks(12 - n);
+          let date = now.date_naive().week(chrono::Weekday::Mon).first_day()
+            - chrono::Duration::weeks(12 - n);
           date.format("%m/%d").to_string()
         }
         Timeframe::Monthly => {
-          let date = now - chrono::Duration::days((12 * 30) - (n * 30));
+          let date = NaiveDate::from_ymd_opt(
+            now.year(),
+            now
+              .month()
+              .saturating_sub(12u32.saturating_sub(n.try_into()?)),
+            1,
+          )
+          .unwrap_or_else(|| now.date_naive() - chrono::Duration::days((12 * 30) - (n * 30)));
           date.format("%y/%m").to_string()
         }
         Timeframe::Yearly => {
-          let date = now - chrono::Duration::days((12 * 365) - (n * 365));
+          let date = NaiveDate::from_ymd_opt(
+            now
+              .year()
+              .saturating_sub(12i32.saturating_sub(n.try_into()?)),
+            1,
+            1,
+          )
+          .unwrap_or_else(|| now.date_naive() - chrono::Duration::days((12 * 365) - (n * 365)));
           date.format("%Y").to_string()
         }
       };

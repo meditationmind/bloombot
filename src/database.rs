@@ -3031,14 +3031,24 @@ impl DatabaseHandler {
       Timeframe::Daily => {
         sqlx::query_as!(
           Res,
-          r#"WITH "daily_data" AS (
-            SELECT date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago, meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE guild_id = $1 AND user_id = $2
-          ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "daily_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+          r#"
+            WITH "daily_data" AS
+            (
+              SELECT
+                date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago,
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE guild_id = $1 AND user_id = $2
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM "daily_data"
+            WHERE "times_ago" <= 12
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -3046,14 +3056,24 @@ impl DatabaseHandler {
       Timeframe::Weekly => {
         sqlx::query_as!(
           Res,
-          r#"WITH "weekly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
+          r#"
+            WITH "weekly_data" AS
+            (
+              SELECT
+                floor(extract(epoch from (date_trunc('week', now()) + interval '7 days 23 hours 59 minutes 59 seconds') - occurred_at)/(60*60*24*7))::float AS "times_ago",
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE "guild_id" = $1 AND "user_id" = $2
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
             FROM "weekly_data"
             WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -3061,14 +3081,24 @@ impl DatabaseHandler {
       Timeframe::Monthly => {
         sqlx::query_as!(
           Res,
-          r#"WITH "monthly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
+          r#"
+            WITH "monthly_data" AS
+            (
+              SELECT
+                floor(extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at)/(60*60*24*30))::float AS "times_ago",
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE "guild_id" = $1 AND "user_id" = $2
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
             FROM "monthly_data"
             WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -3076,14 +3106,24 @@ impl DatabaseHandler {
       Timeframe::Yearly => {
         sqlx::query_as!(
           Res,
-          r#"WITH "yearly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE "guild_id" = $1 AND "user_id" = $2
-        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
+          r#"
+            WITH "yearly_data" AS
+            (
+              SELECT
+                floor(extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at)/(60*60*24*365))::float AS "times_ago",
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE "guild_id" = $1 AND "user_id" = $2
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
             FROM "yearly_data"
             WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_all(&mut **transaction).await?
@@ -3133,56 +3173,96 @@ impl DatabaseHandler {
       Timeframe::Daily => {
         sqlx::query_as!(
           Res,
-          r#"WITH "daily_data" AS (
-            SELECT date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago, meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE guild_id = $1
-          ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
-          FROM "daily_data"
-          WHERE "times_ago" <= 12
-          GROUP BY "times_ago";"#,
+          r#"
+            WITH "daily_data" AS
+            (
+              SELECT
+                date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago,
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE guild_id = $1
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM "daily_data"
+            WHERE "times_ago" <= 12
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
       Timeframe::Weekly => {
         sqlx::query_as!(
           Res,
-          r#"WITH "weekly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*7))::float AS "times_ago", meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE "guild_id" = $1
-        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
+          r#"
+            WITH "weekly_data" AS
+            (
+              SELECT
+                floor(extract(epoch from (date_trunc('week', now()) + interval '7 days 23 hours 59 minutes 59 seconds') - occurred_at)/(60*60*24*7))::float AS "times_ago",
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE "guild_id" = $1
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
             FROM "weekly_data"
             WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
       Timeframe::Monthly => {
         sqlx::query_as!(
           Res,
-          r#"WITH "monthly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*30))::float AS "times_ago", meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE "guild_id" = $1
-        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
+          r#"
+            WITH "monthly_data" AS
+            (
+              SELECT
+                floor(extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at)/(60*60*24*30))::float AS "times_ago",
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE "guild_id" = $1
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
             FROM "monthly_data"
             WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
       Timeframe::Yearly => {
         sqlx::query_as!(
           Res,
-          r#"WITH "yearly_data" AS (
-            SELECT floor(extract(epoch from NOW() - "occurred_at")/(60*60*24*365))::float AS "times_ago", meditation_minutes, meditation_seconds
-            FROM meditation
-            WHERE "guild_id" = $1
-        ) SELECT "times_ago", (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes, COUNT(*) AS meditation_count
+          r#"
+            WITH "yearly_data" AS
+            (
+              SELECT
+                floor(extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at)/(60*60*24*365))::float AS "times_ago",
+                meditation_minutes,
+                meditation_seconds
+              FROM meditation
+              WHERE "guild_id" = $1
+            )
+            SELECT
+              "times_ago",
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
             FROM "yearly_data"
             WHERE "times_ago" <= 12
-        GROUP BY "times_ago";"#,
+            GROUP BY "times_ago"
+          "#,
           guild_id.to_string(),
         ).fetch_all(&mut **transaction).await?
       },
