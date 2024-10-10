@@ -153,7 +153,9 @@ pub async fn create_star_message(
 pub async fn refresh_chart_stats(db: &DatabaseHandler) -> Result<()> {
   let mut transaction = db.start_transaction().await?;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Weekly).await?;
+  tokio::time::sleep(std::time::Duration::from_secs(60 * 2)).await;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Monthly).await?;
+  tokio::time::sleep(std::time::Duration::from_secs(60 * 2)).await;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Yearly).await?;
   transaction.commit().await?;
 
