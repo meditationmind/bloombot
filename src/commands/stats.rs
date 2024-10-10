@@ -419,11 +419,11 @@ pub async fn server(
   Ok(())
 }
 
-/// Show stats for a user
+/// Show tracking leaderboard
 ///
-/// Shows stats for yourself or a specified user.
+/// Shows the tracking leaderboard, available in several configurations.
 ///
-/// Defaults to daily minutes for yourself. Optionally specify the user, type (minutes or session count), and/or timeframe (daily, weekly, monthly, or yearly).
+/// Defaults to monthly top 5, sorted by minutes, in dark mode. Optionally specify the timeframe (daily, weekly, monthly, or yearly), sort (minutes, sessions, or streak), and theme (light mode or dark mode).
 #[poise::command(slash_command)]
 pub async fn leaderboard(
   ctx: Context<'_>,
