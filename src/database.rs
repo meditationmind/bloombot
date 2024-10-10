@@ -3026,115 +3026,182 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
     timeframe: &Timeframe,
   ) -> Result<Vec<TimeframeStats>> {
-    // Get the last 12 days, weeks, months, or years
+    let mut fresh_data: Option<Res> = None;
+
+    // Calculate data for last 12 days
     let rows: Vec<Res> = match timeframe {
       Timeframe::Daily => {
         sqlx::query_as!(
           Res,
           r#"
-            WITH "daily_data" AS
+            WITH daily_data AS
             (
               SELECT
-                date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago,
+                date_part('day', NOW() - DATE_TRUNC('day', occurred_at)) AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
               WHERE guild_id = $1 AND user_id = $2
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "daily_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM daily_data
+            WHERE times_ago <= 12
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
           user_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
+      // Calculate fresh data for present week, get previous 11 weeks from materialized view
       Timeframe::Weekly => {
-        sqlx::query_as!(
+        fresh_data = sqlx::query_as!(
           Res,
           r#"
-            WITH "weekly_data" AS
+            WITH current_week_data AS
             (
               SELECT
-                floor(extract(epoch from (date_trunc('week', now()) + interval '7 days 23 hours 59 minutes 59 seconds') - occurred_at)/(60*60*24*7))::float AS "times_ago",
+                floor(
+                  extract(epoch from ((date_trunc('week', now()) + interval '1 week') - interval '1 second') - occurred_at) /
+                  (60*60*24*7)
+                )::float AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
-              WHERE "guild_id" = $1 AND "user_id" = $2
+              WHERE guild_id = $1 AND user_id = $2
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "weekly_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM current_week_data
+            WHERE times_ago = 0
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
           user_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        ).fetch_optional(&mut **transaction).await?;
+
+        sqlx::query_as!(
+          Res,
+          r#"
+            SELECT
+              times_ago,
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM weekly_data
+            WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
+            GROUP BY times_ago
+          "#,
+          guild_id.to_string(),
+          user_id.to_string(),
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
+      // Calculate fresh data for present month, get previous 11 month from materialized view
       Timeframe::Monthly => {
-        sqlx::query_as!(
+        fresh_data = sqlx::query_as!(
           Res,
           r#"
-            WITH "monthly_data" AS
+            WITH current_month_data AS
             (
               SELECT
-                floor(extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at)/(60*60*24*30))::float AS "times_ago",
+                floor(
+                  extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at) /
+                  extract(epoch from (((date_trunc('month', occurred_at) + interval '1 month') - interval '1 second') - (date_trunc('month', occurred_at))))
+                )::float AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
-              WHERE "guild_id" = $1 AND "user_id" = $2
+              WHERE guild_id = $1 AND user_id = $2
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "monthly_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM current_month_data
+            WHERE times_ago = 0
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
           user_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        ).fetch_optional(&mut **transaction).await?;
+
+        sqlx::query_as!(
+          Res,
+          r#"
+            SELECT
+              times_ago,
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM monthly_data
+            WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
+            GROUP BY times_ago
+          "#,
+          guild_id.to_string(),
+          user_id.to_string(),
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
+      // Calculate fresh data for present year, get previous 11 years from materialized view
       Timeframe::Yearly => {
-        sqlx::query_as!(
+        fresh_data = sqlx::query_as!(
           Res,
           r#"
-            WITH "yearly_data" AS
+            WITH current_year_data AS
             (
               SELECT
-                floor(extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at)/(60*60*24*365))::float AS "times_ago",
+                floor(
+                  extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at) /
+                  extract(epoch from (((date_trunc('year', occurred_at) + interval '1 year') - interval '1 second') - (date_trunc('year', occurred_at))))
+                )::float AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
-              WHERE "guild_id" = $1 AND "user_id" = $2
+              WHERE guild_id = $1 AND user_id = $2
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "yearly_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM current_year_data
+            WHERE times_ago = 0
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
           user_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        ).fetch_optional(&mut **transaction).await?;
+
+        sqlx::query_as!(
+          Res,
+          r#"
+            SELECT
+              times_ago,
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM yearly_data
+            WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
+            GROUP BY times_ago
+          "#,
+          guild_id.to_string(),
+          user_id.to_string(),
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
     };
 
-    #[allow(clippy::expect_used)]
-    let stats: Vec<TimeframeStats> = (0..12)
+    let mut stats: Vec<TimeframeStats> = (1..12)
       .map(|i| {
         // Comparison is safe since floor produces integer
         #[allow(clippy::float_cmp)]
+        #[allow(clippy::expect_used)]
         let row = rows.iter().find(|row| {
           row
             .times_ago
@@ -3159,6 +3226,18 @@ impl DatabaseHandler {
       })
       .rev()
       .collect();
+
+    if let Some(fresh_data) = fresh_data {
+      stats.push(TimeframeStats {
+        sum: Some(fresh_data.meditation_minutes.unwrap_or(0)),
+        count: Some(fresh_data.meditation_count.unwrap_or(0)),
+      });
+    } else {
+      stats.push(TimeframeStats {
+        sum: Some(0),
+        count: Some(0),
+      });
+    }
 
     Ok(stats)
   }
@@ -3168,111 +3247,176 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     timeframe: &Timeframe,
   ) -> Result<Vec<TimeframeStats>> {
-    // Get the last 12 days, weeks, months, or years
+    let mut fresh_data: Option<Res> = None;
+    let bench_begin = std::time::Instant::now();
+
+    // Calculate data for last 12 days
     let rows: Vec<Res> = match timeframe {
       Timeframe::Daily => {
         sqlx::query_as!(
           Res,
           r#"
-            WITH "daily_data" AS
+            WITH daily_data AS
             (
               SELECT
-                date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS times_ago,
+                date_part('day', NOW() - DATE_TRUNC('day', occurred_at)) AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
               WHERE guild_id = $1
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "daily_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM daily_data
+            WHERE times_ago <= 12
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
+      // Calculate fresh data for present week, get previous 11 weeks from materialized view
       Timeframe::Weekly => {
-        sqlx::query_as!(
+        fresh_data = sqlx::query_as!(
           Res,
           r#"
-            WITH "weekly_data" AS
+            WITH current_week_data AS
             (
               SELECT
-                floor(extract(epoch from (date_trunc('week', now()) + interval '7 days 23 hours 59 minutes 59 seconds') - occurred_at)/(60*60*24*7))::float AS "times_ago",
+                floor(
+                  extract(epoch from ((date_trunc('week', now()) + interval '1 week') - interval '1 second') - occurred_at) /
+                  (60*60*24*7)
+                )::float AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
-              WHERE "guild_id" = $1
+              WHERE guild_id = $1
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "weekly_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM current_week_data
+            WHERE times_ago = 0
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        ).fetch_optional(&mut **transaction).await?;
+
+        sqlx::query_as!(
+          Res,
+          r#"
+            SELECT
+              times_ago,
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM weekly_data
+            WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
+            GROUP BY times_ago
+          "#,
+          guild_id.to_string(),
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
+      // Calculate fresh data for present month, get previous 11 month from materialized view
       Timeframe::Monthly => {
-        sqlx::query_as!(
+        fresh_data = sqlx::query_as!(
           Res,
           r#"
-            WITH "monthly_data" AS
+            WITH current_month_data AS
             (
               SELECT
-                floor(extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at)/(60*60*24*30))::float AS "times_ago",
+                floor(
+                  extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at) /
+                  extract(epoch from (((date_trunc('month', occurred_at) + interval '1 month') - interval '1 second') - (date_trunc('month', occurred_at))))
+                )::float AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
-              WHERE "guild_id" = $1
+              WHERE guild_id = $1
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "monthly_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM current_month_data
+            WHERE times_ago = 0
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        ).fetch_optional(&mut **transaction).await?;
+
+        sqlx::query_as!(
+          Res,
+          r#"
+            SELECT
+              times_ago,
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM monthly_data
+            WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
+            GROUP BY times_ago
+          "#,
+          guild_id.to_string(),
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
+      // Calculate fresh data for present year, get previous 11 years from materialized view
       Timeframe::Yearly => {
-        sqlx::query_as!(
+        fresh_data = sqlx::query_as!(
           Res,
           r#"
-            WITH "yearly_data" AS
+            WITH current_year_data AS
             (
               SELECT
-                floor(extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at)/(60*60*24*365))::float AS "times_ago",
+                floor(
+                  extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at) /
+                  extract(epoch from (((date_trunc('year', occurred_at) + interval '1 year') - interval '1 second') - (date_trunc('year', occurred_at))))
+                )::float AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
-              WHERE "guild_id" = $1
+              WHERE guild_id = $1
             )
             SELECT
-              "times_ago",
+              times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
               COUNT(*) AS meditation_count
-            FROM "yearly_data"
-            WHERE "times_ago" <= 12
-            GROUP BY "times_ago"
+            FROM current_year_data
+            WHERE times_ago = 0
+            GROUP BY times_ago
           "#,
           guild_id.to_string(),
-        ).fetch_all(&mut **transaction).await?
-      },
+        ).fetch_optional(&mut **transaction).await?;
+
+        sqlx::query_as!(
+          Res,
+          r#"
+            SELECT
+              times_ago,
+              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
+              COUNT(*) AS meditation_count
+            FROM yearly_data
+            WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
+            GROUP BY times_ago
+          "#,
+          guild_id.to_string(),
+        )
+        .fetch_all(&mut **transaction)
+        .await?
+      }
     };
 
-    #[allow(clippy::expect_used)]
-    let stats: Vec<TimeframeStats> = (0..12)
+    let mut stats: Vec<TimeframeStats> = (1..12)
       .map(|i| {
         // Comparison is safe since floor produces integer
         #[allow(clippy::float_cmp)]
+        #[allow(clippy::expect_used)]
         let row = rows.iter().find(|row| {
           row
             .times_ago
@@ -3297,6 +3441,24 @@ impl DatabaseHandler {
       })
       .rev()
       .collect();
+
+    if let Some(fresh_data) = fresh_data {
+      stats.push(TimeframeStats {
+        sum: Some(fresh_data.meditation_minutes.unwrap_or(0)),
+        count: Some(fresh_data.meditation_count.unwrap_or(0)),
+      });
+    } else {
+      stats.push(TimeframeStats {
+        sum: Some(0),
+        count: Some(0),
+      });
+    }
+
+    println!(
+      "\nTime for {:?}: {:?} (ordered by Bloom)\n\n{stats:?}",
+      poise::ChoiceParameter::name(timeframe),
+      bench_begin.elapsed()
+    );
 
     Ok(stats)
   }

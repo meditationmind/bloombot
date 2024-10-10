@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n              times_ago,\n              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,\n              COUNT(*) AS meditation_count\n            FROM monthly_data\n            WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12\n            GROUP BY times_ago\n          ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "times_ago",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "meditation_minutes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "meditation_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "a21cb61557ad556fc7093e12c029032916fe534299c466c7b1f5fca33459214c"
+}
