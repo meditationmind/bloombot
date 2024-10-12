@@ -15,6 +15,90 @@ pub enum DateFormat {
   Dmy,
 }
 
+#[derive(poise::ChoiceParameter)]
+pub enum DefaultReasons {
+  #[name = "Rule 1: Be kind"]
+  Rule1BeKind,
+  #[name = "Rule 2: Be respectful"]
+  Rule2BeRespectful,
+  #[name = "Rule 3: All-ages appropriate"]
+  Rule3AllAges,
+  #[name = "Rule 4: Respect boundaries"]
+  Rule4RespectBoundaries,
+  #[name = "Rule 8: No self-promo"]
+  Rule8SelfPromo,
+  #[name = "Rule 9: Respect IP rights"]
+  Rule9IPRights,
+  #[name = "Rule 10: No drug chat"]
+  Rule10Drugs,
+  #[name = "Rule 10: No politics"]
+  Rule10Politics,
+  #[name = "Non-discussion channel"]
+  NonDiscussionChannel,
+  #[name = "Unwholesome meme"]
+  UnwholesomeMeme,
+}
+
+impl DefaultReasons {
+  fn response(&self) -> String {
+    match *self {
+      DefaultReasons::Rule1BeKind =>
+        "Please help us cultivate a warm and welcoming atmosphere by remaining civil \
+        and treating others with kindness. Disagreeing with others, challenging views, \
+        questioning actions/behavior, etc. can all be done respectfully and mindfully."
+        .to_string(),
+      DefaultReasons::Rule2BeRespectful =>
+        "Please help us cultivate an atmosphere of respect. This is a diverse and inclusive \
+        community; all ages, genders, religions, and traditions are welcome. Questioning \
+        identities or views may done respectfully, as long as the other person exhibits a \
+        willingness to engage."
+        .to_string(),
+      DefaultReasons::Rule3AllAges =>
+        "This is an all-ages server. Please help us cultivate a wholesome atmosphere by being \
+        mindful of excessive profanity and vulgar language. Try to limit mature themes, such as \
+        sexual or potentially triggering topics, to the <#1020856801115246702> forum with the \
+        `Mature Topic` tag applied."
+        .to_string(),
+      DefaultReasons::Rule4RespectBoundaries =>
+        "We love having fun! A bit of jesting or banter is fine, as long as it is \
+        good-natured and consensual. If the other party ever seems uncomfortable or asks you to \
+        stop, respect their wishes, even if you were engaging with good intentions."
+        .to_string(),
+      DefaultReasons::Rule8SelfPromo =>
+        "Advertising, recruitment, solicitation, and self-promo require approval. This server is \
+        meant to be a safe space, where community members can feel confident they're interacting with \
+        fellow members who care about the community, and self-promo can violate that sense of safety. \
+        While exceptions are rare, you may contact <@575252669443211264> to request authorization."
+        .to_string(),
+      DefaultReasons::Rule9IPRights =>
+        "Sharing content that violates intellectual property rights is prohibited by the Discord \
+        Community Guidelines."
+        .to_string(),
+      DefaultReasons::Rule10Drugs =>
+        "As an all-ages Discord Partner community accessible via Server Discovery, \
+        discussion of drugs/controlled substances is prohibited by Discord's Discovery \
+        guidelines. Please help us cultivate and maintain an environment that is appropriate \
+        for all of our diverse membership. Thank you!"
+        .to_string(),
+      DefaultReasons::Rule10Politics =>
+        "Due to the strong tendency for political discussions to become highly charged and promote \
+        polarized views, we ask that members choose a different outlet. As long as they are relevant \
+        to server themes and remain civil, discussions may include political elements, but discussing \
+        politics directly is outside of the server scope."
+        .to_string(),
+      DefaultReasons::NonDiscussionChannel =>
+        "Please note that this is a non-discussion channel. If you would like to discuss or respond to \
+        a message, please create a thread, or you may DM the author if they have the DM-friendly tag."
+        .to_string(),
+      DefaultReasons::UnwholesomeMeme =>
+        "Please help us ensure that memes are wholesome and appropriate for all ages. While we do \
+        enjoy a wide range of humor, we also recognize that much of it does not fit the intention of \
+        this channel. Please employ discretion when choosing where to share. Thank you!"
+        .to_string(),
+    }
+  }
+}
+
 #[derive(Debug, Modal)]
 #[name = "Erase Message"]
 struct EraseMessageModal {
@@ -239,12 +323,22 @@ pub async fn message(
   #[max_length = 512] // Max length for audit log reason
   #[description = "The reason for deleting the message"]
   reason: Option<String>,
+  #[description = "Choose a predefined default reason"] default_reason: Option<DefaultReasons>,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
   let channel_id: ChannelId = message.channel_id;
   let message_id: MessageId = message.id;
-  let reason = reason.unwrap_or("No reason provided.".to_string());
+  let reason = match reason {
+    Some(custom_reason) => custom_reason,
+    None => {
+      if let Some(default_reason) = default_reason {
+        default_reason.response()
+      } else {
+        "No reason provided.".to_string()
+      }
+    }
+  };
   let audit_log_reason: Option<&str> = Some(reason.as_str());
 
   ctx
@@ -521,6 +615,7 @@ pub async fn populate(
   #[description = "The user to populate erase data for"] user: serenity::User,
   #[description = "The link for the erase notification message"] message_link: String,
   #[description = "The reason for the erasure"] reason: Option<String>,
+  #[description = "Choose a predefined default reason"] default_reason: Option<DefaultReasons>,
   #[description = "The date of the erasure (YYYY-MM-DD)"]
   #[rename = "date"]
   erase_date: chrono::NaiveDate,
@@ -541,13 +636,24 @@ pub async fn populate(
 
   let datetime = chrono::NaiveDateTime::new(erase_date, erase_time).and_utc();
 
+  let reason = match reason {
+    Some(custom_reason) => custom_reason,
+    None => {
+      if let Some(default_reason) = default_reason {
+        default_reason.response()
+      } else {
+        "No reason provided.".to_string()
+      }
+    }
+  };
+
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   DatabaseHandler::add_erase(
     &mut transaction,
     &guild_id,
     &user.id,
     &message_link,
-    reason.as_deref(),
+    Some(&reason),
     datetime,
   )
   .await?;
