@@ -25,18 +25,24 @@ pub enum DefaultReasons {
   Rule3AllAges,
   #[name = "Rule 4: Respect boundaries"]
   Rule4RespectBoundaries,
-  #[name = "Rule 8: No self-promo"]
+  #[name = "Rule 8: Self-promo"]
   Rule8SelfPromo,
   #[name = "Rule 9: Respect IP rights"]
   Rule9IPRights,
-  #[name = "Rule 10: No drug chat"]
+  #[name = "Rule 10: Drug chat"]
   Rule10Drugs,
-  #[name = "Rule 10: No politics"]
+  #[name = "Rule 10: Politics"]
   Rule10Politics,
+  #[name = "Rule 10: Disinformation"]
+  Rule10Disinformation,
+  #[name = "Mental health guidelines"]
+  MentalHealth,
   #[name = "Non-discussion channel"]
   NonDiscussionChannel,
   #[name = "Unwholesome meme"]
   UnwholesomeMeme,
+  #[name = "Excessive venting"]
+  ExcessiveVenting,
 }
 
 impl DefaultReasons {
@@ -50,14 +56,14 @@ impl DefaultReasons {
       DefaultReasons::Rule2BeRespectful =>
         "Please help us cultivate an atmosphere of respect. This is a diverse and inclusive \
         community; all ages, genders, religions, and traditions are welcome. Questioning \
-        identities or views may done respectfully, as long as the other person exhibits a \
+        identities or views may be done respectfully, as long as the other person exhibits a \
         willingness to engage."
         .to_string(),
       DefaultReasons::Rule3AllAges =>
         "This is an all-ages server. Please help us cultivate a wholesome atmosphere by being \
-        mindful of excessive profanity and vulgar language. Try to limit mature themes, such as \
-        sexual or potentially triggering topics, to the <#1020856801115246702> forum with the \
-        `Mature Topic` tag applied."
+        mindful of excessive profanity and vulgar or violent language or content. Try to limit \
+        mature themes, such as sexual or potentially triggering topics, to the <#1020856801115246702> \
+        forum with the `Mature Topic` tag applied."
         .to_string(),
       DefaultReasons::Rule4RespectBoundaries =>
         "We love having fun! A bit of jesting or banter is fine, as long as it is \
@@ -86,6 +92,17 @@ impl DefaultReasons {
         to server themes and remain civil, discussions may include political elements, but discussing \
         politics directly is outside of the server scope."
         .to_string(),
+      DefaultReasons::Rule10Disinformation =>
+        "Sharing potentially harmful misinformation, such as conspiracy theories or fake news, \
+        is prohibited by the Discord Community Guidelines. Even seemingly harmless conspiracy \
+        theories serve to spread misinformation and are rarely relevant to server themes, \
+        so we ask that such discussion be avoided."
+        .to_string(),
+      DefaultReasons::MentalHealth =>
+        "This is not a mental health server. For everyone's safety, we ask that members avoid diagnosing \
+        others and giving or requesting personalized advice regarding diagnosable mental health conditions \
+        or medications. See our Mental Health Discussion Guidelines: <#809814483874480138>"
+        .to_string(),
       DefaultReasons::NonDiscussionChannel =>
         "Please note that this is a non-discussion channel. If you would like to discuss or respond to \
         a message, please create a thread, or you may DM the author if they have the DM-friendly tag."
@@ -95,6 +112,11 @@ impl DefaultReasons {
         enjoy a wide range of humor, we also recognize that much of it does not fit the intention of \
         this channel. Please employ discretion when choosing where to share. Thank you!"
         .to_string(),
+      DefaultReasons::ExcessiveVenting =>
+      "We understand that sometimes people just want to let off some steam, which is why we have the \
+      `#venting` and `#venting-void` channels. We ask that venting be limited to these channels. If \
+      you are looking for advice or feedback, consider posting in <#1020856801115246702>. Thank you!"
+      .to_string(),
     }
   }
 }
