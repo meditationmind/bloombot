@@ -3197,7 +3197,9 @@ impl DatabaseHandler {
       }
     };
 
-    let mut stats: Vec<TimeframeStats> = (1..12)
+    let daily = matches!(timeframe, Timeframe::Daily);
+    let range = if daily { 0..12 } else { 1..12 };
+    let mut stats: Vec<TimeframeStats> = range
       .map(|i| {
         // Comparison is safe since floor produces integer
         #[allow(clippy::float_cmp)]
@@ -3232,7 +3234,7 @@ impl DatabaseHandler {
         sum: Some(fresh_data.meditation_minutes.unwrap_or(0)),
         count: Some(fresh_data.meditation_count.unwrap_or(0)),
       });
-    } else {
+    } else if !daily {
       stats.push(TimeframeStats {
         sum: Some(0),
         count: Some(0),
@@ -3411,7 +3413,9 @@ impl DatabaseHandler {
       }
     };
 
-    let mut stats: Vec<TimeframeStats> = (1..12)
+    let daily = matches!(timeframe, Timeframe::Daily);
+    let range = if daily { 0..12 } else { 1..12 };
+    let mut stats: Vec<TimeframeStats> = range
       .map(|i| {
         // Comparison is safe since floor produces integer
         #[allow(clippy::float_cmp)]
@@ -3446,7 +3450,7 @@ impl DatabaseHandler {
         sum: Some(fresh_data.meditation_minutes.unwrap_or(0)),
         count: Some(fresh_data.meditation_count.unwrap_or(0)),
       });
-    } else {
+    } else if !daily {
       stats.push(TimeframeStats {
         sum: Some(0),
         count: Some(0),
