@@ -95,7 +95,9 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
 #[poise::command(slash_command)]
 pub async fn edit(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
-  #[description = "ID of the quote to edit"] quote_id: String,
+  #[description = "ID of the quote to edit"]
+  #[rename = "id"]
+  quote_id: String,
 ) -> Result<()> {
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
@@ -156,7 +158,9 @@ pub async fn edit(
 #[poise::command(slash_command)]
 pub async fn remove(
   ctx: Context<'_>,
-  #[description = "The quote ID to remove"] id: String,
+  #[description = "The quote ID to remove"]
+  #[rename = "id"]
+  quote_id: String,
 ) -> Result<()> {
   let data = ctx.data();
 
@@ -165,7 +169,7 @@ pub async fn remove(
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
-  if !DatabaseHandler::quote_exists(&mut transaction, &guild_id, id.as_str()).await? {
+  if !DatabaseHandler::quote_exists(&mut transaction, &guild_id, quote_id.as_str()).await? {
     ctx
       .send(
         CreateReply::default()
@@ -176,7 +180,7 @@ pub async fn remove(
     return Ok(());
   }
 
-  DatabaseHandler::remove_quote(&mut transaction, &guild_id, id.as_str()).await?;
+  DatabaseHandler::remove_quote(&mut transaction, &guild_id, quote_id.as_str()).await?;
 
   commit_and_say(
     ctx,
@@ -377,7 +381,9 @@ pub async fn search(
 #[poise::command(slash_command)]
 pub async fn show(
   ctx: Context<'_>,
-  #[description = "ID of the quote to show"] quote_id: String,
+  #[description = "ID of the quote to show"]
+  #[rename = "id"]
+  quote_id: String,
 ) -> Result<()> {
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 

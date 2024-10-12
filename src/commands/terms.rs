@@ -130,7 +130,9 @@ pub async fn terms(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
 #[poise::command(slash_command)]
 pub async fn add(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
-  #[description = "The term to add"] term_name: String,
+  #[description = "The term to add"]
+  #[rename = "term"]
+  term_name: String,
 ) -> Result<()> {
   use poise::Modal as _;
 
@@ -195,7 +197,9 @@ pub async fn add(
 #[poise::command(slash_command)]
 pub async fn edit(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
-  #[description = "The term to edit"] term_name: String,
+  #[description = "The term to edit"]
+  #[rename = "term"]
+  term_name: String,
 ) -> Result<()> {
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
@@ -291,7 +295,9 @@ pub async fn edit(
 #[poise::command(slash_command)]
 pub async fn remove(
   ctx: Context<'_>,
-  #[description = "The term to remove"] term: String,
+  #[description = "The term to remove"]
+  #[rename = "term"]
+  term_name: String,
 ) -> Result<()> {
   let data = ctx.data();
 
@@ -300,7 +306,7 @@ pub async fn remove(
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
-  if !DatabaseHandler::term_exists(&mut transaction, &guild_id, term.as_str()).await? {
+  if !DatabaseHandler::term_exists(&mut transaction, &guild_id, term_name.as_str()).await? {
     ctx
       .send(
         poise::CreateReply::default()
@@ -311,7 +317,7 @@ pub async fn remove(
     return Ok(());
   }
 
-  DatabaseHandler::remove_term(&mut transaction, term.as_str(), &guild_id).await?;
+  DatabaseHandler::remove_term(&mut transaction, term_name.as_str(), &guild_id).await?;
 
   commit_and_say(
     ctx,
