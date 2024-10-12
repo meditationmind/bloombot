@@ -593,23 +593,23 @@ pub async fn add(
     let task_http = ctx.serenity_context().http.clone();
     let task_conn = data.db.clone();
     let update_leaderboards = tokio::task::spawn(async move {
-      log::info!("Refreshing leaderboard views...");
+      log::info!("Leaderboard: Refreshing views");
       let refresh_start = std::time::Instant::now();
       if let Err(err) = crate::events::leaderboards::refresh(&task_conn).await {
-        error!("Error refreshing leaderboard views: {:?}", err);
+        error!("Leaderboard: Error refreshing views: {:?}", err);
       }
-      log::info!("Refresh completed in: {:#?}", refresh_start.elapsed());
+      log::info!("Refresh completed in {:#?}", refresh_start.elapsed());
 
       tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-      log::info!("Generating leaderboard images...");
+      log::info!("Leaderboard: Generating images");
       let generation_start = std::time::Instant::now();
       if let Err(err) =
         crate::events::leaderboards::generate(&task_http, &task_conn, &guild_id).await
       {
-        error!("Error generating leaderboard images: {:?}", err);
+        error!("Leaderboard: Error generating images: {:?}", err);
       }
-      log::info!("Generation completed in: {:#?}", generation_start.elapsed());
+      log::info!("Leaderboard: Generation completed in {:#?}", generation_start.elapsed());
     });
     update_leaderboards.await?;
   }

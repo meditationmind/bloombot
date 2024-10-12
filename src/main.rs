@@ -19,7 +19,7 @@ use dotenvy::dotenv;
 use log::{error, info};
 use poise::serenity_prelude::{self as serenity, model::channel};
 use rand::rngs::SmallRng;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use serenity::FullEvent as Event;
 use std::sync::Arc;
 use std::time::Duration;
@@ -240,25 +240,29 @@ async fn event_handler(
       let task_conn = data.db.clone();
       let guild_id = guild.id;
       let update_leaderboards = tokio::task::spawn(async move {
-        info!("Refreshing leaderboard views...");
+        info!("Leaderboard: Refreshing views");
         let refresh_start = std::time::Instant::now();
         if let Err(err) = events::leaderboards::refresh(&task_conn).await {
-          error!("Error refreshing leaderboard views: {:?}", err);
+          error!("Leaderboard: Error refreshing views: {:?}", err);
         }
-        info!("Refresh completed in: {:#?}", refresh_start.elapsed());
+        info!("Leaderboard: Refresh completed in {:#?}", refresh_start.elapsed());
 
         sleep(Duration::from_secs(10)).await;
 
-        info!("Generating leaderboard images...");
+        info!("Leaderboard: Generating images");
         let generation_start = std::time::Instant::now();
         if let Err(err) = events::leaderboards::generate(&task_http, &task_conn, &guild_id).await {
-          error!("Error generating leaderboard images: {:?}", err);
+          error!("Leaderboard: Error generating images: {:?}", err);
         }
-        info!("Generation completed in: {:#?}", generation_start.elapsed());
+        info!("Leaderboard: Generation completed in {:#?}", generation_start.elapsed());
       });
       update_leaderboards.await?;
 
-      sleep(Duration::from_secs(60 * 5)).await;
+      let rng = Arc::clone(&data.rng);
+      let mut rng = rng.lock().await;
+      let random_number = rng.gen_range(4..12);
+      info!("Chart stats: Refresh in {} minutes", &random_number);
+      sleep(Duration::from_secs(random_number * 60)).await;
 
       let task_conn = data.db.clone();
       let update_chart_stats = tokio::task::spawn(async move {
@@ -266,12 +270,17 @@ async fn event_handler(
         loop {
           interval.tick().await;
 
-          info!("Refreshing chart stat views...");
+          info!("Chart stats: Refreshing views");
           let refresh_start = std::time::Instant::now();
           if let Err(err) = events::refresh_chart_stats(&task_conn).await {
-            error!("Error refreshing chart stat views: {:?}", err);
+            error!("Chart stats: Error refreshing views: {:?}", err);
           }
-          info!("Refresh completed in: {:#?}", refresh_start.elapsed());
+          info!(
+            "Chart stats: Refresh completed in {:#?}",
+            refresh_start
+              .elapsed()
+              .saturating_sub(Duration::from_secs(60 * 4))
+          );
         }
       });
       update_chart_stats.await?;
