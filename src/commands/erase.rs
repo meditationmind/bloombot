@@ -4,8 +4,10 @@ use crate::database::DatabaseHandler;
 use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, MessageId};
-use poise::{CreateReply, Modal};
+use poise::serenity_prelude::{
+  self as serenity, builder::*, ChannelId, CreateQuickModal, MessageId,
+};
+use poise::{ChoiceParameter, CreateReply};
 
 #[derive(poise::ChoiceParameter)]
 pub enum DateFormat {
@@ -121,16 +123,6 @@ impl DefaultReasons {
   }
 }
 
-#[derive(Debug, Modal)]
-#[name = "Erase Message"]
-struct EraseMessageModal {
-  #[name = "Reason"]
-  #[paragraph]
-  #[placeholder = "The reason for deleting the message"]
-  #[max_length = 512]
-  reason: Option<String>,
-}
-
 /// Delete a message and notify the user
 ///
 /// Deletes a message and notifies the user via DM or private thread with an optional reason.
@@ -148,16 +140,125 @@ pub async fn erase_message(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
   #[description = "The message to delete"] message: serenity::Message,
 ) -> Result<()> {
-  let erase_data = EraseMessageModal::execute(ctx).await?;
+  ctx.defer_ephemeral().await?;
+  let ctx_id = ctx.id();
 
-  if let Some(erase_data) = erase_data {
-    ctx.defer_ephemeral().await?;
+  let reply = {
+    let default_reason_dropdown = vec![serenity::CreateActionRow::SelectMenu(
+      CreateSelectMenu::new(
+        format!("{ctx_id}"),
+        CreateSelectMenuKind::String {
+          #[rustfmt::skip]
+          options: vec![
+            CreateSelectMenuOption::new("Custom", "custom"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule1BeKind.name(), "Rule1BeKind"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule2BeRespectful.name(), "Rule2BeRespectful"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule3AllAges.name(), "Rule3AllAges"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule4RespectBoundaries.name(), "Rule4RespectBoundaries"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule8SelfPromo.name(), "Rule8SelfPromo"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule9IPRights.name(), "Rule9IPRights"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule10Drugs.name(), "Rule10Drugs"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule10Politics.name(), "Rule10Politics"),
+            CreateSelectMenuOption::new(DefaultReasons::Rule10Disinformation.name(), "Rule10Disinformation"),
+            CreateSelectMenuOption::new(DefaultReasons::MentalHealth.name(), "MentalHealth"),
+            CreateSelectMenuOption::new(DefaultReasons::NonDiscussionChannel.name(), "NonDiscussionChannel"),
+            CreateSelectMenuOption::new(DefaultReasons::UnwholesomeMeme.name(), "UnwholesomeMeme"),
+            CreateSelectMenuOption::new(DefaultReasons::ExcessiveVenting.name(), "ExcessiveVenting"),
+            CreateSelectMenuOption::new("None", "none"),
+            CreateSelectMenuOption::new("Cancel erase", "cancel"),
+          ],
+        },
+      )
+      .placeholder("Choose a reason"),
+    )];
+
+    CreateReply::default()
+      .components(default_reason_dropdown)
+      .ephemeral(true)
+  };
+
+  let msg = ctx.send(reply).await?;
+
+  while let Some(mci) = serenity::ComponentInteractionCollector::new(ctx)
+    .author_id(ctx.author().id)
+    .channel_id(ctx.channel_id())
+    .timeout(std::time::Duration::from_secs(60))
+    .filter(move |mci| mci.data.custom_id == ctx_id.to_string())
+    .await
+  {
+    let choice = match &mci.data.kind {
+      serenity::ComponentInteractionDataKind::StringSelect { values } => &values[0],
+      _ => panic!("unexpected interaction data kind"),
+    };
+
+    if choice == "cancel" {
+      mci
+        .create_response(
+          ctx,
+          CreateInteractionResponse::UpdateMessage(
+            CreateInteractionResponseMessage::new()
+              .content(format!("{} Erase cancelled.", EMOJI.mminfo))
+              .ephemeral(true)
+              .components(Vec::new()),
+          ),
+        )
+        .await?;
+
+      return Ok(());
+    }
+
+    let erase_data = if choice == "custom" {
+      mci
+        .quick_modal(
+          ctx.serenity_context,
+          CreateQuickModal::new("Erase Message")
+            .timeout(std::time::Duration::from_secs(300))
+            .field(
+              CreateInputText::new(serenity::InputTextStyle::Paragraph, "Reason", "")
+                .max_length(512)
+                .placeholder("The reason for deleting the message"),
+            ),
+        )
+        .await?
+    } else {
+      None
+    };
+
+    if choice == "custom" && erase_data.is_none() {
+      mci
+        .edit_response(
+          ctx,
+          EditInteractionResponse::new()
+            .content(format!("{} Erase cancelled.", EMOJI.mminfo))
+            .components(Vec::new()),
+        )
+        .await?;
+      return Ok(());
+    }
+
+    let reason = if let Some(erase_data) = &erase_data {
+      &erase_data.inputs[0]
+    } else {
+      match choice.as_str() {
+        "Rule1BeKind" => &DefaultReasons::Rule1BeKind.response(),
+        "Rule2BeRespectful" => &DefaultReasons::Rule2BeRespectful.response(),
+        "Rule3AllAges" => &DefaultReasons::Rule3AllAges.response(),
+        "Rule4RespectBoundaries" => &DefaultReasons::Rule4RespectBoundaries.response(),
+        "Rule8SelfPromo" => &DefaultReasons::Rule8SelfPromo.response(),
+        "Rule9IPRights" => &DefaultReasons::Rule9IPRights.response(),
+        "Rule10Drugs" => &DefaultReasons::Rule10Drugs.response(),
+        "Rule10Politics" => &DefaultReasons::Rule10Politics.response(),
+        "Rule10Disinformation" => &DefaultReasons::Rule10Disinformation.response(),
+        "MentalHealth" => &DefaultReasons::MentalHealth.response(),
+        "NonDiscussionChannel" => &DefaultReasons::NonDiscussionChannel.response(),
+        "UnwholesomeMeme" => &DefaultReasons::UnwholesomeMeme.response(),
+        "ExcessiveVenting" => &DefaultReasons::ExcessiveVenting.response(),
+        _ => &"No reason provided.".to_string(),
+      }
+    };
 
     let channel_id: ChannelId = message.channel_id;
     let message_id: MessageId = message.id;
-    let reason = erase_data
-      .reason
-      .unwrap_or("No reason provided.".to_string());
     let audit_log_reason: Option<&str> = Some(reason.as_str());
 
     ctx
@@ -223,9 +324,10 @@ pub async fn erase_message(
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     );
+
     dm_embed = dm_embed.footer(CreateEmbedFooter::new(
     "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff."
-  ));
+    ));
 
     let log_channel = serenity::ChannelId::new(CHANNELS.logs);
 
@@ -240,21 +342,44 @@ pub async fn erase_message(
       &guild_id,
       &user_id,
       &message_link,
-      Some(&reason),
+      Some(reason),
       occurred_at,
     )
     .await?;
 
-    commit_and_say(
-      poise::Context::Application(ctx),
-      transaction,
-      MessageType::TextOnly(format!(
-        "{} Message deleted. User will be notified via DM or private thread.",
-        EMOJI.mmcheck
-      )),
-      true,
-    )
-    .await?;
+    DatabaseHandler::commit_transaction(transaction).await?;
+    if let Some(qmr) = erase_data {
+      qmr
+        .interaction
+        .create_response(
+          ctx,
+          CreateInteractionResponse::UpdateMessage(
+            CreateInteractionResponseMessage::new()
+              .content(format!(
+                "{} Message deleted. User will be notified via DM or private thread.",
+                EMOJI.mmcheck
+              ))
+              .ephemeral(true)
+              .components(Vec::new()),
+          ),
+        )
+        .await?;
+    } else {
+      mci
+        .create_response(
+          ctx,
+          CreateInteractionResponse::UpdateMessage(
+            CreateInteractionResponseMessage::new()
+              .content(format!(
+                "{} Message deleted. User will be notified via DM or private thread.",
+                EMOJI.mmcheck
+              ))
+              .ephemeral(true)
+              .components(Vec::new()),
+          ),
+        )
+        .await?;
+    }
 
     if message
       .author
@@ -312,6 +437,16 @@ pub async fn erase_message(
         .await?;
     }
   }
+
+  msg
+    .edit(
+      poise::Context::Application(ctx),
+      CreateReply::default()
+        .content(format!("{} Erase cancelled.", EMOJI.mminfo))
+        .components(Vec::new())
+        .ephemeral(true),
+    )
+    .await?;
 
   Ok(())
 }
