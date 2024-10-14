@@ -11,7 +11,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS yearly_leaderboard AS
     FROM meditation m
     LEFT JOIN streak s ON m.user_id = s.user_id
     LEFT JOIN tracking_profile t ON m.user_id = t.user_id
-    WHERE m.occurred_at >= date_trunc('year', now()) AND m.occurred_at <= now()
+    WHERE m.occurred_at >= date_trunc('year', now())
     GROUP BY name, guild, streak, anonymous_tracking, streaks_active, streaks_private;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS monthly_leaderboard AS
@@ -27,7 +27,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS monthly_leaderboard AS
     FROM meditation m
     LEFT JOIN streak s ON m.user_id = s.user_id
     LEFT JOIN tracking_profile t ON m.user_id = t.user_id
-    WHERE m.occurred_at >= date_trunc('month', now()) AND m.occurred_at <= now()
+    WHERE m.occurred_at >= date_trunc('month', now())
     GROUP BY name, guild, streak, anonymous_tracking, streaks_active, streaks_private;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS weekly_leaderboard AS
@@ -43,7 +43,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS weekly_leaderboard AS
     FROM meditation m
     LEFT JOIN streak s ON m.user_id = s.user_id
     LEFT JOIN tracking_profile t ON m.user_id = t.user_id
-    WHERE m.occurred_at >= date_trunc('week', now()) AND m.occurred_at <= now()
+    WHERE m.occurred_at >= date_trunc('week', now())
     GROUP BY name, guild, streak, anonymous_tracking, streaks_active, streaks_private;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS daily_leaderboard AS
@@ -59,7 +59,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS daily_leaderboard AS
     FROM meditation m
     LEFT JOIN streak s ON m.user_id = s.user_id
     LEFT JOIN tracking_profile t ON m.user_id = t.user_id
-    WHERE m.occurred_at >= date_trunc('day', now()) AND m.occurred_at <= now()
+    WHERE m.occurred_at >= date_trunc('day', now())
     GROUP BY name, guild, streak, anonymous_tracking, streaks_active, streaks_private;
 
 CREATE UNIQUE INDEX ON yearly_leaderboard (name);
