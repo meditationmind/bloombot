@@ -190,21 +190,11 @@ impl PageRow for MeditationData {
   }
 
   fn body(&self) -> String {
-    let now = chrono::Utc::now();
-
-    if now - self.occurred_at < chrono::Duration::days(1) {
-      format!(
-        "Date: <t:{}:R>\nID: `{}`",
-        self.occurred_at.timestamp(),
-        self.id
-      )
-    } else {
-      format!(
-        "Date: `{}`\nID: `{}`",
-        self.occurred_at.format("%Y-%m-%d %H:%M"),
-        self.id
-      )
-    }
+    format!(
+      "Date: `{}`\nID: `{}`",
+      self.occurred_at.format("%Y-%m-%d %H:%M"),
+      self.id
+    )
   }
 }
 
