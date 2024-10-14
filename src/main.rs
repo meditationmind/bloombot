@@ -19,7 +19,7 @@ use dotenvy::dotenv;
 use log::{error, info};
 use poise::serenity_prelude::{self as serenity, model::channel};
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use serenity::FullEvent as Event;
 use std::sync::Arc;
 use std::time::Duration;
@@ -245,7 +245,10 @@ async fn event_handler(
         if let Err(err) = events::leaderboards::refresh(&task_conn).await {
           error!("Leaderboard: Error refreshing views: {:?}", err);
         }
-        info!("Leaderboard: Refresh completed in {:#?}", refresh_start.elapsed());
+        info!(
+          "Leaderboard: Refresh completed in {:#?}",
+          refresh_start.elapsed()
+        );
 
         sleep(Duration::from_secs(10)).await;
 
@@ -254,19 +257,46 @@ async fn event_handler(
         if let Err(err) = events::leaderboards::generate(&task_http, &task_conn, &guild_id).await {
           error!("Leaderboard: Error generating images: {:?}", err);
         }
-        info!("Leaderboard: Generation completed in {:#?}", generation_start.elapsed());
+        info!(
+          "Leaderboard: Generation completed in {:#?}",
+          generation_start
+            .elapsed()
+            .saturating_sub(Duration::from_secs(115))
+        );
       });
       update_leaderboards.await?;
-
-      let rng = Arc::clone(&data.rng);
-      let mut rng = rng.lock().await;
-      let random_number = rng.gen_range(4..12);
-      info!("Chart stats: Refresh in {} minutes", &random_number);
-      sleep(Duration::from_secs(random_number * 60)).await;
 
       let task_conn = data.db.clone();
       let update_chart_stats = tokio::task::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(60 * 60 * 12));
+        let wait = {
+          let now = chrono::Utc::now();
+          let midnight = now
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .unwrap_or_else(|| now.naive_utc())
+            .and_utc()
+            + chrono::Duration::hours(24);
+          let noon = now
+            .date_naive()
+            .and_hms_opt(12, 0, 0)
+            .unwrap_or_else(|| now.naive_utc())
+            .and_utc();
+          if noon > now {
+            (noon - now).num_seconds().unsigned_abs()
+          } else {
+            (midnight - now).num_seconds().unsigned_abs()
+          }
+        };
+        #[allow(clippy::cast_possible_wrap)]
+        if wait > 0 {
+          info!(
+            "Chart stats: Next refresh in {}m ({})",
+            wait / 60,
+            (chrono::Utc::now() + chrono::Duration::seconds(wait as i64)).format("%H:%M %P")
+          );
+        }
+        sleep(Duration::from_secs(wait)).await;
         loop {
           interval.tick().await;
 
