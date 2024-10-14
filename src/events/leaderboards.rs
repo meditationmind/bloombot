@@ -204,6 +204,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.day_min_top5_light)
       .await?
@@ -227,6 +229,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.day_min_top10_light)
@@ -263,6 +267,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.week_min_top5_light)
       .await?
@@ -286,6 +292,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.week_min_top10_light)
@@ -322,6 +330,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.month_min_top5_light)
       .await?
@@ -345,6 +355,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.month_min_top10_light)
@@ -381,6 +393,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.year_min_top5_light)
       .await?
@@ -404,6 +418,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.year_min_top10_light)
@@ -440,6 +456,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.day_ses_top5_light)
       .await?
@@ -463,6 +481,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.day_ses_top10_light)
@@ -499,6 +519,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.week_ses_top5_light)
       .await?
@@ -522,6 +544,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.week_ses_top10_light)
@@ -558,6 +582,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.month_ses_top5_light)
       .await?
@@ -581,6 +607,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.month_ses_top10_light)
@@ -617,6 +645,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.year_ses_top5_light)
       .await?
@@ -640,6 +670,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.year_ses_top10_light)
@@ -676,6 +708,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.day_str_top5_light)
       .await?
@@ -699,6 +733,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.day_str_top10_light)
@@ -735,6 +771,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.week_str_top5_light)
       .await?
@@ -758,6 +796,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.week_str_top10_light)
@@ -794,6 +834,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
       )
       .await?;
 
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.month_str_top5_light)
       .await?
@@ -817,6 +859,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.month_str_top10_light)
@@ -852,6 +896,8 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
         false,
       )
       .await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     /*
     let _ = charts::Chart::new_with_name(LEADERBOARDS.year_str_top5_light)
