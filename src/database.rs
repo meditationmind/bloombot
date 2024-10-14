@@ -3015,8 +3015,10 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
     timeframe: &Timeframe,
+    offset: i16,
   ) -> Result<Vec<TimeframeStats>> {
     let mut fresh_data: Option<Res> = None;
+    let now_offset = chrono::Utc::now() + chrono::Duration::minutes(offset.into());
 
     // Calculate data for last 12 days
     let rows: Vec<Res> = match timeframe {
@@ -3027,11 +3029,11 @@ impl DatabaseHandler {
             WITH daily_data AS
             (
               SELECT
-                date_part('day', NOW() - DATE_TRUNC('day', occurred_at)) AS times_ago,
+                date_part('day', $1 - DATE_TRUNC('day', occurred_at)) AS times_ago,
                 meditation_minutes,
                 meditation_seconds
               FROM meditation
-              WHERE guild_id = $1 AND user_id = $2
+              WHERE guild_id = $2 AND user_id = $3 AND occurred_at <= $1
             )
             SELECT
               times_ago,
@@ -3041,6 +3043,7 @@ impl DatabaseHandler {
             WHERE times_ago <= 12
             GROUP BY times_ago
           "#,
+          now_offset,
           guild_id.to_string(),
           user_id.to_string(),
         )

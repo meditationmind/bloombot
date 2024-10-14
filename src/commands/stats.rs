@@ -226,7 +226,7 @@ pub async fn user(
   };
 
   let chart_stats =
-    DatabaseHandler::get_user_chart_stats(&mut transaction, &guild_id, &user.id, &timeframe)
+    DatabaseHandler::get_user_chart_stats(&mut transaction, &guild_id, &user.id, &timeframe, tracking_profile.utc_offset)
       .await?;
 
   let chart = charts::Chart::new()
@@ -234,6 +234,7 @@ pub async fn user(
     .stats(
       &chart_stats,
       &timeframe,
+      tracking_profile.utc_offset,
       &stats_type,
       &chart_style,
       bar_color,
@@ -395,6 +396,7 @@ pub async fn server(
     .stats(
       &chart_stats,
       &timeframe,
+      0,
       &stats_type,
       &chart_style,
       bar_color,

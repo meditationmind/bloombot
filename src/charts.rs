@@ -55,10 +55,12 @@ impl<'a> Chart<'a> {
     })
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub async fn stats(
     mut self,
     stats: &[TimeframeStats],
     timeframe: &Timeframe,
+    offset: i16,
     stats_type: &StatsType,
     chart_style: &ChartStyle,
     bar_color: (u8, u8, u8, u8),
@@ -115,7 +117,7 @@ impl<'a> Chart<'a> {
     for n in 1..13 {
       let label = match timeframe {
         Timeframe::Daily => {
-          let date = now - chrono::Duration::days(12 - n);
+          let date = (now + chrono::Duration::minutes(offset.into())) - chrono::Duration::days(12 - n);
           date.format("%m/%d").to_string()
         }
         Timeframe::Weekly => {
