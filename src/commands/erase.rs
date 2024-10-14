@@ -212,7 +212,7 @@ pub async fn erase_message(
         .quick_modal(
           ctx.serenity_context,
           CreateQuickModal::new("Erase Message")
-            .timeout(std::time::Duration::from_secs(300))
+            .timeout(std::time::Duration::from_secs(600))
             .field(
               CreateInputText::new(serenity::InputTextStyle::Paragraph, "Reason", "")
                 .max_length(512)
