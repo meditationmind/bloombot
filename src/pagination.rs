@@ -140,11 +140,7 @@ impl PaginationPage<'_> {
     self.entries.is_empty()
   }
 
-  pub fn to_embed(
-    &self,
-    title: &str,
-    page_type: PageType,
-  ) -> serenity::CreateEmbed {
+  pub fn to_embed(&self, title: &str, page_type: PageType) -> serenity::CreateEmbed {
     let mut embed = BloomBotEmbed::new().title(title).description(format!(
       "Showing entries {} to {}.",
       (self.page_number * self.entries_per_page) + 1,

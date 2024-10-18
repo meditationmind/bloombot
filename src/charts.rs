@@ -117,7 +117,8 @@ impl<'a> Chart<'a> {
     for n in 1..13 {
       let label = match timeframe {
         Timeframe::Daily => {
-          let date = (now + chrono::Duration::minutes(offset.into())) - chrono::Duration::days(12 - n);
+          let date =
+            (now + chrono::Duration::minutes(offset.into())) - chrono::Duration::days(12 - n);
           date.format("%m/%d").to_string()
         }
         Timeframe::Weekly => {

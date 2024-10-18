@@ -225,9 +225,14 @@ pub async fn user(
     None => false,
   };
 
-  let chart_stats =
-    DatabaseHandler::get_user_chart_stats(&mut transaction, &guild_id, &user.id, &timeframe, tracking_profile.utc_offset)
-      .await?;
+  let chart_stats = DatabaseHandler::get_user_chart_stats(
+    &mut transaction,
+    &guild_id,
+    &user.id,
+    &timeframe,
+    tracking_profile.utc_offset,
+  )
+  .await?;
 
   let chart = charts::Chart::new()
     .await?

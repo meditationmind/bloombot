@@ -81,7 +81,8 @@ pub async fn recent(
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new().embed(pagination.create_page_embed(current_page, PageType::Standard)),
+          CreateInteractionResponseMessage::new()
+            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
         ),
       )
       .await?;
