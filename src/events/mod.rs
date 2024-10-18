@@ -6,10 +6,10 @@ use poise::serenity_prelude::{builder::*, ChannelId, Context, MessageFlags, Reac
 // mod guild_member_addition;
 mod guild_member_removal;
 mod guild_member_update;
+pub mod leaderboards;
 mod message_delete;
 mod reaction_add;
 mod reaction_remove;
-pub mod leaderboards;
 
 // pub use guild_member_addition::guild_member_addition;
 pub use guild_member_removal::guild_member_removal;
@@ -54,10 +54,12 @@ pub async fn create_star_message(
     };
 
     let mut embed = match starred_message.embeds.first() {
-      Some(embed) => if starred_message.content.is_empty() {
-        config::BloomBotEmbed::from(embed.clone())
-      } else {
-        config::BloomBotEmbed::new().description(starred_message.content.clone())
+      Some(embed) => {
+        if starred_message.content.is_empty() {
+          config::BloomBotEmbed::from(embed.clone())
+        } else {
+          config::BloomBotEmbed::new().description(starred_message.content.clone())
+        }
       }
       None => config::BloomBotEmbed::new().description(starred_message.content.clone()),
     };

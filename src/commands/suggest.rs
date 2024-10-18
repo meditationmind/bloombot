@@ -71,7 +71,9 @@ pub async fn suggest(
   ctx
     .send(
       poise::CreateReply::default()
-        .content(format!("Your suggestion has been added to <#{channel_id}>."))
+        .content(format!(
+          "Your suggestion has been added to <#{channel_id}>."
+        ))
         .ephemeral(true),
     )
     .await?;

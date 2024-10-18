@@ -193,7 +193,8 @@ async fn help_all_commands<U, E>(
     });
 
   if config.show_context_menu_commands {
-    let mut context_categories = indexmap::IndexMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
+    let mut context_categories =
+      indexmap::IndexMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
     for cmd in &ctx.framework().options().commands {
       if cmd.context_menu_action.is_none() || cmd.hide_in_help {
         continue;

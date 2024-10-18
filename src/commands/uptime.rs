@@ -18,7 +18,9 @@ pub async fn uptime(ctx: Context<'_>) -> Result<()> {
   let (days, hours) = div_mod(hours, 24);
 
   ctx
-    .say(format!("My current uptime is {days}d {hours}h {minutes}m {seconds}s."))
+    .say(format!(
+      "My current uptime is {days}d {hours}h {minutes}m {seconds}s."
+    ))
     .await?;
 
   Ok(())

@@ -609,7 +609,10 @@ pub async fn add(
       {
         error!("Leaderboard: Error generating images: {:?}", err);
       }
-      log::info!("Leaderboard: Generation completed in {:#?}", generation_start.elapsed());
+      log::info!(
+        "Leaderboard: Generation completed in {:#?}",
+        generation_start.elapsed()
+      );
     });
     update_leaderboards.await?;
   }
