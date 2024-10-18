@@ -65,7 +65,7 @@ pub async fn show(ctx: Context<'_>) -> Result<()> {
       },
     };
 
-  let utc_offset = match time::choice_from_offset(i16::from(tracking_profile.utc_offset)) {
+  let utc_offset = match time::choice_from_offset(tracking_profile.utc_offset) {
     (Some(minus_offset), None) => minus_offset.name().to_string(),
     (None, Some(plus_offset)) => plus_offset.name().to_string(),
     (None, None) => "UTC".to_string(),
@@ -129,21 +129,18 @@ pub async fn offset(
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
   let choice_offset = offset_from_choice(minus_offset, plus_offset, 0);
-  let utc_offset = match choice_offset {
-    Ok(offset) => offset,
-    Err(_) => {
-      ctx
-          .send(
-            CreateReply::default()
-                .content(
-                  "Cannot determine UTC offset based on the choice selected."
-                      .to_string(),
-                )
-                .ephemeral(true),
-          )
-          .await?;
-      return Ok(());
-    }
+  let Ok(utc_offset) = choice_offset else {
+    ctx
+        .send(
+          CreateReply::default()
+              .content(
+                "Cannot determine UTC offset based on the choice selected."
+                    .to_string(),
+              )
+              .ephemeral(true),
+        )
+        .await?;
+    return Ok(());
   };
 
   if let Some(tracking_profile) =
@@ -151,7 +148,7 @@ pub async fn offset(
   {
     let existing_profile = tracking_profile;
 
-    if utc_offset == i16::from(existing_profile.utc_offset) {
+    if utc_offset == existing_profile.utc_offset {
       ctx
         .send(
           CreateReply::default()
@@ -170,7 +167,7 @@ pub async fn offset(
       &mut transaction,
       &guild_id,
       &user_id,
-      i16::from(utc_offset),
+      utc_offset,
       existing_profile.anonymous_tracking,
       existing_profile.streaks_active,
       existing_profile.streaks_private,

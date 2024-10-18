@@ -1,5 +1,3 @@
-use Option;
-
 #[derive(poise::ChoiceParameter)]
 pub enum PlusOffsetChoice {
     #[name = "UTC+1 (BST, CET, IST, WAT, WEST)"]
@@ -192,30 +190,21 @@ mod tests {
 
     #[test]
     fn test_choice_from_offset() {
-        assert!(match choice_from_offset(-420) {
-            (Some(MinusOffsetChoice::UTCMinus7), None) => true,
-            _ => false,
-        });
-        assert!(match choice_from_offset(345) {
-            (None, Some(PlusOffsetChoice::UTCPlus5_45)) => true,
-            _ => false,
-        });
-        assert!(match choice_from_offset(0) {
-            (None, None) => true,
-            _ => false,
-        });
-        assert!(match choice_from_offset(777) {
-            (None, None) => true,
-            _ => false,
-        });
+        matches!(choice_from_offset(-420), (Some(MinusOffsetChoice::UTCMinus7), None));
+        matches!(choice_from_offset(345), (None, Some(PlusOffsetChoice::UTCPlus5_45)));
+        matches!(choice_from_offset(0), (None, None));
+        matches!(choice_from_offset(777), (None, None));
     }
 
     #[test]
     fn test_offset_from_choice() {
-        assert_eq!(offset_from_choice(Some(MinusOffsetChoice::UTCMinus7), None, 0).unwrap(), -420);
-        assert_eq!(offset_from_choice(None, Some(PlusOffsetChoice::UTCPlus5_45), 0).unwrap(), 345);
-        assert_eq!(offset_from_choice(None, None, 0).unwrap(), 0);
-        assert_eq!(offset_from_choice(None, None, 777).unwrap(), 777);
-        assert_eq!(offset_from_choice(Some(MinusOffsetChoice::UTCMinus7), Some(PlusOffsetChoice::UTCPlus5_45), 0).unwrap_err(), "Cannot have both minus and plus offsets");
+        assert_eq!(offset_from_choice(Some(MinusOffsetChoice::UTCMinus7), None, 0).unwrap_or(0), -420);
+        assert_eq!(offset_from_choice(None, Some(PlusOffsetChoice::UTCPlus5_45), 0).unwrap_or(0), 345);
+        assert_eq!(offset_from_choice(None, None, 0).unwrap_or(111), 0);
+        assert_eq!(offset_from_choice(None, None, 777).unwrap_or(0), 777);
+        let Err(err) = offset_from_choice(Some(MinusOffsetChoice::UTCMinus7), Some(PlusOffsetChoice::UTCPlus5_45), 0) else {
+            panic!("Expected Err, got Ok");
+        };
+        assert_eq!(err, "Cannot have both minus and plus offsets");
     }
 }

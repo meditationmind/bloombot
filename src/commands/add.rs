@@ -167,7 +167,7 @@ pub async fn add(
     None => tracking_profile.anonymous_tracking,
   };
 
-  let offset = match offset_from_choice(minus_offset, plus_offset, i16::from(tracking_profile.utc_offset)) {
+  let offset = match offset_from_choice(minus_offset, plus_offset, tracking_profile.utc_offset) {
     Ok(offset) => offset,
     Err(e) => {
       ctx
