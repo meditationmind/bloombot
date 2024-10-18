@@ -1,14 +1,12 @@
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
 use crate::database::{DatabaseHandler, TrackingProfile};
+use crate::time::{offset_from_choice, MinusOffsetChoice, PlusOffsetChoice};
 use crate::{time, Context};
 use anyhow::{Context as AnyhowContext, Result};
 use log::error;
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::{ChoiceParameter, CreateReply};
-use crate::time::{offset_from_choice, MinusOffsetChoice, PlusOffsetChoice};
-
-
 
 #[derive(poise::ChoiceParameter)]
 pub enum Privacy {
@@ -131,15 +129,12 @@ pub async fn offset(
   let choice_offset = offset_from_choice(minus_offset, plus_offset, 0);
   let Ok(utc_offset) = choice_offset else {
     ctx
-        .send(
-          CreateReply::default()
-              .content(
-                "Cannot determine UTC offset based on the choice selected."
-                    .to_string(),
-              )
-              .ephemeral(true),
-        )
-        .await?;
+      .send(
+        CreateReply::default()
+          .content("Cannot determine UTC offset based on the choice selected.".to_string())
+          .ephemeral(true),
+      )
+      .await?;
     return Ok(());
   };
 
