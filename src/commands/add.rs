@@ -1,100 +1,13 @@
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, StreakRoles, TimeSumRoles, CHANNELS, EMOJI};
 use crate::database::{DatabaseHandler, TrackingProfile};
+use crate::time::{offset_from_choice, MinusOffsetChoice, PlusOffsetChoice};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::Duration;
 use log::error;
 use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
 use poise::CreateReply;
-
-#[derive(poise::ChoiceParameter)]
-pub enum MinusOffsetChoices {
-  #[name = "UTC-12 (BIT)"]
-  UTCMinus12,
-  #[name = "UTC-11 (NUT, SST)"]
-  UTCMinus11,
-  #[name = "UTC-10 (CKT, HAST, HST, TAHT)"]
-  UTCMinus10,
-  #[name = "UTC-9:30 (MART, MIT)"]
-  UTCMinus9_30,
-  #[name = "UTC-9 (AKST, GAMT, GIT, HADT)"]
-  UTCMinus9,
-  #[name = "UTC-8 (AKDT, CIST, PST)"]
-  UTCMinus8,
-  #[name = "UTC-7 (MST, PDT)"]
-  UTCMinus7,
-  #[name = "UTC-6 (CST, EAST, GALT, MDT)"]
-  UTCMinus6,
-  #[name = "UTC-5 (ACT, CDT, COT, CST, EASST, ECT, EST, PET)"]
-  UTCMinus5,
-  #[name = "UTC-4:30 (VET)"]
-  UTCMinus4_30,
-  #[name = "UTC-4 (AMT, AST, BOT, CDT, CLT, COST, ECT, EDT, FKT, GYT, PYT)"]
-  UTCMinus4,
-  #[name = "UTC-3:30 (NST, NT)"]
-  UTCMinus3_30,
-  #[name = "UTC-3 (ADT, AMST, ART, BRT, CLST, FKST, GFT, PMST, PYST, ROTT, SRT, UYT)"]
-  UTCMinus3,
-  #[name = "UTC-2:30 (NDT)"]
-  UTCMinus2_30,
-  #[name = "UTC-2 (BRST, FNT, GST, PMDT, UYST)"]
-  UTCMinus2,
-  #[name = "UTC-1 (AZOST, CVT, EGT)"]
-  UTCMinus1,
-}
-
-#[derive(poise::ChoiceParameter)]
-pub enum PlusOffsetChoices {
-  #[name = "UTC+1 (BST, CET, IST, WAT, WEST)"]
-  UTCPlus1,
-  #[name = "UTC+2 (CAT, CEST, EET, IST, SAST, WAST)"]
-  UTCPlus2,
-  #[name = "UTC+3 (AST, EAT, EEST, FET, IDT, IOT, MSK, USZ1)"]
-  UTCPlus3,
-  #[name = "UTC+3:30 (IRST)"]
-  UTCPlus3_30,
-  #[name = "UTC+4 (AMT, AZT, GET, GST, MUT, RET, SAMT, SCT, VOLT)"]
-  UTCPlus4,
-  #[name = "UTC+4:30 (AFT, IRDT)"]
-  UTCPlus4_30,
-  #[name = "UTC+5 (HMT, MAWT, MVT, ORAT, PKT, TFT, TJT, TMT, UZT, YEKT)"]
-  UTCPlus5,
-  #[name = "UTC+5:30 (IST, SLST)"]
-  UTCPlus5_30,
-  #[name = "UTC+5:45 (NPT)"]
-  UTCPlus5_45,
-  #[name = "UTC+6 (BDT, BIOT, BST, BTT, KGT, OMST, VOST)"]
-  UTCPlus6,
-  #[name = "UTC+6:30 (CCT, MMT, MST)"]
-  UTCPlus6_30,
-  #[name = "UTC+7 (CXT, DAVT, HOVT, ICT, KRAT, THA, WIT)"]
-  UTCPlus7,
-  #[name = "UTC+8 (ACT, AWST, BDT, CHOT, CIT, CST, CT, HKT, IRKT, MST, MYT, PST, SGT, SST, ULAT, WST)"]
-  UTCPlus8,
-  #[name = "UTC+8:45 (CWST)"]
-  UTCPlus8_45,
-  #[name = "UTC+9 (AWDT, EIT, JST, KST, TLT, YAKT)"]
-  UTCPlus9,
-  #[name = "UTC+9:30 (ACST, CST)"]
-  UTCPlus9_30,
-  #[name = "UTC+10 (AEST, ChST, CHUT, DDUT, EST, PGT, VLAT)"]
-  UTCPlus10,
-  #[name = "UTC+10:30 (ACDT, CST, LHST)"]
-  UTCPlus10_30,
-  #[name = "UTC+11 (AEDT, BST, KOST, LHST, MIST, NCT, PONT, SAKT, SBT, SRET, VUT, NFT)"]
-  UTCPlus11,
-  #[name = "UTC+12 (FJT, GILT, MAGT, MHT, NZST, PETT, TVT, WAKT)"]
-  UTCPlus12,
-  #[name = "UTC+12:45 (CHAST)"]
-  UTCPlus12_45,
-  #[name = "UTC+13 (NZDT, PHOT, TKT, TOT)"]
-  UTCPlus13,
-  #[name = "UTC+13:45 (CHADT)"]
-  UTCPlus13_45,
-  #[name = "UTC+14 (LINT)"]
-  UTCPlus14,
-}
 
 #[derive(poise::ChoiceParameter)]
 pub enum Privacy {
@@ -223,10 +136,10 @@ pub async fn add(
   seconds: Option<i32>,
   #[description = "Specify a UTC offset for a Western Hemisphere time zone"]
   #[rename = "western_hemisphere_offset"]
-  minus_offset: Option<MinusOffsetChoices>,
+  minus_offset: Option<MinusOffsetChoice>,
   #[description = "Specify a UTC offset for an Eastern Hemisphere time zone"]
   #[rename = "eastern_hemisphere_offset"]
-  plus_offset: Option<PlusOffsetChoices>,
+  plus_offset: Option<PlusOffsetChoice>,
   #[description = "Set visibility of response (defaults to public)"] privacy: Option<Privacy>,
 ) -> Result<()> {
   let data = ctx.data();
@@ -254,104 +167,28 @@ pub async fn add(
     None => tracking_profile.anonymous_tracking,
   };
 
-  let minus_offset = match minus_offset {
-    Some(minus_offset) => match minus_offset {
-      MinusOffsetChoices::UTCMinus12 => -720,
-      MinusOffsetChoices::UTCMinus11 => -660,
-      MinusOffsetChoices::UTCMinus10 => -600,
-      MinusOffsetChoices::UTCMinus9_30 => -570,
-      MinusOffsetChoices::UTCMinus9 => -540,
-      MinusOffsetChoices::UTCMinus8 => -480,
-      MinusOffsetChoices::UTCMinus7 => -420,
-      MinusOffsetChoices::UTCMinus6 => -360,
-      MinusOffsetChoices::UTCMinus5 => -300,
-      MinusOffsetChoices::UTCMinus4_30 => -270,
-      MinusOffsetChoices::UTCMinus4 => -240,
-      MinusOffsetChoices::UTCMinus3_30 => -210,
-      MinusOffsetChoices::UTCMinus3 => -180,
-      MinusOffsetChoices::UTCMinus2_30 => -150,
-      MinusOffsetChoices::UTCMinus2 => -120,
-      MinusOffsetChoices::UTCMinus1 => -60,
-    },
-    None => 0,
-  };
-
-  let plus_offset = match plus_offset {
-    Some(plus_offset) => match plus_offset {
-      PlusOffsetChoices::UTCPlus1 => 60,
-      PlusOffsetChoices::UTCPlus2 => 120,
-      PlusOffsetChoices::UTCPlus3 => 180,
-      PlusOffsetChoices::UTCPlus3_30 => 210,
-      PlusOffsetChoices::UTCPlus4 => 240,
-      PlusOffsetChoices::UTCPlus4_30 => 270,
-      PlusOffsetChoices::UTCPlus5 => 300,
-      PlusOffsetChoices::UTCPlus5_30 => 330,
-      PlusOffsetChoices::UTCPlus5_45 => 345,
-      PlusOffsetChoices::UTCPlus6 => 360,
-      PlusOffsetChoices::UTCPlus6_30 => 390,
-      PlusOffsetChoices::UTCPlus7 => 420,
-      PlusOffsetChoices::UTCPlus8 => 480,
-      PlusOffsetChoices::UTCPlus8_45 => 525,
-      PlusOffsetChoices::UTCPlus9 => 540,
-      PlusOffsetChoices::UTCPlus9_30 => 570,
-      PlusOffsetChoices::UTCPlus10 => 600,
-      PlusOffsetChoices::UTCPlus10_30 => 630,
-      PlusOffsetChoices::UTCPlus11 => 660,
-      PlusOffsetChoices::UTCPlus12 => 720,
-      PlusOffsetChoices::UTCPlus12_45 => 765,
-      PlusOffsetChoices::UTCPlus13 => 780,
-      PlusOffsetChoices::UTCPlus13_45 => 825,
-      PlusOffsetChoices::UTCPlus14 => 840,
-    },
-    None => 0,
+  let offset = match offset_from_choice(minus_offset, plus_offset, tracking_profile.utc_offset) {
+    Ok(offset) => offset,
+    Err(e) => {
+      ctx
+          .send(
+            CreateReply::default()
+                .content(format!(
+                  "A problem occurred while attempting to determine the UTC offset based on your choice: {e}"
+                ))
+                .ephemeral(true),
+          )
+          .await?;
+      return Ok(()); // Return early to avoid further processing
+    }
   };
 
   let seconds = seconds.unwrap_or(0);
 
-  // If no offset is specified in the command or tracking profile, add using UTC.
-  // Check for this first since it's the most common usage. Otherwise, check if multiple
-  // offsets were specified in the command and abort if so. Then, add using the specified
-  // offset. Prioritize command parameters so that the user can override their tracking
-  // profile offset, if they choose to do so.
-  if minus_offset == 0 && plus_offset == 0 && tracking_profile.utc_offset == 0 {
+  if offset == 0 {
     DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes, seconds).await?;
-  } else if minus_offset != 0 && plus_offset != 0 {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(
-            "Cannot specify multiple time zones. Please try again with only one offset."
-              .to_string(),
-          )
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
-  } else if minus_offset != 0 {
-    let adjusted_datetime = chrono::Utc::now() + Duration::minutes(minus_offset);
-    DatabaseHandler::create_meditation_entry(
-      &mut transaction,
-      &guild_id,
-      &user_id,
-      minutes,
-      seconds,
-      adjusted_datetime,
-    )
-    .await?;
-  } else if plus_offset != 0 {
-    let adjusted_datetime = chrono::Utc::now() + Duration::minutes(plus_offset);
-    DatabaseHandler::create_meditation_entry(
-      &mut transaction,
-      &guild_id,
-      &user_id,
-      minutes,
-      seconds,
-      adjusted_datetime,
-    )
-    .await?;
   } else {
-    let adjusted_datetime =
-      chrono::Utc::now() + Duration::minutes(i64::from(tracking_profile.utc_offset));
+    let adjusted_datetime = chrono::Utc::now() + Duration::minutes(i64::from(offset));
     DatabaseHandler::create_meditation_entry(
       &mut transaction,
       &guild_id,

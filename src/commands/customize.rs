@@ -1,99 +1,12 @@
 use crate::commands::{commit_and_say, MessageType};
 use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
 use crate::database::{DatabaseHandler, TrackingProfile};
-use crate::Context;
+use crate::time::{offset_from_choice, MinusOffsetChoice, PlusOffsetChoice};
+use crate::{time, Context};
 use anyhow::{Context as AnyhowContext, Result};
 use log::error;
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::{ChoiceParameter, CreateReply};
-
-#[derive(poise::ChoiceParameter)]
-pub enum MinusOffsetChoices {
-  #[name = "UTC-12 (BIT)"]
-  UTCMinus12,
-  #[name = "UTC-11 (NUT, SST)"]
-  UTCMinus11,
-  #[name = "UTC-10 (CKT, HAST, HST, TAHT)"]
-  UTCMinus10,
-  #[name = "UTC-9:30 (MART, MIT)"]
-  UTCMinus9_30,
-  #[name = "UTC-9 (AKST, GAMT, GIT, HADT)"]
-  UTCMinus9,
-  #[name = "UTC-8 (AKDT, CIST, PST)"]
-  UTCMinus8,
-  #[name = "UTC-7 (MST, PDT)"]
-  UTCMinus7,
-  #[name = "UTC-6 (CST, EAST, GALT, MDT)"]
-  UTCMinus6,
-  #[name = "UTC-5 (ACT, CDT, COT, CST, EASST, ECT, EST, PET)"]
-  UTCMinus5,
-  #[name = "UTC-4:30 (VET)"]
-  UTCMinus4_30,
-  #[name = "UTC-4 (AMT, AST, BOT, CDT, CLT, COST, ECT, EDT, FKT, GYT, PYT)"]
-  UTCMinus4,
-  #[name = "UTC-3:30 (NST, NT)"]
-  UTCMinus3_30,
-  #[name = "UTC-3 (ADT, AMST, ART, BRT, CLST, FKST, GFT, PMST, PYST, ROTT, SRT, UYT)"]
-  UTCMinus3,
-  #[name = "UTC-2:30 (NDT)"]
-  UTCMinus2_30,
-  #[name = "UTC-2 (BRST, FNT, GST, PMDT, UYST)"]
-  UTCMinus2,
-  #[name = "UTC-1 (AZOST, CVT, EGT)"]
-  UTCMinus1,
-}
-
-#[derive(poise::ChoiceParameter)]
-pub enum PlusOffsetChoices {
-  #[name = "UTC+1 (BST, CET, IST, WAT, WEST)"]
-  UTCPlus1,
-  #[name = "UTC+2 (CAT, CEST, EET, IST, SAST, WAST)"]
-  UTCPlus2,
-  #[name = "UTC+3 (AST, EAT, EEST, FET, IDT, IOT, MSK, USZ1)"]
-  UTCPlus3,
-  #[name = "UTC+3:30 (IRST)"]
-  UTCPlus3_30,
-  #[name = "UTC+4 (AMT, AZT, GET, GST, MUT, RET, SAMT, SCT, VOLT)"]
-  UTCPlus4,
-  #[name = "UTC+4:30 (AFT, IRDT)"]
-  UTCPlus4_30,
-  #[name = "UTC+5 (HMT, MAWT, MVT, ORAT, PKT, TFT, TJT, TMT, UZT, YEKT)"]
-  UTCPlus5,
-  #[name = "UTC+5:30 (IST, SLST)"]
-  UTCPlus5_30,
-  #[name = "UTC+5:45 (NPT)"]
-  UTCPlus5_45,
-  #[name = "UTC+6 (BDT, BIOT, BST, BTT, KGT, OMST, VOST)"]
-  UTCPlus6,
-  #[name = "UTC+6:30 (CCT, MMT, MST)"]
-  UTCPlus6_30,
-  #[name = "UTC+7 (CXT, DAVT, HOVT, ICT, KRAT, THA, WIT)"]
-  UTCPlus7,
-  #[name = "UTC+8 (ACT, AWST, BDT, CHOT, CIT, CST, CT, HKT, IRKT, MST, MYT, PST, SGT, SST, ULAT, WST)"]
-  UTCPlus8,
-  #[name = "UTC+8:45 (CWST)"]
-  UTCPlus8_45,
-  #[name = "UTC+9 (AWDT, EIT, JST, KST, TLT, YAKT)"]
-  UTCPlus9,
-  #[name = "UTC+9:30 (ACST, CST)"]
-  UTCPlus9_30,
-  #[name = "UTC+10 (AEST, ChST, CHUT, DDUT, EST, PGT, VLAT)"]
-  UTCPlus10,
-  #[name = "UTC+10:30 (ACDT, CST, LHST)"]
-  UTCPlus10_30,
-  #[name = "UTC+11 (AEDT, BST, KOST, LHST, MIST, NCT, PONT, SAKT, SBT, SRET, VUT, NFT)"]
-  UTCPlus11,
-  #[name = "UTC+12 (FJT, GILT, MAGT, MHT, NZST, PETT, TVT, WAKT)"]
-  UTCPlus12,
-  #[name = "UTC+12:45 (CHAST)"]
-  UTCPlus12_45,
-  #[name = "UTC+13 (NZDT, PHOT, TKT, TOT)"]
-  UTCPlus13,
-  #[name = "UTC+13:45 (CHADT)"]
-  UTCPlus13_45,
-  #[name = "UTC+14 (LINT)"]
-  UTCPlus14,
-}
 
 #[derive(poise::ChoiceParameter)]
 pub enum Privacy {
@@ -150,48 +63,23 @@ pub async fn show(ctx: Context<'_>) -> Result<()> {
       },
     };
 
-  let utc_offset = match tracking_profile.utc_offset {
-    -720 => MinusOffsetChoices::UTCMinus12.name(),
-    -660 => MinusOffsetChoices::UTCMinus11.name(),
-    -600 => MinusOffsetChoices::UTCMinus10.name(),
-    -570 => MinusOffsetChoices::UTCMinus9_30.name(),
-    -540 => MinusOffsetChoices::UTCMinus9.name(),
-    -480 => MinusOffsetChoices::UTCMinus8.name(),
-    -420 => MinusOffsetChoices::UTCMinus7.name(),
-    -360 => MinusOffsetChoices::UTCMinus6.name(),
-    -300 => MinusOffsetChoices::UTCMinus5.name(),
-    -270 => MinusOffsetChoices::UTCMinus4_30.name(),
-    -240 => MinusOffsetChoices::UTCMinus4.name(),
-    -210 => MinusOffsetChoices::UTCMinus3_30.name(),
-    -180 => MinusOffsetChoices::UTCMinus3.name(),
-    -150 => MinusOffsetChoices::UTCMinus2_30.name(),
-    -120 => MinusOffsetChoices::UTCMinus2.name(),
-    -60 => MinusOffsetChoices::UTCMinus1.name(),
-    60 => PlusOffsetChoices::UTCPlus1.name(),
-    120 => PlusOffsetChoices::UTCPlus2.name(),
-    180 => PlusOffsetChoices::UTCPlus3.name(),
-    210 => PlusOffsetChoices::UTCPlus3_30.name(),
-    240 => PlusOffsetChoices::UTCPlus4.name(),
-    270 => PlusOffsetChoices::UTCPlus4_30.name(),
-    300 => PlusOffsetChoices::UTCPlus5.name(),
-    330 => PlusOffsetChoices::UTCPlus5_30.name(),
-    345 => PlusOffsetChoices::UTCPlus5_45.name(),
-    360 => PlusOffsetChoices::UTCPlus6.name(),
-    390 => PlusOffsetChoices::UTCPlus6_30.name(),
-    420 => PlusOffsetChoices::UTCPlus7.name(),
-    480 => PlusOffsetChoices::UTCPlus8.name(),
-    525 => PlusOffsetChoices::UTCPlus8_45.name(),
-    540 => PlusOffsetChoices::UTCPlus9.name(),
-    570 => PlusOffsetChoices::UTCPlus9_30.name(),
-    600 => PlusOffsetChoices::UTCPlus10.name(),
-    630 => PlusOffsetChoices::UTCPlus10_30.name(),
-    660 => PlusOffsetChoices::UTCPlus11.name(),
-    720 => PlusOffsetChoices::UTCPlus12.name(),
-    765 => PlusOffsetChoices::UTCPlus12_45.name(),
-    780 => PlusOffsetChoices::UTCPlus13.name(),
-    825 => PlusOffsetChoices::UTCPlus13_45.name(),
-    840 => PlusOffsetChoices::UTCPlus14.name(),
-    _ => "None",
+  let utc_offset = match time::choice_from_offset(tracking_profile.utc_offset) {
+    (Some(minus_offset), None) => minus_offset.name().to_string(),
+    (None, Some(plus_offset)) => plus_offset.name().to_string(),
+    (None, None) => "UTC".to_string(),
+    _ => {
+      ctx
+          .send(
+            CreateReply::default()
+                .content(
+                  "Matched both plus and minus offsets from the given offset. This should never happen."
+                      .to_string(),
+                )
+                .ephemeral(true),
+          )
+          .await?;
+      return Ok(());
+    }
   };
 
   ctx
@@ -224,10 +112,10 @@ pub async fn offset(
   ctx: Context<'_>,
   #[description = "Specify a UTC offset for a Western Hemisphere time zone"]
   #[rename = "western_hemisphere_offset"]
-  minus_offset: Option<MinusOffsetChoices>,
+  minus_offset: Option<MinusOffsetChoice>,
   #[description = "Specify a UTC offset for an Eastern Hemisphere time zone"]
   #[rename = "eastern_hemisphere_offset"]
-  plus_offset: Option<PlusOffsetChoices>,
+  plus_offset: Option<PlusOffsetChoice>,
 ) -> Result<()> {
   let data = ctx.data();
 
@@ -238,76 +126,16 @@ pub async fn offset(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  let minus_offset = match minus_offset {
-    Some(minus_offset) => match minus_offset {
-      MinusOffsetChoices::UTCMinus12 => -720,
-      MinusOffsetChoices::UTCMinus11 => -660,
-      MinusOffsetChoices::UTCMinus10 => -600,
-      MinusOffsetChoices::UTCMinus9_30 => -570,
-      MinusOffsetChoices::UTCMinus9 => -540,
-      MinusOffsetChoices::UTCMinus8 => -480,
-      MinusOffsetChoices::UTCMinus7 => -420,
-      MinusOffsetChoices::UTCMinus6 => -360,
-      MinusOffsetChoices::UTCMinus5 => -300,
-      MinusOffsetChoices::UTCMinus4_30 => -270,
-      MinusOffsetChoices::UTCMinus4 => -240,
-      MinusOffsetChoices::UTCMinus3_30 => -210,
-      MinusOffsetChoices::UTCMinus3 => -180,
-      MinusOffsetChoices::UTCMinus2_30 => -150,
-      MinusOffsetChoices::UTCMinus2 => -120,
-      MinusOffsetChoices::UTCMinus1 => -60,
-    },
-    None => 0,
-  };
-
-  let plus_offset = match plus_offset {
-    Some(plus_offset) => match plus_offset {
-      PlusOffsetChoices::UTCPlus1 => 60,
-      PlusOffsetChoices::UTCPlus2 => 120,
-      PlusOffsetChoices::UTCPlus3 => 180,
-      PlusOffsetChoices::UTCPlus3_30 => 210,
-      PlusOffsetChoices::UTCPlus4 => 240,
-      PlusOffsetChoices::UTCPlus4_30 => 270,
-      PlusOffsetChoices::UTCPlus5 => 300,
-      PlusOffsetChoices::UTCPlus5_30 => 330,
-      PlusOffsetChoices::UTCPlus5_45 => 345,
-      PlusOffsetChoices::UTCPlus6 => 360,
-      PlusOffsetChoices::UTCPlus6_30 => 390,
-      PlusOffsetChoices::UTCPlus7 => 420,
-      PlusOffsetChoices::UTCPlus8 => 480,
-      PlusOffsetChoices::UTCPlus8_45 => 525,
-      PlusOffsetChoices::UTCPlus9 => 540,
-      PlusOffsetChoices::UTCPlus9_30 => 570,
-      PlusOffsetChoices::UTCPlus10 => 600,
-      PlusOffsetChoices::UTCPlus10_30 => 630,
-      PlusOffsetChoices::UTCPlus11 => 660,
-      PlusOffsetChoices::UTCPlus12 => 720,
-      PlusOffsetChoices::UTCPlus12_45 => 765,
-      PlusOffsetChoices::UTCPlus13 => 780,
-      PlusOffsetChoices::UTCPlus13_45 => 825,
-      PlusOffsetChoices::UTCPlus14 => 840,
-    },
-    None => 0,
-  };
-
-  if minus_offset != 0 && plus_offset != 0 {
+  let choice_offset = offset_from_choice(minus_offset, plus_offset, 0);
+  let Ok(utc_offset) = choice_offset else {
     ctx
       .send(
         CreateReply::default()
-          .content(
-            "Cannot specify multiple time zones. Please try again with only one offset."
-              .to_string(),
-          )
+          .content("Cannot determine UTC offset based on the choice selected.".to_string())
           .ephemeral(true),
       )
       .await?;
     return Ok(());
-  }
-
-  let utc_offset = if minus_offset != 0 {
-    minus_offset
-  } else {
-    plus_offset
   };
 
   if let Some(tracking_profile) =

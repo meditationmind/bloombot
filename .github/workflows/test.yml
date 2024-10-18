@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain installation
+        run: rustup toolchain install stable --profile minimal --no-self-updatep
+      - name: Caching setup
+        uses: Swatinem/rust-cache@v2
+      - name: Checks
+        run: cargo check
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Tests
+        run: cargo test --all-features
+      - name: Clippy
+        run: cargo clippy --all --all-features --tests -- -D warnings

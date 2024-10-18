@@ -33,6 +33,7 @@ mod database;
 mod embeddings;
 mod events;
 mod pagination;
+mod time;
 
 pub struct Data {
   pub db: Arc<database::DatabaseHandler>,
