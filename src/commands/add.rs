@@ -167,6 +167,14 @@ pub async fn add(
     None => tracking_profile.anonymous_tracking,
   };
 
+  // Usually not necessary, but defer to avoid possible unknown interaction
+  // errors due to slow DB lookups, workload redeployment, etc.
+  if privacy {
+    ctx.defer_ephemeral().await?;
+  } else {
+    ctx.defer().await?;
+  }
+
   let offset = match offset_from_choice(minus_offset, plus_offset, tracking_profile.utc_offset) {
     Ok(offset) => offset,
     Err(e) => {
