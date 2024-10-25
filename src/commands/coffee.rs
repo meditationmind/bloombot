@@ -15,18 +15,10 @@ pub async fn coffee(ctx: Context<'_>) -> Result<()> {
   let rng = Arc::clone(&data.rng);
   let mut rng = rng.lock().await;
 
-  let choice = rng.gen_range(0..2);
-
-  match choice {
-    0 => {
-      ctx.say("☕").await?;
-    }
-    1 => {
-      ctx.say("⚰️").await?;
-    }
-    _ => {
-      ctx.say("Something went wrong.").await?;
-    }
+  if rng.gen() {
+    ctx.say("☕").await?;
+  } else {
+    ctx.say("⚰️").await?;
   }
 
   Ok(())
