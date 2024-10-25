@@ -1,4 +1,4 @@
-use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::Duration;
@@ -9,7 +9,7 @@ use poise::serenity_prelude::{
 use poise::CreateReply;
 
 async fn is_helper(ctx: Context<'_>) -> Result<bool> {
-  let community_sit_helper = serenity::RoleId::from(1285275266549158050);
+  let community_sit_helper = serenity::RoleId::from(ROLES.community_sit_helper);
   let has_role = match ctx.author_member().await {
     Some(member) => member.roles.contains(&community_sit_helper),
     None => false,

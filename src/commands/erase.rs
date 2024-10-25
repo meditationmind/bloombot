@@ -395,17 +395,17 @@ pub async fn erase_message(
               // If message channel is text channel, we can create thread there
               message.channel_id
             } else {
-              // If not a text channel, then create private thread in lounge to avoid failure
-              ChannelId::from(501464482996944909)
+              // If not a text channel, then create private thread in default channel to avoid failure
+              ChannelId::from(CHANNELS.private_thread_default)
             }
           } else {
-            // If we couldn't convert to GuildChannel, then just default to lounge
-            ChannelId::from(501464482996944909)
+            // If we couldn't convert to GuildChannel, then use default channel
+            ChannelId::from(CHANNELS.private_thread_default)
           }
         }
         Err(_e) => {
-          // Default to lounge if channel retrieval request failed
-          ChannelId::from(501464482996944909)
+          // If channel retrieval request failed, then use default channel
+          ChannelId::from(CHANNELS.private_thread_default)
         }
       };
 
@@ -608,17 +608,17 @@ pub async fn message(
             // If message channel is text channel, we can create thread there
             message.channel_id
           } else {
-            // If not a text channel, then create private thread in lounge to avoid failure
-            ChannelId::from(501464482996944909)
+            // If not a text channel, then create private thread in default channel to avoid failure
+            ChannelId::from(CHANNELS.private_thread_default)
           }
         } else {
-          // If we couldn't convert to GuildChannel, then just default to lounge
-          ChannelId::from(501464482996944909)
+          // If we couldn't convert to GuildChannel, then use default channel
+          ChannelId::from(CHANNELS.private_thread_default)
         }
       }
       Err(_e) => {
-        // Default to lounge if channel retrieval request failed
-        ChannelId::from(501464482996944909)
+        // If channel retrieval request failed, then use default channel
+        ChannelId::from(CHANNELS.private_thread_default)
       }
     };
 
