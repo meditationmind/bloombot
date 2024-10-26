@@ -37,6 +37,23 @@ pub async fn post_guild_hours(ctx: &Context<'_>, guild_hours: &Option<i64>) -> R
   Ok(())
 }
 
+pub fn minimize_markdown(text: &str) -> String {
+  text
+    .chars()
+    .filter(|c| !matches!(c, '*'))
+    .map(|c| {
+      if c.is_ascii_punctuation() {
+        if matches!(c, '_' | '~') {
+          c.to_string()
+        } else {
+          format!("\\{c}")
+        }
+      } else {
+        c.to_string()
+      }
+    })
+    .collect::<String>()
+}
 pub async fn show_add_with_quote(
   ctx: &Context<'_>,
   transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -49,22 +66,7 @@ pub async fn show_add_with_quote(
   let random_quote = DatabaseHandler::get_random_quote(transaction, guild_id).await?;
 
   if let Some(random_quote) = random_quote {
-    let quote = random_quote
-      .quote
-      .chars()
-      .filter(|c| !matches!(c, '*'))
-      .map(|c| {
-        if c.is_ascii_punctuation() {
-          if matches!(c, '_' | '~') {
-            c.to_string()
-          } else {
-            format!("\\{c}")
-          }
-        } else {
-          c.to_string()
-        }
-      })
-      .collect::<String>();
+    let quote = minimize_markdown(&random_quote.quote);
 
     if privacy {
       Ok(format!(
@@ -259,4 +261,33 @@ pub async fn update_streak_roles(
   }
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_minimize_markdown() {
+    assert_eq!(
+      minimize_markdown("A quote with *italics markdown* inside."),
+      "A quote with italics markdown inside\\."
+    );
+    assert_eq!(
+      minimize_markdown("A quote with __underline markdown__ inside."),
+      "A quote with __underline markdown__ inside\\."
+    );
+    assert_eq!(
+      minimize_markdown("A quote with ~~strikethrough markdown~~ inside."),
+      "A quote with ~~strikethrough markdown~~ inside\\."
+    );
+    assert_eq!(
+      minimize_markdown("A quote with a hyphen (-) and an em dash (—) inside."),
+      "A quote with a hyphen \\(\\-\\) and an em dash \\(—\\) inside\\."
+    );
+    assert_eq!(
+      minimize_markdown("A quote with single quotes ('') and double quotes (\"\") inside."),
+      "A quote with single quotes \\(\\'\\'\\) and double quotes \\(\\\"\\\"\\) inside\\."
+    );
+  }
 }
