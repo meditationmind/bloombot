@@ -276,8 +276,8 @@ async fn update(
   }
 
   if let Some(existing_entry) = existing_entry {
-    let minutes = minutes.unwrap_or(existing_entry.meditation_minutes);
-    let seconds = seconds.unwrap_or(existing_entry.meditation_seconds);
+    let minutes = minutes.unwrap_or(existing_entry.minutes);
+    let seconds = seconds.unwrap_or(existing_entry.seconds);
 
     let existing_date = existing_entry.occurred_at;
     let year = year.unwrap_or(existing_date.year());
@@ -333,17 +333,17 @@ async fn update(
     )
     .await?;
 
-    let description = if existing_entry.meditation_seconds > 0 || seconds > 0 {
+    let description = if existing_entry.seconds > 0 || seconds > 0 {
       format!(
-      "**User**: <@{}>\n**ID**: {}\n\n__**Before**__\n**Date**: {}\n**Time**: {} minute(s) {} second(s)\n\n__**After**__\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
-      existing_entry.user_id,
-      entry_id,
-      existing_date.format("%B %d, %Y at %l:%M %P"),
-      existing_entry.meditation_minutes,
-      existing_entry.meditation_seconds,
-      datetime.format("%B %d, %Y at %l:%M %P"),
-      minutes,
-      seconds,
+        "**User**: <@{}>\n**ID**: {}\n\n__**Before**__\n**Date**: {}\n**Time**: {} minute(s) {} second(s)\n\n__**After**__\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
+        existing_entry.user_id,
+        entry_id,
+        existing_date.format("%B %d, %Y at %l:%M %P"),
+        existing_entry.minutes,
+        existing_entry.seconds,
+        datetime.format("%B %d, %Y at %l:%M %P"),
+        minutes,
+        seconds,
       )
     } else {
       format!(
@@ -351,7 +351,7 @@ async fn update(
         existing_entry.user_id,
         entry_id,
         existing_date.format("%B %d, %Y at %l:%M %P"),
-        existing_entry.meditation_minutes,
+        existing_entry.minutes,
         datetime.format("%B %d, %Y at %l:%M %P"),
         minutes,
         )
@@ -449,14 +449,14 @@ async fn delete(
 
   DatabaseHandler::delete_meditation_entry(&mut transaction, &entry_id).await?;
 
-  let description = if entry.meditation_seconds > 0 {
+  let description = if entry.seconds > 0 {
     format!(
       "**User**: <@{}>\n**ID**: {}\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
       entry.user_id,
       entry.id,
       entry.occurred_at.format("%B %d, %Y"),
-      entry.meditation_minutes,
-      entry.meditation_seconds,
+      entry.minutes,
+      entry.seconds,
     )
   } else {
     format!(
@@ -464,7 +464,7 @@ async fn delete(
       entry.user_id,
       entry.id,
       entry.occurred_at.format("%B %d, %Y"),
-      entry.meditation_minutes,
+      entry.minutes,
     )
   };
 

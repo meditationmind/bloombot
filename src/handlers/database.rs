@@ -8,15 +8,28 @@
 )]
 #![cfg_attr(any(), rustfmt::skip::macros(query, query_as))]
 
+use crate::data::stats;
 use crate::{
-  commands::helpers::pagination::{PageRow, PageType},
+  commands::helpers::time::{ChallengeTimeframe, Timeframe},
   commands::stats::{LeaderboardType, SortBy},
+  data,
 };
 use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike, Utc};
+use data::bookmark::Bookmark;
+use data::course::{Course, ExtendedCourse};
+use data::erase::Erase;
+use data::meditation::Meditation;
+use data::quote::Quote;
+use data::star_message::StarMessage;
+use data::stats::{Guild, LeaderboardUser, Streak, User};
+use data::steam_key::{Recipient, SteamKey};
+use data::term::{Names, SearchResult, Term};
+use data::tracking_profile::TrackingProfile;
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
-use poise::serenity_prelude::{self as serenity, Mentionable};
+use poise::serenity_prelude::{self as serenity};
+use stats::Timeframe as TimeframeStats;
 use ulid::Ulid;
 
 #[derive(Debug)]
@@ -34,373 +47,6 @@ struct MeditationCountByDay {
 #[allow(clippy::module_name_repetitions)]
 pub struct DatabaseHandler {
   pool: sqlx::PgPool,
-}
-
-#[derive(Debug)]
-pub struct TrackingProfile {
-  pub user_id: serenity::UserId,
-  pub guild_id: serenity::GuildId,
-  pub utc_offset: i16,
-  pub anonymous_tracking: bool,
-  pub streaks_active: bool,
-  pub streaks_private: bool,
-  pub stats_private: bool,
-}
-
-//Default values for tracking customization
-impl Default for TrackingProfile {
-  fn default() -> Self {
-    Self {
-      user_id: serenity::UserId::default(),
-      guild_id: serenity::GuildId::default(),
-      utc_offset: 0,
-      anonymous_tracking: false,
-      streaks_active: true,
-      streaks_private: false,
-      stats_private: false,
-    }
-  }
-}
-
-pub struct Streak {
-  pub current: i32,
-  pub longest: i32,
-}
-
-pub struct UserStats {
-  pub all_minutes: i64,
-  pub all_count: u64,
-  pub timeframe_stats: TimeframeStats,
-  pub streak: Streak,
-}
-
-#[derive(Debug)]
-pub struct LeaderboardUserStats {
-  pub name: Option<String>,
-  pub minutes: Option<i64>,
-  pub sessions: Option<i64>,
-  pub streak: Option<i32>,
-  pub anonymous_tracking: Option<bool>,
-  pub streaks_active: Option<bool>,
-  pub streaks_private: Option<bool>,
-}
-
-pub struct GuildStats {
-  pub all_minutes: i64,
-  pub all_count: u64,
-  pub timeframe_stats: TimeframeStats,
-}
-
-#[derive(poise::ChoiceParameter)]
-pub enum Timeframe {
-  Yearly,
-  Monthly,
-  Weekly,
-  Daily,
-}
-
-#[derive(poise::ChoiceParameter, PartialEq)]
-pub enum ChallengeTimeframe {
-  #[name = "Monthly Challenge"]
-  Monthly,
-  #[name = "365-Day Challenge"]
-  YearRound,
-}
-
-#[derive(Debug)]
-pub struct TimeframeStats {
-  pub sum: Option<i64>,
-  pub count: Option<i64>,
-}
-
-pub struct EraseData {
-  pub id: String,
-  pub user_id: serenity::UserId,
-  pub message_link: String,
-  pub reason: String,
-  pub occurred_at: chrono::DateTime<Utc>,
-}
-
-impl PageRow for EraseData {
-  fn title(&self, page_type: PageType) -> String {
-    match page_type {
-      PageType::Standard => {
-        if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
-          "Date: `Not Available`".to_owned()
-        } else {
-          format!("Date: `{}`", self.occurred_at.format("%Y-%m-%d %H:%M"))
-        }
-      }
-      PageType::Alternate => {
-        if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
-          "Date: `Not Available`".to_owned()
-        } else {
-          format!("Date: `{}`", self.occurred_at.format("%e %B %Y %H:%M"))
-        }
-      }
-    }
-  }
-
-  fn body(&self) -> String {
-    if self.message_link == "None" {
-      format!("**Reason:** {}\n-# Notification not available", self.reason)
-    } else {
-      format!(
-        "**Reason:** {}\n[Go to erase notification]({})",
-        self.reason, self.message_link
-      )
-    }
-  }
-}
-
-pub struct MeditationData {
-  pub id: String,
-  pub user_id: serenity::UserId,
-  pub meditation_minutes: i32,
-  pub meditation_seconds: i32,
-  pub occurred_at: chrono::DateTime<Utc>,
-}
-
-impl PageRow for MeditationData {
-  fn title(&self, _page_type: PageType) -> String {
-    if self.meditation_seconds > 0 {
-      format!(
-        "{} {} {} {}",
-        self.meditation_minutes,
-        if self.meditation_minutes == 1 {
-          "minute"
-        } else {
-          "minutes"
-        },
-        self.meditation_seconds,
-        if self.meditation_seconds == 1 {
-          "second"
-        } else {
-          "seconds"
-        },
-      )
-    } else {
-      format!(
-        "{} {}",
-        self.meditation_minutes,
-        if self.meditation_minutes == 1 {
-          "minute"
-        } else {
-          "minutes"
-        },
-      )
-    }
-  }
-
-  fn body(&self) -> String {
-    format!(
-      "Date: `{}`\nID: `{}`",
-      self.occurred_at.format("%Y-%m-%d %H:%M"),
-      self.id
-    )
-  }
-}
-
-pub struct QuoteData {
-  pub id: String,
-  pub quote: String,
-  pub author: Option<String>,
-}
-
-impl PageRow for QuoteData {
-  fn title(&self, _page_type: PageType) -> String {
-    format!("`ID: {}`", self.id)
-  }
-
-  fn body(&self) -> String {
-    format!(
-      "{}\n― {}",
-      self.quote.clone(),
-      self.author.clone().unwrap_or("Anonymous".to_owned())
-    )
-  }
-}
-
-pub struct SteamKeyData {
-  pub steam_key: String,
-  pub used: bool,
-  pub reserved: Option<serenity::UserId>,
-  pub guild_id: serenity::GuildId,
-}
-
-impl PageRow for SteamKeyData {
-  fn title(&self, _page_type: PageType) -> String {
-    self.steam_key.clone()
-  }
-
-  fn body(&self) -> String {
-    format!(
-      "Used: {}\nReserved for: {}",
-      if self.used { "Yes" } else { "No" },
-      match self.reserved {
-        Some(reserved) => reserved.mention().to_string(),
-        None => "Nobody".to_owned(),
-      },
-    )
-  }
-}
-
-pub struct SteamKeyRecipientData {
-  pub user_id: serenity::UserId,
-  pub guild_id: serenity::GuildId,
-  pub challenge_prize: Option<bool>,
-  pub donator_perk: Option<bool>,
-  pub total_keys: i16,
-}
-
-impl PageRow for SteamKeyRecipientData {
-  fn title(&self, _page_type: PageType) -> String {
-    "__Recipient__".to_owned()
-  }
-
-  fn body(&self) -> String {
-    format!(
-      "Name: {}\nDonator Perk: {}\nChallenge Prize: {}\nTotal Keys: {}",
-      self.user_id.mention(),
-      match self.donator_perk {
-        Some(value) =>
-          if value {
-            "Yes"
-          } else {
-            "No"
-          },
-        None => "No",
-      },
-      match self.challenge_prize {
-        Some(value) =>
-          if value {
-            "Yes"
-          } else {
-            "No"
-          },
-        None => "No",
-      },
-      self.total_keys,
-    )
-  }
-}
-
-pub struct BookmarkData {
-  pub id: String,
-  pub link: String,
-  pub description: Option<String>,
-  pub added: chrono::DateTime<Utc>,
-}
-
-impl PageRow for BookmarkData {
-  fn title(&self, _page_type: PageType) -> String {
-    self.link.clone()
-  }
-
-  fn body(&self) -> String {
-    if let Some(description) = &self.description {
-      format!(
-        "> {}\n> -# Added: <t:{}:f>\n> -# ID: [{}](discord://{} \"For copying a bookmark ID on mobile. Not a working link.\")\n** **",
-        description,
-        self.added.timestamp(),
-        self.id,
-        self.id,
-      )
-    } else {
-      format!(
-        "> -# Added: <t:{}:f>\n> -# ID: [{}](discord://{} \"For copying a bookmark ID on mobile. Not a working link.\")\n** **",
-        self.added.timestamp(),
-        self.id,
-        self.id,
-      )
-    }
-  }
-}
-
-pub struct CourseData {
-  pub course_name: String,
-  pub participant_role: serenity::RoleId,
-  pub graduate_role: serenity::RoleId,
-}
-
-impl PageRow for CourseData {
-  fn title(&self, _page_type: PageType) -> String {
-    self.course_name.clone()
-  }
-
-  fn body(&self) -> String {
-    format!(
-      "Participants: {}\nGraduates: {}",
-      self.participant_role.mention(),
-      self.graduate_role.mention()
-    )
-  }
-}
-
-pub struct ExtendedCourseData {
-  pub course_name: String,
-  pub participant_role: serenity::RoleId,
-  pub graduate_role: serenity::RoleId,
-  pub guild_id: serenity::GuildId,
-}
-
-#[derive(Debug)]
-pub struct Term {
-  pub id: String,
-  pub name: String,
-  pub meaning: String,
-  pub usage: Option<String>,
-  pub links: Option<Vec<String>>,
-  pub category: Option<String>,
-  pub aliases: Option<Vec<String>>,
-}
-
-impl PageRow for Term {
-  fn title(&self, _page_type: PageType) -> String {
-    format!("__{}__", self.name.clone())
-  }
-
-  fn body(&self) -> String {
-    /*let meaning = match self.meaning.len() > 157 {
-      true => {
-        let truncate = self.meaning.chars().take(157).collect::<String>();
-        let truncate_split = match truncate.rsplit_once(' ') {
-          Some(pair) => pair.0.to_string(),
-          None => truncate
-        };
-        let truncate_final = if truncate_split.chars().last().unwrap().is_ascii_punctuation() {
-          truncate_split.chars().take(truncate_split.chars().count() - 1).collect::<String>()
-        } else {
-          truncate_split
-        };
-        format!("{}...", truncate_final)
-      },
-      false => self.meaning.clone(),
-    };
-    meaning*/
-    self.meaning.clone()
-  }
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct TermSearchResult {
-  pub term_name: String,
-  pub meaning: String,
-  pub distance_score: Option<f64>,
-}
-
-#[derive(Debug)]
-pub struct TermNames {
-  pub term_name: String,
-  pub aliases: Option<Vec<String>>,
-}
-
-#[allow(clippy::struct_field_names)]
-pub struct StarMessage {
-  pub record_id: String,
-  pub starred_message_id: serenity::MessageId,
-  pub board_message_id: serenity::MessageId,
-  pub starred_channel_id: serenity::ChannelId,
 }
 
 impl DatabaseHandler {
@@ -732,7 +378,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
-  ) -> Result<Option<SteamKeyRecipientData>> {
+  ) -> Result<Option<Recipient>> {
     let row = sqlx::query!(
       r#"
         SELECT user_id, guild_id, challenge_prize, donator_perk, total_keys FROM steamkey_recipients WHERE user_id = $1 AND guild_id = $2
@@ -744,7 +390,7 @@ impl DatabaseHandler {
     .await?;
 
     let steamkey_recipient = match row {
-      Some(row) => Some(SteamKeyRecipientData {
+      Some(row) => Some(Recipient {
         user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
         guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>()?),
         challenge_prize: row.challenge_prize,
@@ -760,7 +406,7 @@ impl DatabaseHandler {
   pub async fn get_steamkey_recipients(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-  ) -> Result<Vec<SteamKeyRecipientData>> {
+  ) -> Result<Vec<Recipient>> {
     let rows = sqlx::query!(
       r#"
         SELECT user_id, guild_id, challenge_prize, donator_perk, total_keys FROM steamkey_recipients WHERE guild_id = $1
@@ -773,7 +419,7 @@ impl DatabaseHandler {
     #[allow(clippy::expect_used)]
     let steamkey_recipients = rows
       .into_iter()
-      .map(|row| SteamKeyRecipientData {
+      .map(|row| Recipient {
         user_id: serenity::UserId::new(
           row
             .user_id
@@ -910,7 +556,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
-  ) -> Result<Vec<BookmarkData>> {
+  ) -> Result<Vec<Bookmark>> {
     let rows = sqlx::query!(
       r#"
         SELECT record_id, message_link, user_desc, occurred_at FROM bookmarks WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at ASC
@@ -923,7 +569,7 @@ impl DatabaseHandler {
 
     let bookmark_data = rows
       .into_iter()
-      .map(|row| BookmarkData {
+      .map(|row| Bookmark {
         id: row.record_id,
         link: row.message_link,
         description: row.user_desc,
@@ -939,7 +585,7 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
     keyword: &str,
-  ) -> Result<Vec<BookmarkData>> {
+  ) -> Result<Vec<Bookmark>> {
     let rows = sqlx::query!(
       r#"
         SELECT record_id, message_link, user_desc, occurred_at,
@@ -958,7 +604,7 @@ impl DatabaseHandler {
 
     let bookmark_data = rows
       .into_iter()
-      .map(|row| BookmarkData {
+      .map(|row| Bookmark {
         id: row.record_id,
         link: row.message_link,
         description: row.user_desc,
@@ -1016,7 +662,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
-  ) -> Result<Vec<EraseData>> {
+  ) -> Result<Vec<Erase>> {
     let rows = sqlx::query!(
       r#"
         SELECT record_id, user_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
@@ -1030,7 +676,7 @@ impl DatabaseHandler {
     #[allow(clippy::expect_used)]
     let erase_data = rows
       .into_iter()
-      .map(|row| EraseData {
+      .map(|row| Erase {
         id: row.record_id,
         user_id: serenity::UserId::new(
           row
@@ -1111,7 +757,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
-  ) -> Result<Vec<MeditationData>> {
+  ) -> Result<Vec<Meditation>> {
     let rows = sqlx::query!(
       r#"
         SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
@@ -1125,7 +771,7 @@ impl DatabaseHandler {
     #[allow(clippy::expect_used)]
     let meditation_entries = rows
       .into_iter()
-      .map(|row| MeditationData {
+      .map(|row| Meditation {
         id: row.record_id,
         user_id: serenity::UserId::new(
           row
@@ -1133,8 +779,8 @@ impl DatabaseHandler {
             .parse::<u64>()
             .expect("parse should not fail since user_id is UserId.to_string()"),
         ),
-        meditation_minutes: row.meditation_minutes,
-        meditation_seconds: row.meditation_seconds,
+        minutes: row.meditation_minutes,
+        seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
       })
       .collect();
@@ -1188,7 +834,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     meditation_id: &str,
-  ) -> Result<Option<MeditationData>> {
+  ) -> Result<Option<Meditation>> {
     let row = sqlx::query!(
       r#"
         SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE record_id = $1 AND guild_id = $2
@@ -1200,11 +846,11 @@ impl DatabaseHandler {
     .await?;
 
     let meditation_entry = match row {
-      Some(row) => Some(MeditationData {
+      Some(row) => Some(Meditation {
         id: row.record_id,
         user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
-        meditation_minutes: row.meditation_minutes,
-        meditation_seconds: row.meditation_seconds,
+        minutes: row.meditation_minutes,
+        seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
       }),
       None => None,
@@ -1217,7 +863,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
-  ) -> Result<Option<MeditationData>> {
+  ) -> Result<Option<Meditation>> {
     let row = sqlx::query!(
       r#"
         SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at
@@ -1233,11 +879,11 @@ impl DatabaseHandler {
     .await?;
 
     let meditation_entry = match row {
-      Some(row) => Some(MeditationData {
+      Some(row) => Some(Meditation {
         id: row.record_id,
         user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
-        meditation_minutes: row.meditation_minutes,
-        meditation_seconds: row.meditation_seconds,
+        minutes: row.meditation_minutes,
+        seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
       }),
       None => None,
@@ -1487,7 +1133,7 @@ impl DatabaseHandler {
   pub async fn get_all_quotes(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-  ) -> Result<Vec<QuoteData>> {
+  ) -> Result<Vec<Quote>> {
     let rows = sqlx::query!(
       r#"
         SELECT record_id, quote, author FROM quote WHERE guild_id = $1
@@ -1499,7 +1145,7 @@ impl DatabaseHandler {
 
     let quotes = rows
       .into_iter()
-      .map(|row| QuoteData {
+      .map(|row| Quote {
         id: row.record_id,
         quote: row.quote,
         author: row.author,
@@ -1513,7 +1159,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     keyword: &str,
-  ) -> Result<Vec<QuoteData>> {
+  ) -> Result<Vec<Quote>> {
     let rows = sqlx::query!(
       r#"
         SELECT record_id, quote, author
@@ -1528,7 +1174,7 @@ impl DatabaseHandler {
 
     let quotes = rows
       .into_iter()
-      .map(|row| QuoteData {
+      .map(|row| Quote {
         id: row.record_id,
         quote: row.quote,
         author: row.author,
@@ -1542,7 +1188,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     quote_id: &str,
-  ) -> Result<Option<QuoteData>> {
+  ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
       r#"
         SELECT record_id, quote, author FROM quote WHERE record_id = $1 AND guild_id = $2
@@ -1554,7 +1200,7 @@ impl DatabaseHandler {
     .await?;
 
     let quote = match row {
-      Some(row) => Some(QuoteData {
+      Some(row) => Some(Quote {
         id: row.record_id,
         quote: row.quote,
         author: row.author,
@@ -1867,7 +1513,7 @@ impl DatabaseHandler {
   pub async fn get_all_steam_keys(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-  ) -> Result<Vec<SteamKeyData>> {
+  ) -> Result<Vec<SteamKey>> {
     let rows = sqlx::query!(
       r#"
         SELECT steam_key, reserved, used, guild_id FROM steamkey WHERE guild_id = $1
@@ -1880,8 +1526,8 @@ impl DatabaseHandler {
     #[allow(clippy::expect_used)]
     let steam_keys = rows
       .into_iter()
-      .map(|row| SteamKeyData {
-        steam_key: row.steam_key,
+      .map(|row| SteamKey {
+        key: row.steam_key,
         reserved: row.reserved.map(|reserved| {
           serenity::UserId::new(
             reserved
@@ -1958,14 +1604,14 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     search_vector: pgvector::Vector,
     limit: usize,
-  ) -> Result<Vec<TermSearchResult>> {
+  ) -> Result<Vec<SearchResult>> {
     // For some reason, pgvector wants a vector to look like a string [1,2,3] instead of an array.
     // I'm sorry for what you are about to see.
     // let pgvector_format = format!("{:?}", search_vector);
 
     // limit should be a small integer
     #[allow(clippy::cast_possible_wrap)]
-    let terms: Vec<TermSearchResult> = sqlx::query_as(
+    let terms: Vec<SearchResult> = sqlx::query_as(
       r#"
         SELECT term_name, meaning, embedding <=> $1 AS distance_score
         FROM term
@@ -2107,7 +1753,7 @@ impl DatabaseHandler {
   pub async fn get_all_courses(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-  ) -> Result<Vec<CourseData>> {
+  ) -> Result<Vec<Course>> {
     let rows = sqlx::query!(
       r#"
         SELECT course_name, participant_role, graduate_role
@@ -2123,8 +1769,8 @@ impl DatabaseHandler {
     #[allow(clippy::expect_used)]
     let courses = rows
       .into_iter()
-      .map(|row| CourseData {
-        course_name: row.course_name,
+      .map(|row| Course {
+        name: row.course_name,
         participant_role: serenity::RoleId::new(
           row
             .participant_role
@@ -2147,7 +1793,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     course_name: &str,
-  ) -> Result<Option<CourseData>> {
+  ) -> Result<Option<Course>> {
     let row = sqlx::query!(
       r#"
         SELECT course_name, participant_role, graduate_role
@@ -2161,8 +1807,8 @@ impl DatabaseHandler {
     .await?;
 
     let course_data = match row {
-      Some(row) => Some(CourseData {
-        course_name: row.course_name,
+      Some(row) => Some(Course {
+        name: row.course_name,
         participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>()?),
         graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>()?),
       }),
@@ -2175,7 +1821,7 @@ impl DatabaseHandler {
   pub async fn get_course_in_dm(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     course_name: &str,
-  ) -> Result<Option<ExtendedCourseData>> {
+  ) -> Result<Option<ExtendedCourse>> {
     let row = sqlx::query!(
       r#"
         SELECT course_name, participant_role, graduate_role, guild_id
@@ -2188,8 +1834,8 @@ impl DatabaseHandler {
     .await?;
 
     let extended_course_data = match row {
-      Some(row) => Some(ExtendedCourseData {
-        course_name: row.course_name,
+      Some(row) => Some(ExtendedCourse {
+        name: row.course_name,
         participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>()?),
         graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>()?),
         guild_id: serenity::GuildId::new(
@@ -2210,7 +1856,7 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     course_name: &str,
     similarity: f32,
-  ) -> Result<Option<CourseData>> {
+  ) -> Result<Option<Course>> {
     let row = sqlx::query!(
       r#"
         SELECT course_name, participant_role, graduate_role, SET_LIMIT($2), SIMILARITY(LOWER(course_name), LOWER($1)) AS similarity_score
@@ -2227,8 +1873,8 @@ impl DatabaseHandler {
     .await?;
 
     let course_data = match row {
-      Some(row) => Some(CourseData {
-        course_name: row.course_name,
+      Some(row) => Some(Course {
+        name: row.course_name,
         participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>()?),
         graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>()?),
       }),
@@ -2299,7 +1945,7 @@ impl DatabaseHandler {
   pub async fn get_term_list(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-  ) -> Result<Vec<TermNames>> {
+  ) -> Result<Vec<Names>> {
     let rows = sqlx::query!(
       r#"
         SELECT term_name, aliases
@@ -2314,7 +1960,7 @@ impl DatabaseHandler {
 
     let term_list = rows
       .into_iter()
-      .map(|row| TermNames {
+      .map(|row| Names {
         term_name: row.term_name,
         aliases: row.aliases,
       })
@@ -2442,7 +2088,7 @@ impl DatabaseHandler {
   pub async fn get_random_quote(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-  ) -> Result<Option<QuoteData>> {
+  ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
       r#"
         SELECT record_id, quote, author FROM quote WHERE guild_id = $1 ORDER BY RANDOM() LIMIT 1
@@ -2453,7 +2099,7 @@ impl DatabaseHandler {
     .await?;
 
     let quote = match row {
-      Some(row) => Some(QuoteData {
+      Some(row) => Some(Quote {
         id: row.record_id,
         quote: row.quote,
         author: row.author,
@@ -2468,7 +2114,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     keyword: &str,
-  ) -> Result<Option<QuoteData>> {
+  ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
       r#"
         SELECT record_id, quote, author
@@ -2484,7 +2130,7 @@ impl DatabaseHandler {
     .await?;
 
     let quote = match row {
-      Some(row) => Some(QuoteData {
+      Some(row) => Some(Quote {
         id: row.record_id,
         quote: row.quote,
         author: row.author,
@@ -2592,7 +2238,7 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
     timeframe: &ChallengeTimeframe,
-  ) -> Result<UserStats> {
+  ) -> Result<User> {
     // Get total count, total sum, and count/sum for timeframe
     let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
     let start_time = match timeframe {
@@ -2629,7 +2275,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let user_stats = UserStats {
+    let user_stats = User {
       all_minutes: 0,
       all_count: 0,
       timeframe_stats: timeframe_data,
@@ -2646,7 +2292,7 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
     sort_by: &SortBy,
     leaderboard_type: &LeaderboardType,
-  ) -> Result<Vec<LeaderboardUserStats>> {
+  ) -> Result<Vec<LeaderboardUser>> {
     let limit = match leaderboard_type {
       LeaderboardType::Top5 => 5,
       LeaderboardType::Top10 => 10,
@@ -2655,7 +2301,7 @@ impl DatabaseHandler {
       Timeframe::Daily => {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM daily_leaderboard
@@ -2669,7 +2315,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM daily_leaderboard
@@ -2683,7 +2329,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Streak => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM daily_leaderboard
@@ -2703,7 +2349,7 @@ impl DatabaseHandler {
       Timeframe::Weekly => {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM weekly_leaderboard
@@ -2717,7 +2363,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM weekly_leaderboard
@@ -2731,7 +2377,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Streak => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM weekly_leaderboard
@@ -2751,7 +2397,7 @@ impl DatabaseHandler {
       Timeframe::Monthly => {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM monthly_leaderboard
@@ -2765,7 +2411,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM monthly_leaderboard
@@ -2779,7 +2425,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Streak => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM monthly_leaderboard
@@ -2799,7 +2445,7 @@ impl DatabaseHandler {
       Timeframe::Yearly => {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM yearly_leaderboard
@@ -2813,7 +2459,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM yearly_leaderboard
@@ -2827,7 +2473,7 @@ impl DatabaseHandler {
             .fetch_all(&mut **transaction)
             .await?,
           SortBy::Streak => sqlx::query_as!(
-              LeaderboardUserStats,
+              LeaderboardUser,
               r#"
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM yearly_leaderboard
@@ -2898,7 +2544,7 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
     timeframe: &Timeframe,
-  ) -> Result<UserStats> {
+  ) -> Result<User> {
     // Get total count, total sum, and count/sum for timeframe
     let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
     let start_time = match timeframe {
@@ -2935,7 +2581,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let user_stats = UserStats {
+    let user_stats = User {
       all_minutes: total_data.total_sum.unwrap_or(0),
       all_count: total_data.total_count.unwrap_or(0).try_into()?,
       timeframe_stats: timeframe_data,
@@ -2949,7 +2595,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     timeframe: &Timeframe,
-  ) -> Result<GuildStats> {
+  ) -> Result<Guild> {
     // Get total count, total sum, and count/sum for timeframe
     let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
     let start_time = match timeframe {
@@ -2984,7 +2630,7 @@ impl DatabaseHandler {
     .fetch_one(&mut **transaction)
     .await?;
 
-    let guild_stats = GuildStats {
+    let guild_stats = Guild {
       all_minutes: total_data.total_sum.unwrap_or(0),
       all_count: total_data.total_count.unwrap_or(0).try_into()?,
       timeframe_stats: timeframe_data,

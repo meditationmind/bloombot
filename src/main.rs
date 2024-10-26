@@ -20,6 +20,7 @@ use tokio::sync::Mutex;
 mod charts;
 mod commands;
 mod config;
+mod data;
 mod events;
 mod handlers;
 

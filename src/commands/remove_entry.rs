@@ -67,14 +67,14 @@ pub async fn remove_entry(
   )
   .await?;
 
-  let description = if entry.meditation_seconds > 0 {
+  let description = if entry.seconds > 0 {
     format!(
       "**User**: {}\n**ID**: {}\n**Date**: {}\n**Time**: {} minute(s) {} second(s)",
       ctx.author(),
       entry.id,
       entry.occurred_at.format("%B %d, %Y"),
-      entry.meditation_minutes,
-      entry.meditation_seconds,
+      entry.minutes,
+      entry.seconds,
     )
   } else {
     format!(
@@ -82,7 +82,7 @@ pub async fn remove_entry(
       ctx.author(),
       entry.id,
       entry.occurred_at.format("%B %d, %Y"),
-      entry.meditation_minutes,
+      entry.minutes,
     )
   };
 
