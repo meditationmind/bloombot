@@ -31,6 +31,15 @@ pub struct Paginator<'a> {
 }
 
 impl<'a> Paginator<'a> {
+  /// Creates and initializes a new [`Paginator`] with a title, entry data as a [`PageRowRef`]
+  /// vector slice, and the number of entries per page.
+  ///
+  /// The maximum entries per page is 25, a restriction imposed by the field limit for
+  /// a single Discord embed object. Note that the combined sum of characters for an embed
+  /// cannot exceed 6000, meaning that a sensible number of entries per page will generally
+  /// fall between 5 and 10. See [Discord Embed Limits] for more info.
+  ///
+  /// [Discord Embed Limits]: https://discord.com/developers/docs/resources/message#embed-object-embed-limits
   pub fn new(
     title: impl Display,
     entries: &[&'a (dyn PageRow + Send + Sync)],
@@ -130,6 +139,11 @@ impl<'a> Paginator<'a> {
     }
   }
 
+  /// Receives a [`Paginator`] initialized with [`Paginator::new()`] and initiates pagination.
+  ///
+  /// An optional `page` argument specifies the initial page, [`PageType`] allows for multiple
+  /// page variations, and setting `ephemeral` to `true` displays the pagination ephemerally,
+  /// meaning via private in-channel messages.
   pub async fn paginate(
     self,
     ctx: Context<'_>,

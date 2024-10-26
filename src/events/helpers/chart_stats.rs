@@ -6,6 +6,11 @@ use anyhow::Result;
 use log::{error, info};
 use tokio::time::sleep;
 
+/// Refreshes materialized views used to query stats for creating [`stats`][stats] charts.
+/// Since this is an intensive process, the function sleeps for two minutes between refreshing
+/// the materialized view for each [`Timeframe`] to keep resource usage low.
+///
+/// [stats]: crate::commands::stats::stats
 async fn refresh(db: &DatabaseHandler) -> Result<()> {
   let mut transaction = db.start_transaction().await?;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Weekly).await?;
@@ -18,6 +23,13 @@ async fn refresh(db: &DatabaseHandler) -> Result<()> {
   Ok(())
 }
 
+/// Orchestrates timing for calling [`refresh`] to refresh materialized views used for
+/// charts stats. Time from call until noon or midnight, whichever is closer, is calculated
+/// and a [`tokio::task`] is spawned and put to sleep for that duration, after which the
+/// [`refresh`] is called and then repeated in 12-hour intervals.
+///
+/// Logging includes time until initial [`refresh`], as well as notification upon initiation,
+/// and upon completion with time elapsed.
 pub async fn update(source: &str, task_conn: Arc<DatabaseHandler>) {
   let mut interval = tokio::time::interval(Duration::from_secs(60 * 60 * 12));
   let wait = {

@@ -123,10 +123,12 @@ impl DefaultReasons {
   }
 }
 
-/// Erases a message, logs the erase in the `CHANNELS.logs` channel, and returns
+/// Erases a message, logs the erase in the [`CHANNELS.logs`][logs] channel, and returns
 /// an embed to be used for private notification. The `transaction` needs to be committed
 /// after this function is called or it will be rolled back and the erase will not be
 /// added to the database.
+///
+/// [logs]: crate::config::CHANNELS
 async fn erase_and_log(
   ctx: Context<'_>,
   transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -226,7 +228,9 @@ async fn erase_and_log(
 
 /// Notifies a user of deletion via DM, or via private thread if a DM cannot be delivered.
 /// Private threads are created in the channel where the message was deleted, when possible.
-/// When that fails, the `CHANNELS.private_thread_default` channel is used as a fallback.
+/// When that fails, the [`CHANNELS.private_thread_default`][ptd] channel is used as a fallback.
+///
+/// [ptd]: crate::config::CHANNELS
 async fn notify_user(
   ctx: Context<'_>,
   message: &serenity::Message,

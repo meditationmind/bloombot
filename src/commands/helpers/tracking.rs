@@ -13,6 +13,11 @@ use crate::{
   Context,
 };
 
+/// Queries the database for the total count of guild sessions and divides by 10. If there is no
+/// remainder, the function queries the database for the guild total of minutes meditated, divides
+/// this number by 60 to convert to hours, and returns this number. If the total count divided by
+/// 10 produces a remainder, the function returns `None`. This works as a trigger to announce the
+/// total minutes every 10th session added.
 pub async fn get_guild_hours(
   transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
   guild_id: &serenity::GuildId,
@@ -26,6 +31,10 @@ pub async fn get_guild_hours(
   }
 }
 
+/// Announces the guild total of minutes meditated in the [`CHANNELS.tracking`][tracking] channel, using
+/// the value returned by [`get_guild_hours`] as a trigger to announce every 10th session added.
+///
+/// [tracking]: crate::config::CHANNELS
 pub async fn post_guild_hours(ctx: &Context<'_>, guild_hours: &Option<i64>) -> Result<()> {
   if let Some(guild_hours) = guild_hours {
     if ctx.channel_id() == CHANNELS.tracking {
@@ -37,6 +46,16 @@ pub async fn post_guild_hours(ctx: &Context<'_>, guild_hours: &Option<i64>) -> R
   Ok(())
 }
 
+/// Takes a `&str` and strips all asterisks (`*`), then escapes all other ASCII punctuation,
+/// except for underscores (`_`) and tildes (`~`). For Discord markdown, this prevents italics
+/// (or cancellation thereof) and all other markdown except for underline and strikethrough.
+/// This is the desired behavior for quotes, which permit normal markdown when displayed using
+/// [`quote`][quote], but are fully italicized when presented with an [`add`][add] or
+/// [`import`][import] notification.
+///
+/// [add]: crate::commands::add::add()
+/// [quote]: crate::commands::quote::quote()
+/// [import]: crate::commands::import::import()
 pub fn minimize_markdown(text: &str) -> String {
   text
     .chars()
@@ -54,6 +73,19 @@ pub fn minimize_markdown(text: &str) -> String {
     })
     .collect::<String>()
 }
+
+/// Displays confirmation of time added via [`add`][add] or [`import`][import] and attempts to
+/// include a random quote from the database. If a quote could not be fetched, the notification
+/// is posted with the quote omitted.
+///
+/// When called from [`add`][add], the notification is formatted for use as a reply to the slash
+/// command. When called from elsewhere ([`import`][import]), the notification is formatted for
+/// independent posting, directly to a channel, e.g., [`CHANNELS.tracking`][tracking].
+/// When `privacy` is set to `true`, notifications are anonymized.
+///
+/// [add]: crate::commands::add::add()
+/// [import]: crate::commands::import::import()
+/// [tracking]: crate::config::CHANNELS
 pub async fn show_add_with_quote(
   ctx: &Context<'_>,
   transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -88,6 +120,19 @@ pub async fn show_add_with_quote(
   }
 }
 
+/// Gets a user's [`TimeSumRoles`] and checks to see whether a new role should be added.
+/// If so, all previous [`TimeSumRoles`] are first removed, and if this fails, the user is
+/// notified and the operation is aborted. Since the new role has not been added, the
+/// removal will be attempted again on next add.
+///
+/// Once previous roles are removed, the new role is added and notification is sent as a
+/// reply to the slash command ([`add`][add]), or in the case of [`import`][import], directly
+/// to the [`CHANNELS.tracking`][tracking] channel or the originating DM. Notifications
+/// honor privacy settings using ephemeral messages, based on the `privacy` argument.
+///
+/// [add]: crate::commands::add::add()
+/// [import]: crate::commands::import::import()
+/// [tracking]: crate::config::CHANNELS
 pub async fn update_time_roles(
   ctx: &Context<'_>,
   member: &serenity::Member,
@@ -173,6 +218,19 @@ pub async fn update_time_roles(
   Ok(())
 }
 
+/// Gets a user's [`StreakRoles`] and checks to see whether a new role should be added.
+/// If so, all previous [`StreakRoles`] are first removed, and if this fails, the user is
+/// notified and the operation is aborted. Since the new role has not been added, the
+/// removal will be attempted again on next add.
+///
+/// Once previous roles are removed, the new role is added and notification is sent as a
+/// reply to the slash command ([`add`][add]), or in the case of [`import`][import], directly
+/// to the [`CHANNELS.tracking`][tracking] channel or the originating DM. Notifications
+/// honor privacy settings using ephemeral messages, based on the `privacy` argument.
+///
+/// [add]: crate::commands::add::add()
+/// [import]: crate::commands::import::import()
+/// [tracking]: crate::config::CHANNELS
 pub async fn update_streak_roles(
   ctx: &Context<'_>,
   member: &serenity::Member,
