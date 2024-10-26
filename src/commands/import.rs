@@ -338,8 +338,8 @@ pub async fn import(
     vec![latest_meditation.unwrap_or(Meditation {
       id: String::new(),
       user_id: UserId::default(),
-      meditation_minutes: 0,
-      meditation_seconds: 0,
+      minutes: 0,
+      seconds: 0,
       occurred_at: chrono::DateTime::UNIX_EPOCH,
     })]
   } else {
@@ -363,8 +363,7 @@ pub async fn import(
         let minutes = row.meditation_minutes;
         for entry in &current_data {
           if entry.occurred_at.date_naive() == datetime_utc.date_naive()
-            && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
-              < datetime_utc)
+            && !(((entry.occurred_at + TimeDelta::minutes(entry.minutes.into())) < datetime_utc)
               || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
           {
             continue 'result;
@@ -404,7 +403,7 @@ pub async fn import(
             }
             for entry in &current_data {
               if entry.occurred_at.date_naive() == datetime_utc.date_naive()
-                && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
+                && !(((entry.occurred_at + TimeDelta::minutes(entry.minutes.into()))
                   < datetime_utc)
                   || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
               {
@@ -451,7 +450,7 @@ pub async fn import(
             }
             for entry in &current_data {
               if entry.occurred_at.date_naive() == datetime_utc.date_naive()
-                && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
+                && !(((entry.occurred_at + TimeDelta::minutes(entry.minutes.into()))
                   < datetime_utc)
                   || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
               {
@@ -495,7 +494,7 @@ pub async fn import(
             };
             for entry in &current_data {
               if entry.occurred_at.date_naive() == datetime_utc.date_naive()
-                && !(((entry.occurred_at + TimeDelta::minutes(entry.meditation_minutes.into()))
+                && !(((entry.occurred_at + TimeDelta::minutes(entry.minutes.into()))
                   < datetime_utc)
                   || ((datetime_utc + TimeDelta::minutes(minutes.into())) < entry.occurred_at))
               {

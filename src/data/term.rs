@@ -39,14 +39,14 @@ impl PageRow for Term {
 }
 
 #[derive(Debug, sqlx::FromRow)]
-pub struct TermSearchResult {
+pub struct SearchResult {
   pub term_name: String,
   pub meaning: String,
   pub distance_score: Option<f64>,
 }
 
 #[derive(Debug)]
-pub struct TermNames {
+pub struct Names {
   pub term_name: String,
   pub aliases: Option<Vec<String>>,
 }

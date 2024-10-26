@@ -2,7 +2,7 @@ use crate::commands::helpers::pagination::{PageRow, PageType};
 use poise::serenity_prelude::{self as serenity, Mentionable};
 
 pub struct SteamKey {
-  pub steam_key: String,
+  pub key: String,
   pub used: bool,
   pub reserved: Option<serenity::UserId>,
   pub guild_id: serenity::GuildId,
@@ -10,7 +10,7 @@ pub struct SteamKey {
 
 impl PageRow for SteamKey {
   fn title(&self, _page_type: PageType) -> String {
-    self.steam_key.clone()
+    self.key.clone()
   }
 
   fn body(&self) -> String {
@@ -25,7 +25,7 @@ impl PageRow for SteamKey {
   }
 }
 
-pub struct SteamKeyRecipient {
+pub struct Recipient {
   pub user_id: serenity::UserId,
   pub guild_id: serenity::GuildId,
   pub challenge_prize: Option<bool>,
@@ -33,7 +33,7 @@ pub struct SteamKeyRecipient {
   pub total_keys: i16,
 }
 
-impl PageRow for SteamKeyRecipient {
+impl PageRow for Recipient {
   fn title(&self, _page_type: PageType) -> String {
     "__Recipient__".to_owned()
   }

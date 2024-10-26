@@ -3,15 +3,15 @@ pub struct Streak {
   pub longest: i32,
 }
 
-pub struct UserStats {
+pub struct User {
   pub all_minutes: i64,
   pub all_count: u64,
-  pub timeframe_stats: TimeframeStats,
+  pub timeframe_stats: Timeframe,
   pub streak: Streak,
 }
 
 #[derive(Debug)]
-pub struct LeaderboardUserStats {
+pub struct LeaderboardUser {
   pub name: Option<String>,
   pub minutes: Option<i64>,
   pub sessions: Option<i64>,
@@ -21,14 +21,14 @@ pub struct LeaderboardUserStats {
   pub streaks_private: Option<bool>,
 }
 
-pub struct GuildStats {
+pub struct Guild {
   pub all_minutes: i64,
   pub all_count: u64,
-  pub timeframe_stats: TimeframeStats,
+  pub timeframe_stats: Timeframe,
 }
 
 #[derive(Debug)]
-pub struct TimeframeStats {
+pub struct Timeframe {
   pub sum: Option<i64>,
   pub count: Option<i64>,
 }

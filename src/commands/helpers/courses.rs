@@ -25,7 +25,7 @@ pub async fn course_not_found(
           poise::CreateReply::default()
             .content(format!(
               "{} Course does not exist. Did you mean `{}`?",
-              EMOJI.mminfo, possible_course.course_name
+              EMOJI.mminfo, possible_course.name
             ))
             .ephemeral(true),
         )

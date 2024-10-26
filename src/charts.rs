@@ -6,7 +6,7 @@
 
 use crate::commands::helpers::time::Timeframe;
 use crate::commands::stats::{ChartStyle, LeaderboardType, SortBy, StatsType};
-use crate::data::stats::TimeframeStats;
+use crate::data::stats::Timeframe as TimeframeStats;
 use anyhow::Result;
 use charts_rs::{
   svg_to_webp, Align, BarChart, Box, LegendCategory, Series, TableCellStyle, TableChart,
@@ -17,7 +17,7 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct Chart<'a> {
   file: tokio::fs::File,
-  path: std::path::PathBuf,
+  path: PathBuf,
   filename: &'a str,
 }
 

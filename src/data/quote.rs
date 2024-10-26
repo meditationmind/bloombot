@@ -1,5 +1,6 @@
 use crate::commands::helpers::pagination::{PageRow, PageType};
 
+#[allow(clippy::struct_field_names)]
 pub struct Quote {
   pub id: String,
   pub quote: String,

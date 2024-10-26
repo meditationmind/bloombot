@@ -1,3 +1,5 @@
+#![allow(clippy::struct_excessive_bools)]
+
 use poise::serenity_prelude::{self as serenity};
 
 #[derive(Debug)]

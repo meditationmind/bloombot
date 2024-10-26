@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::charts;
 use crate::commands::helpers::time::Timeframe;
 use crate::commands::stats::{LeaderboardType, SortBy};
-use crate::data::stats::LeaderboardUserStats;
+use crate::data::stats::LeaderboardUser;
 use crate::database::DatabaseHandler;
 use anyhow::Result;
 use log::{error, info};
@@ -128,7 +128,7 @@ async fn refresh(db: &DatabaseHandler) -> Result<()> {
 pub async fn process_stats(
   ctx: &Http,
   guild_id: &GuildId,
-  stats: &Vec<LeaderboardUserStats>,
+  stats: &Vec<LeaderboardUser>,
 ) -> Result<Option<Vec<Vec<String>>>> {
   let mut leaderboard_data: Vec<Vec<String>> = vec![vec![
     "Name".to_string(),
