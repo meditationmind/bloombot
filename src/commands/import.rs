@@ -419,7 +419,7 @@ pub async fn import(
     .first()
     .with_context(|| "Failed to assign attachment")?;
 
-  if attachment.size > 262144 && !staff {
+  if attachment.size > 262_144 && !staff {
     ctx
       .send(
         CreateReply::default()

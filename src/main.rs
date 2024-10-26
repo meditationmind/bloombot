@@ -1,9 +1,5 @@
 #![warn(clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
-#![allow(
-  clippy::too_many_lines,
-  clippy::unreadable_literal,
-  clippy::module_name_repetitions
-)]
+#![allow(clippy::too_many_lines)]
 
 use anyhow::{Context as ErrorContext, Error, Result};
 use commands::{

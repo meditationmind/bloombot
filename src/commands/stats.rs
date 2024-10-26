@@ -11,6 +11,7 @@ use log::info;
 use poise::serenity_prelude::{self as serenity, builder::*, UserId};
 use poise::ChoiceParameter;
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(poise::ChoiceParameter)]
 pub enum StatsType {
   #[name = "Minutes"]
