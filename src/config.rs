@@ -1,3 +1,4 @@
+#![allow(clippy::unreadable_literal)]
 use poise::serenity_prelude::{self as serenity, Embed, GuildId, RoleId};
 use std::fmt;
 
@@ -27,6 +28,7 @@ pub struct Roles {
   pub patreon: u64,
   pub kofi: u64,
   pub staff: u64,
+  pub community_sit_helper: u64,
 }
 
 pub const ROLES: Roles = Roles {
@@ -36,6 +38,7 @@ pub const ROLES: Roles = Roles {
   patreon: 543900027928444935,
   kofi: 1083219974509826048,
   staff: 788760128010059786,
+  community_sit_helper: 1285275266549158050,
 };
 
 pub struct Channels {
@@ -48,6 +51,7 @@ pub struct Channels {
   pub donators: u64,
   pub suggestion: u64,
   pub tracking: u64,
+  pub private_thread_default: u64,
 }
 
 pub const CHANNELS: Channels = Channels {
@@ -60,6 +64,7 @@ pub const CHANNELS: Channels = Channels {
   donators: 551895169532952578,
   suggestion: 553676378621476887,
   tracking: 440556997364940801,
+  private_thread_default: 501464482996944909,
 };
 
 pub struct Emotes<'a> {
