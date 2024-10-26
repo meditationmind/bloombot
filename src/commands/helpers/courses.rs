@@ -14,12 +14,13 @@ pub async fn course_not_found(
     DatabaseHandler::get_possible_course(transaction, &guild_id, course_name.as_str(), 0.8).await?;
 
   if let Some(possible_course) = possible_course {
-    // Check if user is in the course
+    // Check if user is enrolled in possible_course
     if ctx
       .author()
       .has_role(ctx, guild_id, possible_course.participant_role)
       .await?
     {
+      // Suggest possible_course if user is enrolled in the course
       ctx
         .send(
           poise::CreateReply::default()
@@ -30,24 +31,19 @@ pub async fn course_not_found(
             .ephemeral(true),
         )
         .await?;
-    } else {
-      ctx
-        .send(
-          poise::CreateReply::default()
-            .content(format!("{} Course does not exist.", EMOJI.mminfo))
-            .ephemeral(true),
-        )
-        .await?;
+
+      return Ok(());
     }
-  } else {
-    ctx
-      .send(
-        poise::CreateReply::default()
-          .content(format!("{} Course does not exist.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
-      .await?;
   }
+
+  // If no possible_course is found or user is not enrolled in possible_course
+  ctx
+    .send(
+      poise::CreateReply::default()
+        .content(format!("{} Course does not exist.", EMOJI.mminfo))
+        .ephemeral(true),
+    )
+    .await?;
 
   Ok(())
 }
