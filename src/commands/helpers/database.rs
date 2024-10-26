@@ -4,10 +4,9 @@ use crate::Context;
 use anyhow::Result;
 use poise::{serenity_prelude as serenity, CreateReply};
 
-#[allow(clippy::large_enum_variant)]
 pub enum MessageType {
   TextOnly(String),
-  EmbedOnly(serenity::CreateEmbed),
+  EmbedOnly(Box<serenity::CreateEmbed>),
 }
 
 /// Takes a transaction and a response, committing the transaction if the message is sent successfully,
@@ -42,7 +41,7 @@ pub async fn commit_and_say(
       ctx
         .send(
           CreateReply {
-            embeds: vec![message],
+            embeds: vec![*message],
             ..Default::default()
           }
           .ephemeral(ephemeral),

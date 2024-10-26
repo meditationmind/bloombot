@@ -154,7 +154,7 @@ async fn create(
   database::commit_and_say(
     ctx,
     transaction,
-    MessageType::EmbedOnly(success_embed),
+    MessageType::EmbedOnly(Box::new(success_embed)),
     true,
   )
   .await?;
@@ -365,7 +365,7 @@ async fn update(
     database::commit_and_say(
       ctx,
       transaction,
-      MessageType::EmbedOnly(success_embed),
+      MessageType::EmbedOnly(Box::new(success_embed)),
       true,
     )
     .await?;
@@ -476,7 +476,7 @@ async fn delete(
   database::commit_and_say(
     ctx,
     transaction,
-    MessageType::EmbedOnly(success_embed),
+    MessageType::EmbedOnly(Box::new(success_embed)),
     true,
   )
   .await?;
