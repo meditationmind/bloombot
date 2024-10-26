@@ -1,7 +1,8 @@
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
-use crate::database::{DatabaseHandler, TrackingProfile};
+use crate::data::tracking_profile::TrackingProfile;
+use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use log::error;

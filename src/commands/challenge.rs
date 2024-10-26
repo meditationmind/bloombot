@@ -1,7 +1,9 @@
 #![allow(clippy::cast_precision_loss)]
 
+use crate::commands::helpers::time::ChallengeTimeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
-use crate::database::{ChallengeTimeframe, DatabaseHandler, TrackingProfile};
+use crate::data::tracking_profile::TrackingProfile;
+use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{Datelike, Timelike, Utc};

@@ -1,5 +1,6 @@
 use crate::commands::helpers::database::{self, MessageType};
-use crate::database::{DatabaseHandler, TrackingProfile};
+use crate::data::tracking_profile::TrackingProfile;
+use crate::database::DatabaseHandler;
 use crate::{config, Context};
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude as serenity;
