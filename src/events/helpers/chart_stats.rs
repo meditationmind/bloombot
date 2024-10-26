@@ -34,21 +34,23 @@ pub async fn update(source: &str, task_conn: Arc<DatabaseHandler>) {
       .unwrap_or_else(|| now.naive_utc())
       .and_utc();
     if noon > now {
-      (noon - now).num_seconds().unsigned_abs()
+      (noon - now).num_seconds()
     } else {
-      (midnight - now).num_seconds().unsigned_abs()
+      (midnight - now).num_seconds()
     }
   };
-  #[allow(clippy::cast_possible_wrap)]
+
   if wait > 0 {
     info!(
       target: source,
       "Chart stats: Next refresh in {}m ({})",
       wait / 60,
-      (chrono::Utc::now() + chrono::Duration::seconds(wait as i64)).format("%H:%M %P")
+      (chrono::Utc::now() + chrono::Duration::seconds(wait)).format("%H:%M %P")
     );
   }
-  sleep(Duration::from_secs(wait)).await;
+
+  sleep(Duration::from_secs(wait.unsigned_abs())).await;
+
   loop {
     interval.tick().await;
 
