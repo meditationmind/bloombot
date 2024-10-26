@@ -1,7 +1,7 @@
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{
@@ -10,7 +10,7 @@ use poise::serenity_prelude::{
 use poise::{ChoiceParameter, CreateReply};
 
 #[derive(poise::ChoiceParameter)]
-pub enum DateFormat {
+enum DateFormat {
   #[name = "YYYY-MM-DD (ISO 8601)"]
   Ymd,
   #[name = "DD Month YYYY"]
@@ -18,7 +18,7 @@ pub enum DateFormat {
 }
 
 #[derive(poise::ChoiceParameter)]
-pub enum DefaultReasons {
+enum DefaultReasons {
   #[name = "Rule 1: Be kind"]
   Rule1BeKind,
   #[name = "Rule 2: Be respectful"]
@@ -510,7 +510,7 @@ pub async fn erase(_: Context<'_>) -> Result<()> {
 ///
 /// Deletes a message and notifies the user via DM or private thread with an optional reason.
 #[poise::command(slash_command)]
-pub async fn message(
+async fn message(
   ctx: Context<'_>,
   #[description = "The message to delete"] message: serenity::Message,
   #[max_length = 512] // Max length for audit log reason
@@ -535,7 +535,7 @@ pub async fn message(
 
   let dm_embed = erase_and_log(ctx, &mut transaction, &message, &reason).await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!(
@@ -555,7 +555,7 @@ pub async fn message(
 ///
 /// List erases for a specified user, with dates and links to notification messages, when available.
 #[poise::command(slash_command)]
-pub async fn list(
+async fn list(
   ctx: Context<'_>,
   #[description = "The user to show erase data for"] user: serenity::User,
   #[description = "The page to show"] page: Option<usize>,
@@ -575,88 +575,23 @@ pub async fn list(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  // Define some unique identifiers for the navigation buttons
-  let ctx_id = ctx.id();
-  let prev_button_id = format!("{ctx_id}prev");
-  let next_button_id = format!("{ctx_id}next");
-
-  let mut current_page = page.unwrap_or(0).saturating_sub(1);
-
   let erases = DatabaseHandler::get_erases(&mut transaction, &guild_id, &user.id).await?;
   let erases: Vec<PageRowRef> = erases.iter().map(|erase| erase as _).collect();
+
   drop(transaction);
-  let pagination = Pagination::new(
-    format!("Erases for {user_nick_or_name}"),
-    erases,
-    ENTRIES_PER_PAGE,
-  )
-  .await?;
 
-  if pagination.get_page(current_page).is_none() {
-    current_page = pagination.get_last_page_number();
-  }
-
-  let first_page = match date_format {
-    Some(DateFormat::Dmy) => pagination.create_page_embed(current_page, PageType::Alternate),
-    _ => pagination.create_page_embed(current_page, PageType::Standard),
+  let page_type = match date_format {
+    Some(DateFormat::Dmy) => PageType::Alternate,
+    _ => PageType::Standard,
   };
 
-  ctx
-    .send({
-      let mut f = CreateReply::default();
-      if pagination.get_page_count() > 1 {
-        f = f.components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(&prev_button_id).label("Previous"),
-          CreateButton::new(&next_button_id).label("Next"),
-        ])]);
-      }
-      f.embeds = vec![first_page];
-      f.ephemeral(privacy)
-    })
-    .await?;
-
-  // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
-    .await
-  {
-    // Depending on which button was pressed, go to next or previous page
-    if press.data.custom_id == next_button_id {
-      current_page = pagination.update_page_number(current_page, 1);
-    } else if press.data.custom_id == prev_button_id {
-      current_page = pagination.update_page_number(current_page, -1);
-    } else {
-      // This is an unrelated button interaction
-      continue;
-    }
-
-    // Update the message with the new page contents
-    if let Some(DateFormat::Dmy) = date_format {
-      press
-        .create_response(
-          ctx,
-          CreateInteractionResponse::UpdateMessage(
-            CreateInteractionResponseMessage::new()
-              .embed(pagination.create_page_embed(current_page, PageType::Alternate)),
-          ),
-        )
-        .await?;
-    } else {
-      press
-        .create_response(
-          ctx,
-          CreateInteractionResponse::UpdateMessage(
-            CreateInteractionResponseMessage::new()
-              .embed(pagination.create_page_embed(current_page, PageType::Standard)),
-          ),
-        )
-        .await?;
-    }
-  }
+  Paginator::new(
+    format!("Erases for {user_nick_or_name}"),
+    &erases,
+    ENTRIES_PER_PAGE,
+  )
+  .paginate(ctx, page, page_type, privacy)
+  .await?;
 
   Ok(())
 }
@@ -665,7 +600,7 @@ pub async fn list(
 ///
 /// Populate the database with past erases for a user.
 #[poise::command(slash_command)]
-pub async fn populate(
+async fn populate(
   ctx: Context<'_>,
   #[description = "The user to populate erase data for"] user: serenity::User,
   #[description = "The link for the erase notification message"] message_link: String,
@@ -713,7 +648,7 @@ pub async fn populate(
   )
   .await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Erase data has been added.", EMOJI.mmcheck)),

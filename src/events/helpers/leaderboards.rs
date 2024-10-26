@@ -1,8 +1,13 @@
+use std::sync::Arc;
+use std::time::Duration;
+
 use crate::charts;
 use crate::commands::stats::{LeaderboardType, SortBy};
 use crate::database::{DatabaseHandler, LeaderboardUserStats, Timeframe};
 use anyhow::Result;
+use log::{error, info};
 use poise::serenity_prelude::{GuildId, Http, UserId};
+use tokio::time::sleep;
 
 #[allow(dead_code)]
 pub struct Leaderboards<'a> {
@@ -107,7 +112,7 @@ pub const LEADERBOARDS: Leaderboards = Leaderboards {
   year_str_top10_light: "leaderboard_ystr10l.webp",
 };
 
-pub async fn refresh(db: &DatabaseHandler) -> Result<()> {
+async fn refresh(db: &DatabaseHandler) -> Result<()> {
   let mut transaction = db.start_transaction().await?;
   DatabaseHandler::refresh_leaderboard(&mut transaction, &Timeframe::Daily).await?;
   DatabaseHandler::refresh_leaderboard(&mut transaction, &Timeframe::Weekly).await?;
@@ -118,7 +123,7 @@ pub async fn refresh(db: &DatabaseHandler) -> Result<()> {
   Ok(())
 }
 
-async fn process_stats(
+pub async fn process_stats(
   ctx: &Http,
   guild_id: &GuildId,
   stats: &Vec<LeaderboardUserStats>,
@@ -180,7 +185,7 @@ async fn process_stats(
   Ok(Some(leaderboard_data))
 }
 
-pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Result<()> {
+async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Result<()> {
   let mut transaction = db.start_transaction_with_retry(5).await?;
 
   let daily_minutes = DatabaseHandler::get_leaderboard_stats(
@@ -938,4 +943,37 @@ pub async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> 
   }
 
   Ok(())
+}
+
+pub async fn update(
+  source: &str,
+  task_http: Arc<Http>,
+  task_conn: Arc<DatabaseHandler>,
+  guild_id: GuildId,
+) {
+  info!(target: source, "Leaderboard: Refreshing views");
+  let refresh_start = std::time::Instant::now();
+  if let Err(err) = refresh(&task_conn).await {
+    error!(target: source, "Leaderboard: Error refreshing views: {:?}", err);
+  }
+  info!(
+    target: source,
+    "Leaderboard: Refresh completed in {:#?}",
+    refresh_start.elapsed()
+  );
+
+  sleep(Duration::from_secs(10)).await;
+
+  info!(target: source, "Leaderboard: Generating images");
+  let generation_start = std::time::Instant::now();
+  if let Err(err) = generate(&task_http, &task_conn, &guild_id).await {
+    error!(target: source, "Leaderboard: Error generating images: {:?}", err);
+  }
+  info!(
+    target: source,
+    "Leaderboard: Generation completed in {:#?}",
+    generation_start
+      .elapsed()
+      .saturating_sub(Duration::from_secs(115))
+  );
 }

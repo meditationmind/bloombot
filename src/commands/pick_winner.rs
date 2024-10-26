@@ -8,7 +8,7 @@ use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::CreateReply;
 
 #[derive(Debug, Clone, Copy, poise::ChoiceParameter)]
-pub enum Months {
+enum Months {
   January,
   February,
   March,

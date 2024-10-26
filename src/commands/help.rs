@@ -4,15 +4,15 @@ use anyhow::{Context as AnyhowContext, Result};
 use poise::{serenity_prelude::builder::*, CreateReply};
 use std::fmt::Write as _;
 
-pub struct HelpConfiguration<'a> {
+struct HelpConfiguration<'a> {
   /// Extra text displayed at the bottom of your message. Can be used for help and tips specific to your bot.
-  pub extra_text_at_bottom: &'a str,
+  extra_text_at_bottom: &'a str,
   /// Whether to make the response ephemeral if possible. Can be nice to reduce clutter.
-  pub ephemeral: bool,
+  ephemeral: bool,
   /// Whether to list context menu commands as well.
-  pub show_context_menu_commands: bool,
+  show_context_menu_commands: bool,
   /// Optionally specify a secret category to completely prevent from being accessible via the command.
-  pub secret_category: &'a str,
+  secret_category: &'a str,
 }
 
 impl Default for HelpConfiguration<'_> {
@@ -282,7 +282,7 @@ async fn help_all_commands<U, E>(
   Ok(())
 }
 
-pub async fn help_menu<U, E>(
+async fn help_menu<U, E>(
   ctx: poise::Context<'_, U, E>,
   command: Option<&str>,
   config: HelpConfiguration<'_>,

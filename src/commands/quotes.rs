@@ -1,10 +1,9 @@
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::{CreateReply, Modal};
 
 #[derive(Debug, Modal)]
@@ -57,7 +56,7 @@ pub async fn quotes(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
 ///
 /// Adds a quote to the database.
 #[poise::command(slash_command)]
-pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Result<()> {
+async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Result<()> {
   use poise::Modal as _;
 
   let quote_data = AddQuoteModal::execute(ctx).await?;
@@ -77,7 +76,7 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
     )
     .await?;
 
-    commit_and_say(
+    database::commit_and_say(
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Quote has been added.", EMOJI.mmcheck)),
@@ -93,7 +92,7 @@ pub async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Resul
 ///
 /// Edits an existing quote.
 #[poise::command(slash_command)]
-pub async fn edit(
+async fn edit(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
   #[description = "ID of the quote to edit"]
   #[rename = "id"]
@@ -140,7 +139,7 @@ pub async fn edit(
     )
     .await?;
 
-    commit_and_say(
+    database::commit_and_say(
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Quote has been edited.", EMOJI.mmcheck)),
@@ -156,7 +155,7 @@ pub async fn edit(
 ///
 /// Removes a quote from the database.
 #[poise::command(slash_command)]
-pub async fn remove(
+async fn remove(
   ctx: Context<'_>,
   #[description = "The quote ID to remove"]
   #[rename = "id"]
@@ -182,7 +181,7 @@ pub async fn remove(
 
   DatabaseHandler::remove_quote(&mut transaction, &guild_id, quote_id.as_str()).await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Quote has been removed.", EMOJI.mmcheck)),
@@ -197,7 +196,7 @@ pub async fn remove(
 ///
 /// Lists all quotes in the database.
 #[poise::command(slash_command)]
-pub async fn list(
+async fn list(
   ctx: Context<'_>,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
@@ -209,68 +208,14 @@ pub async fn list(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  // Define some unique identifiers for the navigation buttons
-  let ctx_id = ctx.id();
-  let prev_button_id = format!("{ctx_id}prev");
-  let next_button_id = format!("{ctx_id}next");
-
-  let mut current_page = page.unwrap_or(0).saturating_sub(1);
-
   let quotes = DatabaseHandler::get_all_quotes(&mut transaction, &guild_id).await?;
   let quotes: Vec<PageRowRef> = quotes.iter().map(|quote| quote as PageRowRef).collect();
+
   drop(transaction);
-  let pagination = Pagination::new("Quotes", quotes, ENTRIES_PER_PAGE).await?;
 
-  if pagination.get_page(current_page).is_none() {
-    current_page = pagination.get_last_page_number();
-  }
-
-  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
-
-  ctx
-    .send({
-      let mut f = CreateReply::default();
-      if pagination.get_page_count() > 1 {
-        f = f.components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(&prev_button_id).label("Previous"),
-          CreateButton::new(&next_button_id).label("Next"),
-        ])]);
-      }
-      f.embeds = vec![first_page];
-      f.ephemeral(true)
-    })
+  Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE)
+    .paginate(ctx, page, PageType::Standard, true)
     .await?;
-
-  // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
-    .await
-  {
-    // Depending on which button was pressed, go to next or previous page
-    if press.data.custom_id == next_button_id {
-      current_page = pagination.update_page_number(current_page, 1);
-    } else if press.data.custom_id == prev_button_id {
-      current_page = pagination.update_page_number(current_page, -1);
-    } else {
-      // This is an unrelated button interaction
-      continue;
-    }
-
-    // Update the message with the new page contents
-    press
-      .create_response(
-        ctx,
-        CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new()
-            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
-        ),
-      )
-      .await?;
-  }
 
   Ok(())
 }
@@ -281,7 +226,7 @@ pub async fn list(
 ///
 /// Example: "coming back" pema or chodron -thubten
 #[poise::command(slash_command)]
-pub async fn search(
+async fn search(
   ctx: Context<'_>,
   #[description = "One or more keywords in search engine format"] keyword: String,
   #[description = "The page to show"] page: Option<usize>,
@@ -293,13 +238,6 @@ pub async fn search(
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
-
-  // Define some unique identifiers for the navigation buttons
-  let ctx_id = ctx.id();
-  let prev_button_id = format!("{ctx_id}prev");
-  let next_button_id = format!("{ctx_id}next");
-
-  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let quotes = DatabaseHandler::search_quotes(&mut transaction, &guild_id, &keyword).await?;
 
@@ -318,59 +256,12 @@ pub async fn search(
   }
 
   let quotes: Vec<PageRowRef> = quotes.iter().map(|quote| quote as PageRowRef).collect();
+
   drop(transaction);
-  let pagination = Pagination::new("Quotes", quotes, ENTRIES_PER_PAGE).await?;
 
-  if pagination.get_page(current_page).is_none() {
-    current_page = pagination.get_last_page_number();
-  }
-
-  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
-
-  ctx
-    .send({
-      let mut f = CreateReply::default();
-      if pagination.get_page_count() > 1 {
-        f = f.components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(&prev_button_id).label("Previous"),
-          CreateButton::new(&next_button_id).label("Next"),
-        ])]);
-      }
-      f.embeds = vec![first_page];
-      f.ephemeral(true)
-    })
+  Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE)
+    .paginate(ctx, page, PageType::Standard, true)
     .await?;
-
-  // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
-    .await
-  {
-    // Depending on which button was pressed, go to next or previous page
-    if press.data.custom_id == next_button_id {
-      current_page = pagination.update_page_number(current_page, 1);
-    } else if press.data.custom_id == prev_button_id {
-      current_page = pagination.update_page_number(current_page, -1);
-    } else {
-      // This is an unrelated button interaction
-      continue;
-    }
-
-    // Update the message with the new page contents
-    press
-      .create_response(
-        ctx,
-        CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new()
-            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
-        ),
-      )
-      .await?;
-  }
 
   Ok(())
 }
@@ -379,7 +270,7 @@ pub async fn search(
 ///
 /// Shows a specific quote using the quote ID.
 #[poise::command(slash_command)]
-pub async fn show(
+async fn show(
   ctx: Context<'_>,
   #[description = "ID of the quote to show"]
   #[rename = "id"]

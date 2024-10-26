@@ -1,15 +1,15 @@
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
 use crate::database::{DatabaseHandler, TrackingProfile};
-use crate::time::{offset_from_choice, MinusOffsetChoice, PlusOffsetChoice};
-use crate::{time, Context};
+use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use log::error;
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 
 #[derive(poise::ChoiceParameter)]
-pub enum Privacy {
+enum Privacy {
   #[name = "private"]
   Private,
   #[name = "public"]
@@ -17,7 +17,7 @@ pub enum Privacy {
 }
 
 #[derive(poise::ChoiceParameter)]
-pub enum OnOff {
+enum OnOff {
   #[name = "on"]
   On,
   #[name = "off"]
@@ -45,7 +45,7 @@ pub async fn customize(_: Context<'_>) -> Result<()> {
 ///
 /// Show your current settings for meditation tracking experience customization.
 #[poise::command(slash_command)]
-pub async fn show(ctx: Context<'_>) -> Result<()> {
+async fn show(ctx: Context<'_>) -> Result<()> {
   let data = ctx.data();
 
   let guild_id = ctx
@@ -108,7 +108,7 @@ pub async fn show(ctx: Context<'_>) -> Result<()> {
 ///
 /// Set a UTC offset to be used for tracking. Times will be adjusted to your local time. Note that daylight savings time adjustments will need to be made manually, if necessary.
 #[poise::command(slash_command)]
-pub async fn offset(
+async fn offset(
   ctx: Context<'_>,
   #[description = "Specify a UTC offset for a Western Hemisphere time zone"]
   #[rename = "western_hemisphere_offset"]
@@ -126,7 +126,7 @@ pub async fn offset(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  let choice_offset = offset_from_choice(minus_offset, plus_offset, 0);
+  let choice_offset = time::offset_from_choice(minus_offset, plus_offset, 0);
   let Ok(utc_offset) = choice_offset else {
     ctx
       .send(
@@ -187,7 +187,7 @@ pub async fn offset(
     .await?;
   }
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!(
@@ -207,7 +207,7 @@ pub async fn offset(
 ///
 /// When anonymous tracking is turned on, the anonymous entry is displayed in the channel to motivate others, but personal information (total meditation time, streak and role info) is shared with you privately via ephemeral messages.
 #[poise::command(slash_command)]
-pub async fn tracking(
+async fn tracking(
   ctx: Context<'_>,
   #[description = "Turn anonymous tracking on or off (Default is off)"] anonymous: OnOff,
 ) -> Result<()> {
@@ -274,7 +274,7 @@ pub async fn tracking(
     .await?;
   }
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!(
@@ -297,7 +297,7 @@ pub async fn tracking(
 ///
 /// When streaks are set to private, other members will be unable to view your streak using the /streak command. When you view your own streak using the /streak command, the response will be shown privately in an ephemeral message by default. This can be overridden by setting privacy to "public" when using the command.
 #[poise::command(slash_command)]
-pub async fn streak(
+async fn streak(
   ctx: Context<'_>,
   #[description = "Set streak privacy (Defaults to public)"] privacy: Option<Privacy>,
   #[description = "Turn streak reporting on or off (Defaults to on)"] reporting: Option<OnOff>,
@@ -485,7 +485,7 @@ pub async fn streak(
     }
   }
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!(
@@ -505,7 +505,7 @@ pub async fn streak(
 ///
 /// When stats are set to private, other members will be unable to view your stats using the /stats user command. When you view your own stats using the /stats user command, the response will be shown privately in an ephemeral message by default. This can be overridden by setting privacy to "public" when using the command.
 #[poise::command(slash_command)]
-pub async fn stats(
+async fn stats(
   ctx: Context<'_>,
   #[description = "Set stats privacy (Defaults to public)"] privacy: Privacy,
 ) -> Result<()> {
@@ -572,7 +572,7 @@ pub async fn stats(
     .await?;
   }
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!(

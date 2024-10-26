@@ -3,13 +3,10 @@
 
 use anyhow::{Context as ErrorContext, Error, Result};
 use commands::{
-  add::add, bookmark::add_bookmark, bookmark::bookmark, challenge::challenge, coffee::coffee,
-  community_sit::community_sit, complete::complete, course::course, courses::courses,
-  customize::customize, erase::erase, erase::erase_message, glossary::glossary, hello::hello,
-  help::help, import::import, keys::keys, manage::manage, pick_winner::pick_winner, ping::ping,
-  quote::quote, quotes::quotes, recent::recent, remove_entry::remove_entry,
-  report_message::report_message, stats::stats, streak::streak, suggest::suggest, terms::terms,
-  uptime::uptime, whatis::whatis,
+  add, add_bookmark, bookmark, challenge, coffee, community_sit, complete, course, courses,
+  customize, erase, erase_message, glossary, hello, help, import, keys, manage, pick_winner, ping,
+  quote, quotes, recent, remove_entry, report_message, stats, streak, suggest, terms, uptime,
+  whatis,
 };
 use dotenvy::dotenv;
 use log::{error, info};
@@ -18,18 +15,15 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use serenity::FullEvent as Event;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::Mutex;
-use tokio::time::sleep;
 
 mod charts;
 mod commands;
 mod config;
-mod database;
-mod embeddings;
 mod events;
-mod pagination;
-mod time;
+mod handlers;
+
+use handlers::{database, embeddings};
 
 pub struct Data {
   pub db: Arc<database::DatabaseHandler>,
@@ -170,7 +164,6 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
             format!("{} ({})", guild_name, channel.id())
           }
           channel::Channel::Private(_) => "DM".to_owned(),
-          // channel::Channel::Category(_) => "category".to_string(),
           _ => "unknown".to_owned(),
         },
         None => "unknown".to_owned(),
@@ -220,97 +213,12 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
   }
 }
 
-async fn event_handler(
-  ctx: &serenity::Context,
-  event: &Event,
-  // _framework: poise::FrameworkContext<'_, Data, Error>,
-  data: &Data,
-) -> Result<(), Error> {
+async fn event_handler(ctx: &serenity::Context, event: &Event, data: &Data) -> Result<(), Error> {
   let database = &data.db;
 
   match event {
-    // Event::GuildMemberAddition { new_member } => {
-    //   events::guild_member_addition(ctx, new_member).await?;
-    // }
     Event::GuildCreate { guild, .. } => {
-      let task_http = ctx.http.clone();
-      let task_conn = data.db.clone();
-      let guild_id = guild.id;
-      let update_leaderboards = tokio::task::spawn(async move {
-        info!("Leaderboard: Refreshing views");
-        let refresh_start = std::time::Instant::now();
-        if let Err(err) = events::leaderboards::refresh(&task_conn).await {
-          error!("Leaderboard: Error refreshing views: {:?}", err);
-        }
-        info!(
-          "Leaderboard: Refresh completed in {:#?}",
-          refresh_start.elapsed()
-        );
-
-        sleep(Duration::from_secs(10)).await;
-
-        info!("Leaderboard: Generating images");
-        let generation_start = std::time::Instant::now();
-        if let Err(err) = events::leaderboards::generate(&task_http, &task_conn, &guild_id).await {
-          error!("Leaderboard: Error generating images: {:?}", err);
-        }
-        info!(
-          "Leaderboard: Generation completed in {:#?}",
-          generation_start
-            .elapsed()
-            .saturating_sub(Duration::from_secs(115))
-        );
-      });
-      update_leaderboards.await?;
-
-      let task_conn = data.db.clone();
-      let update_chart_stats = tokio::task::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(60 * 60 * 12));
-        let wait = {
-          let now = chrono::Utc::now();
-          let midnight = now
-            .date_naive()
-            .and_hms_opt(0, 0, 0)
-            .unwrap_or_else(|| now.naive_utc())
-            .and_utc()
-            + chrono::Duration::hours(24);
-          let noon = now
-            .date_naive()
-            .and_hms_opt(12, 0, 0)
-            .unwrap_or_else(|| now.naive_utc())
-            .and_utc();
-          if noon > now {
-            (noon - now).num_seconds().unsigned_abs()
-          } else {
-            (midnight - now).num_seconds().unsigned_abs()
-          }
-        };
-        #[allow(clippy::cast_possible_wrap)]
-        if wait > 0 {
-          info!(
-            "Chart stats: Next refresh in {}m ({})",
-            wait / 60,
-            (chrono::Utc::now() + chrono::Duration::seconds(wait as i64)).format("%H:%M %P")
-          );
-        }
-        sleep(Duration::from_secs(wait)).await;
-        loop {
-          interval.tick().await;
-
-          info!("Chart stats: Refreshing views");
-          let refresh_start = std::time::Instant::now();
-          if let Err(err) = events::refresh_chart_stats(&task_conn).await {
-            error!("Chart stats: Error refreshing views: {:?}", err);
-          }
-          info!(
-            "Chart stats: Refresh completed in {:#?}",
-            refresh_start
-              .elapsed()
-              .saturating_sub(Duration::from_secs(60 * 4))
-          );
-        }
-      });
-      update_chart_stats.await?;
+      events::guild_create(ctx, database, &guild.id).await?;
     }
     Event::GuildMemberRemoval { user, .. } => {
       events::guild_member_removal(ctx, user).await?;

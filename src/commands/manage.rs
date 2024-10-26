@@ -1,9 +1,9 @@
 #![allow(clippy::too_many_arguments)]
 
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{Datelike, Timelike};
@@ -11,7 +11,7 @@ use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
 use poise::{ChoiceParameter, CreateReply};
 
 #[derive(poise::ChoiceParameter)]
-pub enum DataType {
+enum DataType {
   #[name = "meditation entries"]
   MeditationEntries,
   #[name = "customization settings"]
@@ -42,7 +42,7 @@ pub async fn manage(_: Context<'_>) -> Result<()> {
 ///
 /// Creates a new meditation entry for the user. Note that all times are in UTC.
 #[poise::command(slash_command)]
-pub async fn create(
+async fn create(
   ctx: Context<'_>,
   #[description = "The user to create the entry for"] user: serenity::User,
   #[description = "The number of minutes for the entry"]
@@ -151,7 +151,7 @@ pub async fn create(
     .description(&description)
     .clone();
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::EmbedOnly(success_embed),
@@ -185,7 +185,7 @@ pub async fn create(
 ///
 /// Lists all meditation entries for a user.
 #[poise::command(slash_command)]
-pub async fn list(
+async fn list(
   ctx: Context<'_>,
   #[description = "The user to list the entries for"] user: serenity::User,
   #[description = "The page to show"] page: Option<usize>,
@@ -197,69 +197,15 @@ pub async fn list(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  // Define some unique identifiers for the navigation buttons
-  let ctx_id = ctx.id();
-  let prev_button_id = format!("{ctx_id}prev");
-  let next_button_id = format!("{ctx_id}next");
-
-  let mut current_page = page.unwrap_or(0).saturating_sub(1);
-
   let entries =
     DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &user.id).await?;
-  drop(transaction);
   let entries: Vec<PageRowRef> = entries.iter().map(|entry| entry as _).collect();
-  let pagination = Pagination::new("Meditation Entries", entries, ENTRIES_PER_PAGE).await?;
 
-  if pagination.get_page(current_page).is_none() {
-    current_page = pagination.get_last_page_number();
-  }
+  drop(transaction);
 
-  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
-
-  ctx
-    .send({
-      let mut f = CreateReply::default();
-      if pagination.get_page_count() > 1 {
-        f = f.components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(&prev_button_id).label("Previous"),
-          CreateButton::new(&next_button_id).label("Next"),
-        ])]);
-      }
-      f.embeds = vec![first_page];
-      f.ephemeral(true)
-    })
+  Paginator::new("Meditation Entries", &entries, ENTRIES_PER_PAGE)
+    .paginate(ctx, page, PageType::Standard, true)
     .await?;
-
-  // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
-    .await
-  {
-    // Depending on which button was pressed, go to next or previous page
-    if press.data.custom_id == next_button_id {
-      current_page = pagination.update_page_number(current_page, 1);
-    } else if press.data.custom_id == prev_button_id {
-      current_page = pagination.update_page_number(current_page, -1);
-    } else {
-      // This is an unrelated button interaction
-      continue;
-    }
-
-    // Update the message with the new page contents
-    press
-      .create_response(
-        ctx,
-        CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new()
-            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
-        ),
-      )
-      .await?;
-  }
 
   Ok(())
 }
@@ -268,7 +214,7 @@ pub async fn list(
 ///
 /// Updates a meditation entry for a user. Note that all times are in UTC.
 #[poise::command(slash_command)]
-pub async fn update(
+async fn update(
   ctx: Context<'_>,
   #[description = "The entry to update"] entry_id: String,
   #[description = "The number of minutes for the entry"]
@@ -416,7 +362,7 @@ pub async fn update(
       .description(&description)
       .clone();
 
-    commit_and_say(
+    database::commit_and_say(
       ctx,
       transaction,
       MessageType::EmbedOnly(success_embed),
@@ -469,7 +415,7 @@ pub async fn update(
 ///
 /// Deletes a meditation entry for the user.
 #[poise::command(slash_command)]
-pub async fn delete(
+async fn delete(
   ctx: Context<'_>,
   #[description = "The entry to delete"] entry_id: String,
 ) -> Result<()> {
@@ -527,7 +473,7 @@ pub async fn delete(
     .description(&description)
     .clone();
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::EmbedOnly(success_embed),
@@ -561,7 +507,7 @@ pub async fn delete(
 ///
 /// Resets all meditation entries or customization settings for a user.
 #[poise::command(slash_command)]
-pub async fn reset(
+async fn reset(
   ctx: Context<'_>,
   #[description = "The user to reset the entries for"] user: serenity::User,
   #[description = "The type of data to reset (Defaults to meditation entries)"]
@@ -706,7 +652,7 @@ pub async fn reset(
 ///
 /// Migrates all meditation entries or customization settings from one user account to another.
 #[poise::command(slash_command)]
-pub async fn migrate(
+async fn migrate(
   ctx: Context<'_>,
   #[description = "The user to migrate data from"] old_user: serenity::User,
   #[description = "The user to migrate data to"] new_user: serenity::User,

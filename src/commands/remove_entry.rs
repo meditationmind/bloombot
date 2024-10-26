@@ -1,4 +1,4 @@
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -59,7 +59,7 @@ pub async fn remove_entry(
 
   DatabaseHandler::delete_meditation_entry(&mut transaction, id.as_str()).await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Entry has been removed.", EMOJI.mmcheck)),

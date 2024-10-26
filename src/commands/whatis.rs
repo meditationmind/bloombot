@@ -1,4 +1,4 @@
-use crate::commands::BloomBotEmbed;
+use crate::config::BloomBotEmbed;
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};

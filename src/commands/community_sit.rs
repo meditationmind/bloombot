@@ -55,7 +55,7 @@ pub async fn community_sit(_: Context<'_>) -> Result<()> {
 ///
 /// Starts a scheduled community sit event.
 #[poise::command(slash_command)]
-pub async fn start(ctx: Context<'_>) -> Result<()> {
+async fn start(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
   let guild_id = ctx
     .guild_id()
@@ -220,7 +220,7 @@ pub async fn start(ctx: Context<'_>) -> Result<()> {
 ///
 /// Ends an active community sit event.
 #[poise::command(slash_command)]
-pub async fn end(ctx: Context<'_>) -> Result<()> {
+async fn end(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
   let guild_id = ctx
     .guild_id()

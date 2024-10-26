@@ -1,11 +1,9 @@
-use crate::commands::BloomBotEmbed;
-use crate::config::CHANNELS;
+use crate::config::{BloomBotEmbed, CHANNELS};
 use crate::database::DatabaseHandler;
 // use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use log::info;
-use pgvector;
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::CreateReply;
 
@@ -30,7 +28,7 @@ pub async fn glossary(_: Context<'_>) -> Result<()> {
 ///
 /// Shows a list of all glossary entries.
 #[poise::command(slash_command)]
-pub async fn list(
+async fn list(
   ctx: Context<'_>,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
@@ -280,7 +278,7 @@ pub async fn browse(
 ///
 /// Shows information about a glossary entry.
 #[poise::command(slash_command)]
-pub async fn info(
+async fn info(
   ctx: Context<'_>,
   #[description = "The term to show information about"] term: String,
 ) -> Result<()> {
@@ -448,7 +446,7 @@ pub async fn info(
 ///
 /// Searches glossary entries using keywords or phrases, leveraging AI to find the closest matches.
 #[poise::command(slash_command)]
-pub async fn search(
+async fn search(
   ctx: Context<'_>,
   #[description = "The term to search for"] search: String,
 ) -> Result<()> {
@@ -558,7 +556,7 @@ pub async fn search(
 ///
 /// Suggest a term for addition to the glossary.
 #[poise::command(slash_command)]
-pub async fn suggest(
+async fn suggest(
   ctx: Context<'_>,
   #[description = "Term you wish to suggest"] suggestion: String,
 ) -> Result<()> {

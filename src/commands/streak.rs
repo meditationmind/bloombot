@@ -1,11 +1,11 @@
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
 use crate::database::{DatabaseHandler, TrackingProfile};
 use crate::{config, Context};
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude as serenity;
 
 #[derive(poise::ChoiceParameter)]
-pub enum Privacy {
+enum Privacy {
   #[name = "private"]
   Private,
   #[name = "public"]
@@ -78,12 +78,12 @@ pub async fn streak(
           )
         };
 
-        commit_and_say(ctx, transaction, MessageType::TextOnly(message), true).await?;
+        database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), true).await?;
 
         return Ok(());
       }
 
-      commit_and_say(
+      database::commit_and_say(
         ctx,
         transaction,
         MessageType::TextOnly(format!(
@@ -108,7 +108,7 @@ pub async fn streak(
       )
     };
 
-    commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
+    database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
 
     return Ok(());
   }
@@ -125,7 +125,7 @@ pub async fn streak(
     )
   };
 
-  commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
+  database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
 
   Ok(())
 }

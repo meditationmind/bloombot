@@ -1,10 +1,9 @@
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
 use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
 use log::info;
-use pgvector;
 use poise::serenity_prelude as serenity;
 use poise::Modal;
 use std::cmp::Ordering;
@@ -47,7 +46,7 @@ struct UpdateTermModal {
   aliases: Option<String>,
 }
 
-pub async fn term_not_found(
+async fn term_not_found(
   ctx: Context<'_>,
   transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
   guild_id: serenity::GuildId,
@@ -128,7 +127,7 @@ pub async fn terms(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
 ///
 /// Adds a new term to the glossary.
 #[poise::command(slash_command)]
-pub async fn add(
+async fn add(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
   #[description = "The term to add"]
   #[rename = "term"]
@@ -179,7 +178,7 @@ pub async fn add(
     )
     .await?;
 
-    commit_and_say(
+    database::commit_and_say(
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Term has been added.", EMOJI.mmcheck)),
@@ -195,7 +194,7 @@ pub async fn add(
 ///
 /// Updates an existing term in the glossary.
 #[poise::command(slash_command)]
-pub async fn edit(
+async fn edit(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
   #[description = "The term to edit"]
   #[rename = "term"]
@@ -277,7 +276,7 @@ pub async fn edit(
     )
     .await?;
 
-    commit_and_say(
+    database::commit_and_say(
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Term has been edited.", EMOJI.mmcheck)),
@@ -293,7 +292,7 @@ pub async fn edit(
 ///
 /// Removes a term from the glossary.
 #[poise::command(slash_command)]
-pub async fn remove(
+async fn remove(
   ctx: Context<'_>,
   #[description = "The term to remove"]
   #[rename = "term"]
@@ -319,7 +318,7 @@ pub async fn remove(
 
   DatabaseHandler::remove_term(&mut transaction, term_name.as_str(), &guild_id).await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Term has been removed.", EMOJI.mmcheck)),
@@ -334,7 +333,7 @@ pub async fn remove(
 ///
 /// Updates embeddings for all terms.
 #[poise::command(slash_command)]
-pub async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
+async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
   let data = ctx.data();
@@ -378,7 +377,7 @@ pub async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
     .await?;
   }
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!(

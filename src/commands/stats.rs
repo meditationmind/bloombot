@@ -3,12 +3,12 @@
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::database::Timeframe;
 use crate::database::{DatabaseHandler, TrackingProfile};
-use crate::events::leaderboards::LEADERBOARDS;
+use crate::events::leaderboards::{self, LEADERBOARDS};
 use crate::Context;
 use crate::{charts, config};
 use anyhow::{Context as AnyhowContext, Result};
 use log::info;
-use poise::serenity_prelude::{self as serenity, builder::*, UserId};
+use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::ChoiceParameter;
 
 #[allow(clippy::module_name_repetitions)]
@@ -49,7 +49,7 @@ pub enum LeaderboardType {
 }
 
 #[derive(poise::ChoiceParameter)]
-pub enum Privacy {
+enum Privacy {
   #[name = "Private"]
   Private,
   #[name = "Public"]
@@ -57,7 +57,7 @@ pub enum Privacy {
 }
 
 #[derive(poise::ChoiceParameter)]
-pub enum Theme {
+enum Theme {
   #[name = "Light Mode"]
   LightMode,
   #[name = "Dark Mode"]
@@ -84,7 +84,7 @@ pub async fn stats(_: Context<'_>) -> Result<()> {
 ///
 /// Defaults to daily minutes for yourself. Optionally specify the user, type (minutes or session count), and/or timeframe (daily, weekly, monthly, or yearly).
 #[poise::command(slash_command)]
-pub async fn user(
+async fn user(
   ctx: Context<'_>,
   #[description = "The user to get the stats of (Defaults to you)"] user: Option<serenity::User>,
   #[description = "The type of stats to get (Defaults to minutes)"]
@@ -304,7 +304,7 @@ pub async fn user(
 ///
 /// Defaults to daily minutes. Optionally specify the type (minutes or session count) and/or timeframe (daily, weekly, monthly, or yearly).
 #[poise::command(slash_command)]
-pub async fn server(
+async fn server(
   ctx: Context<'_>,
   #[description = "The type of stats to get (Defaults to minutes)"]
   #[rename = "type"]
@@ -435,7 +435,7 @@ pub async fn server(
 ///
 /// Defaults to monthly top 5, sorted by minutes, in dark mode. Optionally specify the timeframe (daily, weekly, monthly, or yearly), sort (minutes, sessions, or streak), and theme (light mode or dark mode).
 #[poise::command(slash_command)]
-pub async fn leaderboard(
+async fn leaderboard(
   ctx: Context<'_>,
   #[description = "The leaderboard timeframe (Defaults to monthly)"] timeframe: Option<Timeframe>,
   #[description = "The stat to sort by (Defaults to minutes)"] sort: Option<SortBy>,
@@ -564,97 +564,49 @@ pub async fn leaderboard(
   )
   .await?;
 
-  let mut leaderboard_data: Vec<Vec<String>> = vec![vec![
-    "Name".to_string(),
-    "Minutes".to_string(),
-    "Sessions".to_string(),
-    "Streak".to_string(),
-  ]];
+  let leaderboard_data = leaderboards::process_stats(ctx.http(), &guild_id, &stats).await?;
 
-  let mut rank = 1;
-  for record in stats {
-    if let Some(user_id) = record.name {
-      let user_nick_or_name = if record.anonymous_tracking.unwrap_or(false) {
-        "Anonymous".to_string()
-      } else {
-        let user = UserId::new(user_id.parse::<u64>()?).to_user(&ctx).await?;
-        let name = user
-          .nick_in(&ctx, guild_id)
-          .await
-          .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
-        if name
-          .chars()
-          .all(|c| c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c.is_ascii_whitespace())
-        {
-          name
-        } else {
-          name
-            .chars()
-            .map(|c| {
-              if c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c.is_ascii_whitespace() {
-                c.to_string()
-              } else {
-                String::new()
-              }
-            })
-            .collect::<String>()
-        }
-      };
-      leaderboard_data.push(vec![
-        format!("{}. {}", rank, user_nick_or_name),
-        record.minutes.unwrap_or(0).to_string(),
-        record.sessions.unwrap_or(0).to_string(),
-        if record.streaks_active.unwrap_or(true) && !record.streaks_private.unwrap_or(false) {
-          record.streak.unwrap_or(0).to_string()
-        } else {
-          "N/A".to_string()
-        },
-      ]);
-      rank += 1;
-    }
-  }
+  if let Some(leaderboard_data) = leaderboard_data {
+    let chart = charts::Chart::new()
+      .await?
+      .leaderboard(
+        leaderboard_data,
+        &timeframe,
+        &sort_by,
+        &leaderboard_type,
+        light_mode,
+      )
+      .await?;
 
-  if leaderboard_data.len() == 1 {
+    let file_path = chart.path();
+
+    let embed = BloomBotEmbed::new().image(chart.url());
+
     ctx
       .send(
         poise::CreateReply::default()
-          .content(format!(
-            "{} Sorry, no leaderboard data available.",
-            EMOJI.mminfo
-          ))
-          .ephemeral(true)
-          .allowed_mentions(serenity::CreateAllowedMentions::new()),
+          .embed(embed)
+          .ephemeral(false)
+          .attachment(CreateAttachment::path(&file_path).await?),
       )
       .await?;
+
+    chart.remove().await?;
 
     return Ok(());
   }
 
-  let chart = charts::Chart::new()
-    .await?
-    .leaderboard(
-      leaderboard_data,
-      &timeframe,
-      &sort_by,
-      &leaderboard_type,
-      light_mode,
-    )
-    .await?;
-
-  let file_path = chart.path();
-
-  let embed = BloomBotEmbed::new().image(chart.url());
-
   ctx
     .send(
       poise::CreateReply::default()
-        .embed(embed)
-        .ephemeral(false)
-        .attachment(CreateAttachment::path(&file_path).await?),
+        .content(format!(
+          "{} Sorry, no leaderboard data available.",
+          EMOJI.mminfo
+        ))
+        .ephemeral(true)
+        .allowed_mentions(serenity::CreateAllowedMentions::new()),
     )
     .await?;
-
-  chart.remove().await?;
 
   Ok(())
 }

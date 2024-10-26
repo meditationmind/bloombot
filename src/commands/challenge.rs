@@ -9,7 +9,7 @@ use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::CreateReply;
 
 #[derive(poise::ChoiceParameter)]
-pub enum ChallengeChoices {
+enum ChallengeChoices {
   #[name = "Monthly Challenge"]
   Monthly,
   #[name = "365-Day Challenge"]
@@ -34,7 +34,7 @@ pub async fn challenge(_: Context<'_>) -> Result<()> {
 ///
 /// Join the monthly or 365-day meditation challenge.
 #[poise::command(slash_command)]
-pub async fn join(
+async fn join(
   ctx: Context<'_>,
   #[description = "Challenge you wish to join (Defaults to monthly)"] challenge: Option<
     ChallengeChoices,
@@ -139,7 +139,7 @@ pub async fn join(
 ///
 /// Leave the monthly or 365-day meditation challenge.
 #[poise::command(slash_command)]
-pub async fn leave(
+async fn leave(
   ctx: Context<'_>,
   #[description = "Challenge you wish to leave (Defaults to monthly)"] challenge: Option<
     ChallengeChoices,
@@ -243,7 +243,7 @@ pub async fn leave(
 ///
 /// View your stats for the current monthly or 365-day meditation challenge.
 #[poise::command(slash_command)]
-pub async fn stats(
+async fn stats(
   ctx: Context<'_>,
   #[description = "Challenge you wish to see stats for (Defaults to monthly)"] challenge: Option<
     ChallengeTimeframe,

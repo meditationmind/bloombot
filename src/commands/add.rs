@@ -1,121 +1,21 @@
-use crate::commands::{commit_and_say, MessageType};
-use crate::config::{BloomBotEmbed, StreakRoles, TimeSumRoles, CHANNELS, EMOJI};
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
+use crate::commands::helpers::tracking;
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::{DatabaseHandler, TrackingProfile};
-use crate::time::{offset_from_choice, MinusOffsetChoice, PlusOffsetChoice};
+use crate::events;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::Duration;
-use log::error;
-use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
+use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::CreateReply;
 
 #[derive(poise::ChoiceParameter)]
-pub enum Privacy {
+enum Privacy {
   #[name = "private"]
   Private,
   #[name = "public"]
   Public,
-}
-
-async fn update_time_roles(
-  ctx: Context<'_>,
-  member: &serenity::Member,
-  sum: i64,
-  privacy: bool,
-) -> Result<()> {
-  let current_time_roles = TimeSumRoles::get_users_current_roles(&member.roles);
-  let updated_time_role = TimeSumRoles::from_sum(sum);
-
-  if let Some(updated_time_role) = updated_time_role {
-    if !current_time_roles.contains(&updated_time_role.to_role_id()) {
-      for role in current_time_roles {
-        match member.remove_role(ctx, role).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error removing role: {err}");
-            ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(true)).await?;
-
-            return Ok(());
-          }
-        }
-      }
-
-      match member.add_role(ctx, updated_time_role.to_role_id()).await {
-        Ok(()) => {}
-        Err(err) => {
-          error!("Error adding role: {err}");
-          ctx.send(CreateReply::default()
-            .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-            .allowed_mentions(serenity::CreateAllowedMentions::new())
-            .ephemeral(true)).await?;
-
-          return Ok(());
-        }
-      }
-
-      ctx.send(CreateReply::default()
-        .content(format!(":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!", member.mention(), updated_time_role.to_role_id()))
-        .allowed_mentions(serenity::CreateAllowedMentions::new())
-        .ephemeral(privacy)).await?;
-    }
-  }
-
-  Ok(())
-}
-
-async fn update_streak_roles(
-  ctx: Context<'_>,
-  member: &serenity::Member,
-  streak: i32,
-  privacy: bool,
-) -> Result<()> {
-  let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
-  #[allow(clippy::cast_sign_loss)]
-  let updated_streak_role = StreakRoles::from_streak(streak as u64);
-
-  if let Some(updated_streak_role) = updated_streak_role {
-    if !current_streak_roles.contains(&updated_streak_role.to_role_id()) {
-      for role in current_streak_roles {
-        match member.remove_role(ctx, role).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error removing role: {err}");
-
-            ctx.send(CreateReply::default()
-                .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-                .allowed_mentions(serenity::CreateAllowedMentions::new())
-                .ephemeral(true)).await?;
-
-            return Ok(());
-          }
-        }
-      }
-
-      match member.add_role(ctx, updated_streak_role.to_role_id()).await {
-        Ok(()) => {}
-        Err(err) => {
-          error!("Error adding role: {err}");
-
-          ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(true)).await?;
-
-          return Ok(());
-        }
-      }
-
-      ctx.send(CreateReply::default()
-          .content(format!(":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!", member.mention(), streak, updated_streak_role.to_role_id()))
-          .allowed_mentions(serenity::CreateAllowedMentions::new())
-          .ephemeral(privacy)).await?;
-    }
-  }
-
-  Ok(())
 }
 
 /// Add a meditation entry
@@ -175,7 +75,11 @@ pub async fn add(
     ctx.defer().await?;
   }
 
-  let offset = match offset_from_choice(minus_offset, plus_offset, tracking_profile.utc_offset) {
+  let offset = match time::offset_from_choice(
+    minus_offset,
+    plus_offset,
+    tracking_profile.utc_offset,
+  ) {
     Ok(offset) => offset,
     Err(e) => {
       ctx
@@ -208,47 +112,19 @@ pub async fn add(
     .await?;
   }
 
-  let random_quote = DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await?;
   let user_sum =
     DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, &user_id).await?;
 
-  let response = match random_quote {
-    Some(quote) => {
-      // Strip non-alphanumeric characters from the quote
-      let quote = quote
-        .quote
-        .chars()
-        //.filter(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation() || matches!(c, '’' | '‘' | '“' | '”' | '—' | '…' | 'ā'))
-        .filter(|c| !matches!(c, '*'))
-        .map(|c| {
-          if c.is_ascii_punctuation() {
-            if matches!(c, '_' | '~') {
-              c.to_string()
-            } else {
-              format!("\\{c}")
-            }
-          } else {
-            c.to_string()
-          }
-        })
-        .collect::<String>();
-
-      if privacy {
-        format!(
-          "Someone just added **{minutes} minutes** to their meditation time! :tada:\n*{quote}*"
-        )
-      } else {
-        format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:\n*{quote}*")
-      }
-    }
-    None => {
-      if privacy {
-        format!("Someone just added **{minutes} minutes** to their meditation time! :tada:")
-      } else {
-        format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:")
-      }
-    }
-  };
+  let response = tracking::show_add_with_quote(
+    &ctx,
+    &mut transaction,
+    &guild_id,
+    &user_id,
+    &minutes,
+    &user_sum,
+    privacy,
+  )
+  .await?;
 
   if minutes > 300 {
     let ctx_id = ctx.id();
@@ -390,25 +266,11 @@ pub async fn add(
     0
   };
 
-  // We only show the guild time every tenth add, so we can avoid getting
-  // the guild sum and computing the hours if this is not the tenth add.
-  // Return a string so we can use it to skip displaying the time later
-  // without risking a default integer value matching the actual time.
-  let guild_time_in_hours = {
-    let guild_count =
-      DatabaseHandler::get_guild_meditation_count(&mut transaction, &guild_id).await?;
-    if guild_count % 10 == 0 {
-      let guild_sum =
-        DatabaseHandler::get_guild_meditation_sum(&mut transaction, &guild_id).await?;
-      (guild_sum / 60).to_string()
-    } else {
-      "skip".to_owned()
-    }
-  };
+  let guild_time_in_hours = tracking::get_guild_hours(&mut transaction, &guild_id).await?;
 
   if privacy {
     let private_response = format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:");
-    commit_and_say(
+    database::commit_and_say(
       ctx,
       transaction,
       MessageType::TextOnly(private_response),
@@ -421,45 +283,24 @@ pub async fn add(
       .send_message(ctx, CreateMessage::new().content(response))
       .await?;
   } else {
-    commit_and_say(ctx, transaction, MessageType::TextOnly(response), false).await?;
+    database::commit_and_say(ctx, transaction, MessageType::TextOnly(response), false).await?;
   }
 
-  if guild_time_in_hours != "skip" {
-    ctx.say(format!("Awesome sauce! This server has collectively generated {guild_time_in_hours} hours of realmbreaking meditation!")).await?;
-  }
+  tracking::post_guild_hours(&ctx, &guild_time_in_hours).await?;
 
   let member = guild_id.member(ctx, user_id).await?;
-  update_time_roles(ctx, &member, user_sum, privacy).await?;
+  tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
   if tracking_profile.streaks_active {
-    update_streak_roles(ctx, &member, user_streak, privacy).await?;
+    tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
   }
 
-  if guild_time_in_hours != "skip" {
-    let task_http = ctx.serenity_context().http.clone();
-    let task_conn = data.db.clone();
-    let update_leaderboards = tokio::task::spawn(async move {
-      log::info!("Leaderboard: Refreshing views");
-      let refresh_start = std::time::Instant::now();
-      if let Err(err) = crate::events::leaderboards::refresh(&task_conn).await {
-        error!("Leaderboard: Error refreshing views: {:?}", err);
-      }
-      log::info!("Refresh completed in {:#?}", refresh_start.elapsed());
-
-      tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-
-      log::info!("Leaderboard: Generating images");
-      let generation_start = std::time::Instant::now();
-      if let Err(err) =
-        crate::events::leaderboards::generate(&task_http, &task_conn, &guild_id).await
-      {
-        error!("Leaderboard: Error generating images: {:?}", err);
-      }
-      log::info!(
-        "Leaderboard: Generation completed in {:#?}",
-        generation_start.elapsed()
-      );
-    });
-    update_leaderboards.await?;
+  if guild_time_in_hours.is_some() {
+    tokio::spawn(events::leaderboards::update(
+      module_path!(),
+      ctx.serenity_context().http.clone(),
+      data.db.clone(),
+      guild_id,
+    ));
   }
 
   Ok(())

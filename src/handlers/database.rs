@@ -2,13 +2,15 @@
   clippy::needless_raw_string_hashes,
   clippy::fn_params_excessive_bools,
   clippy::struct_excessive_bools,
-  clippy::too_many_arguments
+  clippy::too_many_arguments,
+  clippy::missing_errors_doc,
+  clippy::missing_panics_doc
 )]
 #![cfg_attr(any(), rustfmt::skip::macros(query, query_as))]
 
 use crate::{
+  commands::helpers::pagination::{PageRow, PageType},
   commands::stats::{LeaderboardType, SortBy},
-  pagination::{PageRow, PageType},
 };
 use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike, Utc};
@@ -29,6 +31,7 @@ struct MeditationCountByDay {
   days_ago: Option<f64>,
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct DatabaseHandler {
   pool: sqlx::PgPool,
 }
@@ -438,7 +441,7 @@ impl DatabaseHandler {
 
       sqlx::migrate!("./migrations").run(&pool).await?;
 
-      info!("Successfully applied migrations.");
+      info!(target: "bloombot::database", "Successfully applied migrations.");
 
       return Ok(Self { pool });
     }

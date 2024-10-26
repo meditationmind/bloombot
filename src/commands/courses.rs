@@ -1,10 +1,11 @@
-use crate::commands::{commit_and_say, course_not_found, MessageType};
+use crate::commands::helpers::courses;
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*};
+use poise::serenity_prelude as serenity;
 use poise::CreateReply;
 
 /// Commands for managing courses
@@ -31,7 +32,7 @@ pub async fn courses(_: Context<'_>) -> Result<()> {
 ///
 /// Adds a course and its associated graduate role to the database.
 #[poise::command(slash_command)]
-pub async fn add(
+async fn add(
   ctx: Context<'_>,
   #[description = "Name of the course"] course_name: String,
   #[description = "The role participants of the course are assumed to have"]
@@ -133,7 +134,7 @@ pub async fn add(
   )
   .await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Course has been added.", EMOJI.mmcheck)),
@@ -148,7 +149,7 @@ pub async fn add(
 ///
 /// Updates the roles for an existing course.
 #[poise::command(slash_command)]
-pub async fn edit(
+async fn edit(
   ctx: Context<'_>,
   #[description = "Name of the course"] course_name: String,
   #[description = "Update the role that participants of the course are assumed to have"]
@@ -182,7 +183,7 @@ pub async fn edit(
 
   // Verify that the course exists
   if course.is_none() {
-    course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
+    courses::course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
     return Ok(());
   }
 
@@ -275,7 +276,7 @@ pub async fn edit(
   )
   .await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Course roles have been updated.", EMOJI.mmcheck)),
@@ -290,7 +291,7 @@ pub async fn edit(
 ///
 /// Lists all courses in the database.
 #[poise::command(slash_command)]
-pub async fn list(
+async fn list(
   ctx: Context<'_>,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
@@ -302,68 +303,14 @@ pub async fn list(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  // Define some unique identifiers for the navigation buttons
-  let ctx_id = ctx.id();
-  let prev_button_id = format!("{ctx_id}prev");
-  let next_button_id = format!("{ctx_id}next");
-
-  let mut current_page = page.unwrap_or(0).saturating_sub(1);
-
   let courses = DatabaseHandler::get_all_courses(&mut transaction, &guild_id).await?;
   let courses: Vec<PageRowRef> = courses.iter().map(|course| course as _).collect();
+
   drop(transaction);
-  let pagination = Pagination::new("Courses", courses, ENTRIES_PER_PAGE).await?;
 
-  if pagination.get_page(current_page).is_none() {
-    current_page = pagination.get_last_page_number();
-  }
-
-  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
-
-  ctx
-    .send({
-      let mut f = CreateReply::default();
-      if pagination.get_page_count() > 1 {
-        f = f.components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(&prev_button_id).label("Previous"),
-          CreateButton::new(&next_button_id).label("Next"),
-        ])]);
-      }
-      f.embeds = vec![first_page];
-      f.ephemeral(true)
-    })
+  Paginator::new("Courses", &courses, ENTRIES_PER_PAGE)
+    .paginate(ctx, page, PageType::Standard, true)
     .await?;
-
-  // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
-    .await
-  {
-    // Depending on which button was pressed, go to next or previous page
-    if press.data.custom_id == next_button_id {
-      current_page = pagination.update_page_number(current_page, 1);
-    } else if press.data.custom_id == prev_button_id {
-      current_page = pagination.update_page_number(current_page, -1);
-    } else {
-      // This is an unrelated button interaction
-      continue;
-    }
-
-    // Update the message with the new page contents
-    press
-      .create_response(
-        ctx,
-        CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new()
-            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
-        ),
-      )
-      .await?;
-  }
 
   Ok(())
 }
@@ -372,7 +319,7 @@ pub async fn list(
 ///
 /// Removes a course from the database.
 #[poise::command(slash_command)]
-pub async fn remove(
+async fn remove(
   ctx: Context<'_>,
   #[description = "Name of the course"] course_name: String,
 ) -> Result<()> {
@@ -394,7 +341,7 @@ pub async fn remove(
 
   DatabaseHandler::remove_course(&mut transaction, &guild_id, course_name.as_str()).await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Course has been removed.", EMOJI.mmcheck)),

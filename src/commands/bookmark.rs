@@ -1,10 +1,10 @@
-use crate::commands::{commit_and_say, MessageType};
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{EMOJI, ROLES};
 use crate::database::DatabaseHandler;
-use crate::pagination::{PageRowRef, PageType, Pagination};
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*, RoleId};
+use poise::serenity_prelude::{self as serenity, RoleId};
 use poise::{CreateReply, Modal};
 
 #[derive(Debug, Modal)]
@@ -77,7 +77,7 @@ pub async fn add_bookmark(
     )
     .await?;
 
-    commit_and_say(
+    database::commit_and_say(
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Bookmark has been added.", EMOJI.mmcheck)),
@@ -108,7 +108,7 @@ pub async fn bookmark(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
 ///
 /// View a list of your bookmarks.
 #[poise::command(slash_command)]
-pub async fn list(
+async fn list(
   ctx: Context<'_>,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
@@ -121,73 +121,18 @@ pub async fn list(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  // Define some unique identifiers for the navigation buttons
-  let ctx_id = ctx.id();
-  let prev_button_id = format!("{ctx_id}prev");
-  let next_button_id = format!("{ctx_id}next");
-
-  let mut current_page = page.unwrap_or(0).saturating_sub(1);
-
   let bookmarks = DatabaseHandler::get_bookmarks(&mut transaction, &guild_id, &user_id).await?;
   let bookmarks: Vec<PageRowRef> = bookmarks
     .iter()
     .map(|bookmark| bookmark as PageRowRef)
     .collect();
+
   drop(transaction);
 
   let bookmarks_per_page = 5;
-  let pagination = Pagination::new("Your Bookmarks", bookmarks, bookmarks_per_page).await?;
-
-  if pagination.get_page(current_page).is_none() {
-    current_page = pagination.get_last_page_number();
-  }
-
-  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
-
-  ctx
-    .send({
-      let mut f = CreateReply::default();
-      if pagination.get_page_count() > 1 {
-        f = f.components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(&prev_button_id).label("Previous"),
-          CreateButton::new(&next_button_id).label("Next"),
-        ])]);
-      }
-      f.embeds = vec![first_page];
-      f.ephemeral(true)
-    })
+  Paginator::new("Your Bookmarks", &bookmarks, bookmarks_per_page)
+    .paginate(ctx, page, PageType::Standard, true)
     .await?;
-
-  // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
-    .await
-  {
-    // Depending on which button was pressed, go to next or previous page
-    if press.data.custom_id == next_button_id {
-      current_page = pagination.update_page_number(current_page, 1);
-    } else if press.data.custom_id == prev_button_id {
-      current_page = pagination.update_page_number(current_page, -1);
-    } else {
-      // This is an unrelated button interaction
-      continue;
-    }
-
-    // Update the message with the new page contents
-    press
-      .create_response(
-        ctx,
-        CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new()
-            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
-        ),
-      )
-      .await?;
-  }
 
   Ok(())
 }
@@ -196,7 +141,7 @@ pub async fn list(
 ///
 /// Adds a message to your bookmarks, with an optional short description.
 #[poise::command(slash_command)]
-pub async fn add(
+async fn add(
   ctx: Context<'_>,
   #[description = "Message to bookmark (message link)"] message: serenity::Message,
   #[max_length = 100]
@@ -243,7 +188,7 @@ pub async fn add(
   )
   .await?;
 
-  commit_and_say(
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Bookmark has been added.", EMOJI.mmcheck)),
@@ -258,7 +203,7 @@ pub async fn add(
 ///
 /// Removes one of your bookmarks.
 #[poise::command(slash_command)]
-pub async fn remove(
+async fn remove(
   ctx: Context<'_>,
   #[description = "The ID of the bookmark to remove"] id: String,
 ) -> Result<()> {
@@ -269,7 +214,7 @@ pub async fn remove(
 
   let result = DatabaseHandler::remove_bookmark(&mut transaction, bookmark_id.as_str()).await?;
   if result > 0 {
-    commit_and_say(
+    database::commit_and_say(
       ctx,
       transaction,
       MessageType::TextOnly(format!("{} Bookmark has been removed.", EMOJI.mmcheck)),
@@ -298,7 +243,7 @@ pub async fn remove(
 ///
 /// Example: "guided meditation" breath or mantra -walking
 #[poise::command(slash_command)]
-pub async fn search(
+async fn search(
   ctx: Context<'_>,
   #[description = "One or more keywords in search engine format"] keyword: String,
   #[description = "The page to show"] page: Option<usize>,
@@ -311,13 +256,6 @@ pub async fn search(
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
-
-  // Define some unique identifiers for the navigation buttons
-  let ctx_id = ctx.id();
-  let prev_button_id = format!("{ctx_id}prev");
-  let next_button_id = format!("{ctx_id}next");
-
-  let mut current_page = page.unwrap_or(0).saturating_sub(1);
 
   let bookmarks =
     DatabaseHandler::search_bookmarks(&mut transaction, &guild_id, &user_id, &keyword).await?;
@@ -340,62 +278,13 @@ pub async fn search(
     .iter()
     .map(|bookmark| bookmark as PageRowRef)
     .collect();
+
   drop(transaction);
 
   let bookmarks_per_page = 5;
-  let pagination =
-    Pagination::new("Bookmark Search Results", bookmarks, bookmarks_per_page).await?;
-
-  if pagination.get_page(current_page).is_none() {
-    current_page = pagination.get_last_page_number();
-  }
-
-  let first_page = pagination.create_page_embed(current_page, PageType::Standard);
-
-  ctx
-    .send({
-      let mut f = CreateReply::default();
-      if pagination.get_page_count() > 1 {
-        f = f.components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(&prev_button_id).label("Previous"),
-          CreateButton::new(&next_button_id).label("Next"),
-        ])]);
-      }
-      f.embeds = vec![first_page];
-      f.ephemeral(true)
-    })
+  Paginator::new("Bookmark Search Results", &bookmarks, bookmarks_per_page)
+    .paginate(ctx, page, PageType::Standard, true)
     .await?;
-
-  // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
-    .await
-  {
-    // Depending on which button was pressed, go to next or previous page
-    if press.data.custom_id == next_button_id {
-      current_page = pagination.update_page_number(current_page, 1);
-    } else if press.data.custom_id == prev_button_id {
-      current_page = pagination.update_page_number(current_page, -1);
-    } else {
-      // This is an unrelated button interaction
-      continue;
-    }
-
-    // Update the message with the new page contents
-    press
-      .create_response(
-        ctx,
-        CreateInteractionResponse::UpdateMessage(
-          CreateInteractionResponseMessage::new()
-            .embed(pagination.create_page_embed(current_page, PageType::Standard)),
-        ),
-      )
-      .await?;
-  }
 
   Ok(())
 }

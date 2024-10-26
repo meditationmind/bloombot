@@ -1,4 +1,4 @@
-use crate::commands::course_not_found;
+use crate::commands::helpers::courses;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -24,7 +24,7 @@ pub async fn course(_: Context<'_>) -> Result<()> {
 ///
 /// Join a Meditation Mind course.
 #[poise::command(slash_command)]
-pub async fn join(
+async fn join(
   ctx: Context<'_>,
   #[description = "Course you wish to join"]
   #[rename = "course"]
@@ -50,7 +50,7 @@ pub async fn join(
 
   // Verify that the course exists
   if course.is_none() {
-    course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
+    courses::course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
     return Ok(());
   }
 
@@ -131,7 +131,7 @@ pub async fn join(
 ///
 /// Leave a Meditation Mind course.
 #[poise::command(slash_command)]
-pub async fn leave(
+async fn leave(
   ctx: Context<'_>,
   #[description = "Course you wish to leave"]
   #[rename = "course"]
@@ -157,7 +157,7 @@ pub async fn leave(
 
   // Verify that the course exists
   if course.is_none() {
-    course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
+    courses::course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
     return Ok(());
   }
 

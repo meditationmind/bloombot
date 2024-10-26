@@ -1,18 +1,14 @@
-use crate::commands::{commit_and_say, MessageType};
-use crate::config::{
-  BloomBotEmbed, StreakRoles, TimeSumRoles, CHANNELS, EMOJI, MEDITATION_MIND, ROLES,
-};
+use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::tracking;
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, MEDITATION_MIND, ROLES};
 use crate::database::{DatabaseHandler, MeditationData, TrackingProfile};
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{TimeDelta, Utc};
-use log::{error, info};
-use poise::serenity_prelude::{
-  self as serenity, builder::*, ChannelId, Mentionable, RoleId, UserId,
-};
+use log::info;
+use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, RoleId, UserId};
 use poise::CreateReply;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use tokio::io::AsyncWriteExt;
 use ulid::Ulid;
 
@@ -105,7 +101,7 @@ struct BloomRecord {
 }
 
 #[derive(poise::ChoiceParameter)]
-pub enum ImportSource {
+enum ImportSource {
   #[name = "Apple Health"]
   AppleHealth,
   #[name = "Finch Breathing Sessions"]
@@ -122,7 +118,7 @@ pub enum ImportSource {
 }
 
 #[derive(poise::ChoiceParameter)]
-pub enum ImportType {
+enum ImportType {
   #[name = "new entries"]
   NewEntries,
   #[name = "all entries"]
@@ -188,167 +184,6 @@ fn process_finch_breathing(content: &Vec<u8>) -> Result<Vec<u8>> {
   let csv = wtr.into_inner()?;
 
   Ok(csv)
-}
-
-async fn update_time_roles(
-  ctx: Context<'_>,
-  member: &serenity::Member,
-  sum: i64,
-  privacy: bool,
-) -> Result<()> {
-  let current_time_roles = TimeSumRoles::get_users_current_roles(&member.roles);
-  let updated_time_role = TimeSumRoles::from_sum(sum);
-
-  if let Some(updated_time_role) = updated_time_role {
-    if !current_time_roles.contains(&updated_time_role.to_role_id()) {
-      for role in current_time_roles {
-        match member.remove_role(ctx, role).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error removing role: {err}");
-            ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(true)).await?;
-
-            return Ok(());
-          }
-        }
-      }
-
-      match member.add_role(ctx, updated_time_role.to_role_id()).await {
-        Ok(()) => {}
-        Err(err) => {
-          error!("Error adding role: {err}");
-          ctx.send(CreateReply::default()
-            .content(format!("{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-            .allowed_mentions(serenity::CreateAllowedMentions::new())
-            .ephemeral(true)).await?;
-
-          return Ok(());
-        }
-      }
-
-      let congrats = if ctx.guild_id().is_some() {
-        format!(
-          ":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!",
-          member.mention(),
-          updated_time_role.to_role_id()
-        )
-      } else {
-        format!(
-          ":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the @{} role!",
-          member.mention(),
-          updated_time_role.to_role_icon()
-        )
-      };
-
-      if privacy {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(congrats)
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(privacy),
-          )
-          .await?;
-      } else {
-        ChannelId::new(CHANNELS.tracking)
-          .send_message(
-            &ctx,
-            CreateMessage::new()
-              .content(congrats)
-              .allowed_mentions(serenity::CreateAllowedMentions::new()),
-          )
-          .await?;
-      }
-    }
-  }
-
-  Ok(())
-}
-
-async fn update_streak_roles(
-  ctx: Context<'_>,
-  member: &serenity::Member,
-  streak: i32,
-  privacy: bool,
-) -> Result<()> {
-  let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
-  #[allow(clippy::cast_sign_loss)]
-  let updated_streak_role = StreakRoles::from_streak(streak as u64);
-
-  if let Some(updated_streak_role) = updated_streak_role {
-    if !current_streak_roles.contains(&updated_streak_role.to_role_id()) {
-      for role in current_streak_roles {
-        match member.remove_role(ctx, role).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error removing role: {err}");
-
-            ctx.send(CreateReply::default()
-                .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-                .allowed_mentions(serenity::CreateAllowedMentions::new())
-                .ephemeral(true)).await?;
-
-            return Ok(());
-          }
-        }
-      }
-
-      match member.add_role(ctx, updated_streak_role.to_role_id()).await {
-        Ok(()) => {}
-        Err(err) => {
-          error!("Error adding role: {err}");
-
-          ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(true)).await?;
-
-          return Ok(());
-        }
-      }
-
-      let congrats = if ctx.guild_id().is_some() {
-        format!(
-          ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!",
-          member.mention(),
-          streak,
-          updated_streak_role.to_role_id()
-        )
-      } else {
-        format!(
-          ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the @{} role!",
-          member.mention(),
-          streak,
-          updated_streak_role.to_role_icon()
-        )
-      };
-
-      if privacy {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(congrats)
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(privacy),
-          )
-          .await?;
-      } else {
-        ChannelId::new(CHANNELS.tracking)
-          .send_message(
-            &ctx,
-            CreateMessage::new()
-              .content(congrats)
-              .allowed_mentions(serenity::CreateAllowedMentions::new()),
-          )
-          .await?;
-      }
-    }
-  }
-
-  Ok(())
 }
 
 /// Import meditation entries from an app
@@ -831,47 +666,19 @@ pub async fn import(
       .await?;
   }
 
-  let random_quote = DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await?;
   let user_sum =
     DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, &user_id).await?;
 
-  let response = match random_quote {
-    Some(quote) => {
-      // Strip non-alphanumeric characters from the quote
-      let quote = quote
-        .quote
-        .chars()
-        //.filter(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation() || matches!(c, '’' | '‘' | '“' | '”' | '—' | '…' | 'ā'))
-        .filter(|c| !matches!(c, '*'))
-        .map(|c| {
-          if c.is_ascii_punctuation() {
-            if matches!(c, '_' | '~') {
-              c.to_string()
-            } else {
-              format!("\\{c}")
-            }
-          } else {
-            c.to_string()
-          }
-        })
-        .collect::<String>();
-
-      if privacy {
-        format!(
-          "Someone just added **{total_minutes} minutes** to their meditation time! :tada:\n*{quote}*"
-        )
-      } else {
-        format!("<@{user_id}> added **{total_minutes} minutes** to their meditation time! Their total meditation time is now {user_sum} minutes :tada:\n*{quote}*")
-      }
-    }
-    None => {
-      if privacy {
-        format!("Someone just added **{total_minutes} minutes** to their meditation time! :tada:")
-      } else {
-        format!("<@{user_id}> added **{total_minutes} minutes** to their meditation time! Their total meditation time is now {user_sum} minutes :tada:")
-      }
-    }
-  };
+  let response = tracking::show_add_with_quote(
+    &ctx,
+    &mut transaction,
+    &guild_id,
+    &user_id,
+    &total_minutes,
+    &user_sum,
+    privacy,
+  )
+  .await?;
 
   let user_streak = if tracking_profile.streaks_active {
     let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
@@ -880,17 +687,7 @@ pub async fn import(
     0
   };
 
-  let guild_time_in_hours = {
-    let guild_count =
-      DatabaseHandler::get_guild_meditation_count(&mut transaction, &guild_id).await?;
-    if guild_count % 10 == 0 {
-      let guild_sum =
-        DatabaseHandler::get_guild_meditation_sum(&mut transaction, &guild_id).await?;
-      (guild_sum / 60).to_string()
-    } else {
-      "skip".to_owned()
-    }
-  };
+  let guild_time_in_hours = tracking::get_guild_hours(&mut transaction, &guild_id).await?;
 
   let h = (total_minutes + (total_seconds / 60)) / 60;
   let m = (total_minutes + (total_seconds / 60)) % 60;
@@ -906,7 +703,8 @@ pub async fn import(
     if result == 1 { "entry" } else { "entries" },
     import_source,
   );
-  commit_and_say(
+
+  database::commit_and_say(
     ctx,
     transaction,
     MessageType::TextOnly(success_response),
@@ -923,21 +721,12 @@ pub async fn import(
     )
     .await?;
 
-  if guild_time_in_hours != "skip" {
-    ChannelId::new(CHANNELS.tracking)
-    .send_message(
-      &ctx,
-      CreateMessage::new()
-        .content(format!("Awesome sauce! This server has collectively generated {guild_time_in_hours} hours of realmbreaking meditation!"))
-        .allowed_mentions(CreateAllowedMentions::new()),
-    )
-    .await?;
-  }
+  tracking::post_guild_hours(&ctx, &guild_time_in_hours).await?;
 
   let member = guild_id.member(ctx, user_id).await?;
-  update_time_roles(ctx, &member, user_sum, privacy).await?;
+  tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
   if tracking_profile.streaks_active {
-    update_streak_roles(ctx, &member, user_streak, privacy).await?;
+    tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
   }
 
   let filename = format!("import_{}_{}.txt", user_id, Ulid::new().to_string());
