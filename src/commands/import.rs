@@ -1,7 +1,9 @@
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, MEDITATION_MIND, ROLES};
-use crate::database::{DatabaseHandler, MeditationData, TrackingProfile};
+use crate::data::meditation::Meditation;
+use crate::data::tracking_profile::TrackingProfile;
+use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{TimeDelta, Utc};
@@ -333,7 +335,7 @@ pub async fn import(
     ImportType::NewEntries => true,
   };
   let current_data = if new_entries_only {
-    vec![latest_meditation.unwrap_or(MeditationData {
+    vec![latest_meditation.unwrap_or(Meditation {
       id: String::new(),
       user_id: UserId::default(),
       meditation_minutes: 0,

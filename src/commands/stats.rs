@@ -1,8 +1,9 @@
 #![allow(clippy::unused_async)]
 
+use crate::commands::helpers::time::Timeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
-use crate::database::Timeframe;
-use crate::database::{DatabaseHandler, TrackingProfile};
+use crate::data::tracking_profile::TrackingProfile;
+use crate::database::DatabaseHandler;
 use crate::events::leaderboards::{self, LEADERBOARDS};
 use crate::Context;
 use crate::{charts, config};

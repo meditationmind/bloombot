@@ -4,8 +4,9 @@
   clippy::cast_sign_loss
 )]
 
+use crate::commands::helpers::time::Timeframe;
 use crate::commands::stats::{ChartStyle, LeaderboardType, SortBy, StatsType};
-use crate::database::{Timeframe, TimeframeStats};
+use crate::data::stats::TimeframeStats;
 use anyhow::Result;
 use charts_rs::{
   svg_to_webp, Align, BarChart, Box, LegendCategory, Series, TableCellStyle, TableChart,

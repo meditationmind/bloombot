@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::database::{DatabaseHandler, Timeframe};
+use crate::commands::helpers::time::Timeframe;
+use crate::database::DatabaseHandler;
 use anyhow::Result;
 use log::{error, info};
 use tokio::time::sleep;

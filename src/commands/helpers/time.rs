@@ -187,6 +187,22 @@ pub fn offset_from_choice(
   }
 }
 
+#[derive(poise::ChoiceParameter)]
+pub enum Timeframe {
+  Yearly,
+  Monthly,
+  Weekly,
+  Daily,
+}
+
+#[derive(poise::ChoiceParameter, PartialEq)]
+pub enum ChallengeTimeframe {
+  #[name = "Monthly Challenge"]
+  Monthly,
+  #[name = "365-Day Challenge"]
+  YearRound,
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
