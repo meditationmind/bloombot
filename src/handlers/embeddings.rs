@@ -1,9 +1,5 @@
 use anyhow::{Context, Result};
-use async_openai::{
-  config::OpenAIConfig,
-  types::{CreateEmbeddingRequest, EmbeddingInput},
-  Client,
-};
+use async_openai::{config::OpenAIConfig, types::CreateEmbeddingRequestArgs, Client};
 use poise::serenity_prelude as serenity;
 use std::env;
 
@@ -22,8 +18,7 @@ impl OpenAIHandler {
   pub fn new() -> Result<Self> {
     let api_key =
       env::var("OPENAI_API_KEY").with_context(|| "Missing OPENAI_API_KEY environment variable")?;
-    let config = OpenAIConfig::new();
-    let config = config.with_api_key(api_key);
+    let config = OpenAIConfig::new().with_api_key(api_key);
     let client = Client::with_config(config);
 
     Ok(Self { client })
@@ -34,14 +29,13 @@ impl OpenAIHandler {
   /// # Errors
   /// Returns an error if more than one embedding was generated.
   pub async fn create_embedding(&self, input: String, user: serenity::UserId) -> Result<Vec<f32>> {
-    let input = CreateEmbeddingRequest {
-      model: "text-embedding-ada-002".to_owned(),
-      input: EmbeddingInput::String(input),
-      user: Some(user.to_string()),
-      ..Default::default()
-    };
+    let request = CreateEmbeddingRequestArgs::default()
+      .model("text-embedding-ada-002")
+      .input(input)
+      .user(user.to_string())
+      .build()?;
 
-    let embeddings = self.client.embeddings().create(input).await?;
+    let embeddings = self.client.embeddings().create(request).await?;
 
     let embedding = match embeddings.data.len() {
       1 => embeddings.data[0].embedding.clone(),

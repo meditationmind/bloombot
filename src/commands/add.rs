@@ -2,7 +2,6 @@ use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::commands::helpers::tracking::{self, privacy, Privacy};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
-use crate::data::tracking_profile::TrackingProfile;
 use crate::database::DatabaseHandler;
 use crate::events;
 use crate::Context;
@@ -45,12 +44,9 @@ pub async fn add(
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
   let tracking_profile =
-    match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
-      Some(tracking_profile) => tracking_profile,
-      None => TrackingProfile {
-        ..Default::default()
-      },
-    };
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id)
+      .await?
+      .unwrap_or_default();
 
   let privacy = privacy!(privacy, tracking_profile.anonymous_tracking);
 

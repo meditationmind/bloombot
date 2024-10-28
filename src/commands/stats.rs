@@ -3,7 +3,6 @@
 use crate::commands::helpers::time::Timeframe;
 use crate::commands::helpers::tracking::{privacy, Privacy};
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
-use crate::data::tracking_profile::TrackingProfile;
 use crate::database::DatabaseHandler;
 use crate::events::leaderboards::{self, LEADERBOARDS};
 use crate::Context;
@@ -107,12 +106,9 @@ async fn user(
     .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
 
   let tracking_profile =
-    match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user.id).await? {
-      Some(tracking_profile) => tracking_profile,
-      None => TrackingProfile {
-        ..Default::default()
-      },
-    };
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user.id)
+      .await?
+      .unwrap_or_default();
 
   let privacy = privacy!(privacy, tracking_profile.stats_private);
 

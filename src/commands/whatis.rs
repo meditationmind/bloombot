@@ -68,13 +68,7 @@ pub async fn whatis(
           ));
 
       ctx
-        .send(
-          poise::CreateReply {
-            embeds: vec![embed],
-            ..Default::default()
-          }
-          .ephemeral(true),
-        )
+        .send(poise::CreateReply::default().embed(embed).ephemeral(true))
         .await?;
 
       return Ok(());
@@ -100,25 +94,14 @@ pub async fn whatis(
         );
 
       ctx
-        .send(
-          poise::CreateReply {
-            embeds: vec![embed],
-            ..Default::default()
-          }
-          .ephemeral(true),
-        )
+        .send(poise::CreateReply::default().embed(embed).ephemeral(true))
         .await?;
 
       return Ok(());
     }
   }
 
-  ctx
-    .send(poise::CreateReply {
-      embeds: vec![embed],
-      ..Default::default()
-    })
-    .await?;
+  ctx.send(poise::CreateReply::default().embed(embed)).await?;
 
   Ok(())
 }

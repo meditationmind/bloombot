@@ -432,12 +432,7 @@ async fn info(
     }
   }
 
-  ctx
-    .send(poise::CreateReply {
-      embeds: vec![embed],
-      ..Default::default()
-    })
-    .await?;
+  ctx.send(poise::CreateReply::default().embed(embed)).await?;
 
   Ok(())
 }
@@ -542,12 +537,7 @@ async fn search(
       embed.description("No terms were found. Try browsing the glossary with `/glossary list`.");
   }
 
-  ctx
-    .send(poise::CreateReply {
-      embeds: vec![embed],
-      ..Default::default()
-    })
-    .await?;
+  ctx.send(poise::CreateReply::default().embed(embed)).await?;
 
   Ok(())
 }

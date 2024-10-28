@@ -103,11 +103,7 @@ async fn join(
   };
 
   ctx
-    .send(CreateReply {
-      embeds: vec![embed],
-      ephemeral: Some(true),
-      ..Default::default()
-    })
+    .send(CreateReply::default().embed(embed).ephemeral(true))
     .await?;
 
   // Log enrollment in staff channel

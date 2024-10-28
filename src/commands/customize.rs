@@ -48,14 +48,10 @@ async fn show(ctx: Context<'_>) -> Result<()> {
   let user_id = ctx.author().id;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
-  //let tracking_profile = DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?;
   let tracking_profile =
-    match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
-      Some(tracking_profile) => tracking_profile,
-      None => TrackingProfile {
-        ..Default::default()
-      },
-    };
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id)
+      .await?
+      .unwrap_or_default();
 
   let utc_offset = match time::choice_from_offset(tracking_profile.utc_offset) {
     (Some(minus_offset), None) => minus_offset.name().to_string(),
@@ -164,9 +160,7 @@ async fn offset(
     )
     .await?;
   } else {
-    let default = TrackingProfile {
-      ..Default::default()
-    };
+    let default = TrackingProfile::default();
 
     DatabaseHandler::create_tracking_profile(
       &mut transaction,
@@ -251,9 +245,7 @@ async fn tracking(
     )
     .await?;
   } else {
-    let default = TrackingProfile {
-      ..Default::default()
-    };
+    let default = TrackingProfile::default();
 
     DatabaseHandler::create_tracking_profile(
       &mut transaction,
@@ -394,9 +386,7 @@ async fn streak(
       }
     }
   } else {
-    let default = TrackingProfile {
-      ..Default::default()
-    };
+    let default = TrackingProfile::default();
 
     let streaks_active = match reporting {
       Some(reporting) => match reporting {
@@ -534,9 +524,7 @@ async fn stats(
     )
     .await?;
   } else {
-    let default = TrackingProfile {
-      ..Default::default()
-    };
+    let default = TrackingProfile::default();
 
     DatabaseHandler::create_tracking_profile(
       &mut transaction,

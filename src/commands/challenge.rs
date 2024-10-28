@@ -2,7 +2,6 @@
 
 use crate::commands::helpers::time::ChallengeTimeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
-use crate::data::tracking_profile::TrackingProfile;
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -277,14 +276,9 @@ async fn stats(
       };
 
       let tracking_profile =
-        match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &member.user.id)
+        DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &member.user.id)
           .await?
-        {
-          Some(tracking_profile) => tracking_profile,
-          None => TrackingProfile {
-            ..Default::default()
-          },
-        };
+          .unwrap_or_default();
 
       if tracking_profile.stats_private {
         ctx.defer_ephemeral().await?;
@@ -400,12 +394,7 @@ async fn stats(
         Utc::now().format("%Y")
       )));
 
-      ctx
-        .send(CreateReply {
-          embeds: vec![embed],
-          ..Default::default()
-        })
-        .await?;
+      ctx.send(CreateReply::default().embed(embed)).await?;
 
       return Ok(());
     }
@@ -435,14 +424,9 @@ async fn stats(
     };
 
     let tracking_profile =
-      match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &member.user.id)
+      DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &member.user.id)
         .await?
-      {
-        Some(tracking_profile) => tracking_profile,
-        None => TrackingProfile {
-          ..Default::default()
-        },
-      };
+        .unwrap_or_default();
 
     if tracking_profile.stats_private {
       ctx.defer_ephemeral().await?;
@@ -556,12 +540,7 @@ async fn stats(
       Utc::now().format("%B %Y")
     )));
 
-    ctx
-      .send(CreateReply {
-        embeds: vec![embed],
-        ..Default::default()
-      })
-      .await?;
+    ctx.send(CreateReply::default().embed(embed)).await?;
 
     return Ok(());
   }

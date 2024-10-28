@@ -30,12 +30,9 @@ pub async fn streak(
   let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
   let tracking_profile =
-    match DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await? {
-      Some(tracking_profile) => tracking_profile,
-      None => TrackingProfile {
-        ..Default::default()
-      },
-    };
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id)
+      .await?
+      .unwrap_or_default();
 
   let privacy = privacy!(privacy, tracking_profile.streaks_private);
 

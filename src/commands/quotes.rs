@@ -301,12 +301,7 @@ async fn show(
         ))
         .clone();
 
-      ctx
-        .send(poise::CreateReply {
-          embeds: vec![embed],
-          ..Default::default()
-        })
-        .await?;
+      ctx.send(poise::CreateReply::default().embed(embed)).await?;
     }
   }
 

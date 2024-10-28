@@ -39,13 +39,7 @@ pub async fn commit_and_say(
     }
     MessageType::EmbedOnly(message) => {
       ctx
-        .send(
-          CreateReply {
-            embeds: vec![*message],
-            ..Default::default()
-          }
-          .ephemeral(ephemeral),
-        )
+        .send(CreateReply::default().embed(*message).ephemeral(ephemeral))
         .await
     }
   };
