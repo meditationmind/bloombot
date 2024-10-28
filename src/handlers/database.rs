@@ -1,7 +1,6 @@
 #![allow(
   clippy::needless_raw_string_hashes,
   clippy::fn_params_excessive_bools,
-  clippy::struct_excessive_bools,
   clippy::too_many_arguments,
   clippy::missing_errors_doc,
   clippy::missing_panics_doc
