@@ -1,8 +1,8 @@
-use crate::config::{BloomBotEmbed, EMOJI, ROLES};
+use crate::commands::helpers::common;
+use crate::config::{BloomBotEmbed, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::RoleId;
 
 /// Get a meditation/mindfulness quote
 ///
@@ -26,17 +26,7 @@ pub async fn quote(
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   if let Some(keyword) = keyword {
-    let supporter = {
-      if let Some(member) = ctx.author_member().await {
-        member.roles.contains(&RoleId::from(ROLES.patreon))
-          || member.roles.contains(&RoleId::from(ROLES.kofi))
-          || member.roles.contains(&RoleId::from(ROLES.staff))
-      } else {
-        false
-      }
-    };
-
-    if supporter {
+    if common::is_supporter(ctx).await? {
       match DatabaseHandler::get_random_quote_with_keyword(&mut transaction, &guild_id, &keyword)
         .await?
       {

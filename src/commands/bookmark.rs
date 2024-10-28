@@ -1,10 +1,11 @@
+use crate::commands::helpers::common;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
-use crate::config::{EMOJI, ROLES};
+use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, RoleId};
+use poise::serenity_prelude as serenity;
 use poise::{CreateReply, Modal};
 
 #[derive(Debug, Modal)]
@@ -37,15 +38,7 @@ pub async fn add_bookmark(
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let supporter = {
-    if let Some(member) = ctx.author_member().await {
-      member.roles.contains(&RoleId::from(ROLES.patreon))
-        || member.roles.contains(&RoleId::from(ROLES.kofi))
-        || member.roles.contains(&RoleId::from(ROLES.staff))
-    } else {
-      false
-    }
-  };
+  let supporter = common::is_supporter(poise::Context::Application(ctx)).await?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let bookmark_count =
@@ -154,15 +147,7 @@ async fn add(
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let supporter = {
-    if let Some(member) = ctx.author_member().await {
-      member.roles.contains(&RoleId::from(ROLES.patreon))
-        || member.roles.contains(&RoleId::from(ROLES.kofi))
-        || member.roles.contains(&RoleId::from(ROLES.staff))
-    } else {
-      false
-    }
-  };
+  let supporter = common::is_supporter(ctx).await?;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
   let bookmark_count =

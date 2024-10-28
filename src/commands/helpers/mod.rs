@@ -1,3 +1,4 @@
+pub(super) mod common;
 pub(super) mod courses;
 pub(super) mod database;
 pub mod pagination;
