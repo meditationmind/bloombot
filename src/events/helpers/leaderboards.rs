@@ -114,6 +114,9 @@ pub const LEADERBOARDS: Leaderboards = Leaderboards {
   year_str_top10_light: "leaderboard_ystr10l.webp",
 };
 
+/// Refreshes materialized views used to query stats for generating [`stats::leaderboard`][stats] charts.
+///
+/// [stats]: crate::commands::stats::stats
 async fn refresh(db: &DatabaseHandler) -> Result<()> {
   let mut transaction = db.start_transaction().await?;
   DatabaseHandler::refresh_leaderboard(&mut transaction, &Timeframe::Daily).await?;
@@ -125,6 +128,9 @@ async fn refresh(db: &DatabaseHandler) -> Result<()> {
   Ok(())
 }
 
+/// Processes [`LeaderboardUser`] data to prepare it for use in generating [`stats::leaderboard`][stats] charts.
+///
+/// [stats]: crate::commands::stats::stats
 pub async fn process_stats(
   ctx: &Http,
   guild_id: &GuildId,
@@ -187,6 +193,12 @@ pub async fn process_stats(
   Ok(Some(leaderboard_data))
 }
 
+/// Generates [`stats::leaderboard`][stats] chart images in all available dark mode varieties
+/// for quickly serving images to users. Light mode varieties are not pre-generated since very
+/// few users prefer light mode. Because so many images are being generated at once, the function
+/// sleeps 5 seconds between each image to keep resource usage low.
+///
+/// [stats]: crate::commands::stats::stats
 async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Result<()> {
   let mut transaction = db.start_transaction_with_retry(5).await?;
 
@@ -947,6 +959,16 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   Ok(())
 }
 
+/// Helps maintain up-to-date [`stats::leaderboard`][stats] charts by calling [`refresh`]
+/// to refresh materialized views and [`generate`] to pre-generate images used for the charts.
+/// Sleeps 10 seconds between [`refresh`] and [`generate`] to ensure that images are generated
+/// using the latest stats.
+///
+/// Logging includes notification upon initiation, and upon completion with time elapsed
+/// for each task. The source argument can be used to customize the target in the logs. For
+/// default behavior, use the [`module_path!`] macro.
+///
+/// [stats]: crate::commands::stats::stats
 pub async fn update(
   source: &str,
   task_http: Arc<Http>,

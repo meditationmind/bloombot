@@ -170,7 +170,7 @@ pub async fn add(
                   .components(Vec::new())
               }
             })
-    )
+        )
         .await
       {
         Ok(()) => {
@@ -277,6 +277,7 @@ pub async fn add(
     tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
   }
 
+  // Spawn a Tokio task to update leaderboards every 10th add
   if guild_time_in_hours.is_some() {
     tokio::spawn(events::leaderboards::update(
       module_path!(),

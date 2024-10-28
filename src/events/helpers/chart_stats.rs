@@ -29,7 +29,8 @@ async fn refresh(db: &DatabaseHandler) -> Result<()> {
 /// [`refresh`] is called and then repeated in 12-hour intervals.
 ///
 /// Logging includes time until initial [`refresh`], as well as notification upon initiation,
-/// and upon completion with time elapsed.
+/// and upon completion with time elapsed. The source argument can be used to customize the
+/// target in the logs. For default behavior, use the [`module_path!`] macro.
 pub async fn update(source: &str, task_conn: Arc<DatabaseHandler>) {
   let mut interval = tokio::time::interval(Duration::from_secs(60 * 60 * 12));
   let wait = {
