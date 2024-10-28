@@ -1,6 +1,7 @@
 #![allow(clippy::unused_async)]
 
 use crate::commands::helpers::time::Timeframe;
+use crate::commands::helpers::tracking::{privacy, Privacy};
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::tracking_profile::TrackingProfile;
 use crate::database::DatabaseHandler;
@@ -15,29 +16,29 @@ use poise::ChoiceParameter;
 #[allow(clippy::module_name_repetitions)]
 #[derive(poise::ChoiceParameter)]
 pub enum StatsType {
-  #[name = "Minutes"]
+  #[name = "minutes"]
   MeditationMinutes,
-  #[name = "Count"]
+  #[name = "count"]
   MeditationCount,
 }
 
 #[derive(poise::ChoiceParameter)]
 pub enum ChartStyle {
-  #[name = "Bar Chart"]
+  #[name = "bar chart"]
   Bar,
-  #[name = "Area Chart"]
+  #[name = "area chart"]
   Area,
-  #[name = "Bar Chart (Combined Data)"]
+  #[name = "bar chart (combined data)"]
   BarCombined,
 }
 
 #[derive(poise::ChoiceParameter)]
 pub enum SortBy {
-  #[name = "Minutes"]
+  #[name = "minutes"]
   Minutes,
-  #[name = "Sessions"]
+  #[name = "sessions"]
   Sessions,
-  #[name = "Streak"]
+  #[name = "streak"]
   Streak,
 }
 
@@ -50,18 +51,10 @@ pub enum LeaderboardType {
 }
 
 #[derive(poise::ChoiceParameter)]
-enum Privacy {
-  #[name = "Private"]
-  Private,
-  #[name = "Public"]
-  Public,
-}
-
-#[derive(poise::ChoiceParameter)]
 enum Theme {
-  #[name = "Light Mode"]
+  #[name = "light mode"]
   LightMode,
-  #[name = "Dark Mode"]
+  #[name = "dark mode"]
   DarkMode,
 }
 
@@ -121,13 +114,7 @@ async fn user(
       },
     };
 
-  let privacy = match privacy {
-    Some(privacy) => match privacy {
-      Privacy::Private => true,
-      Privacy::Public => false,
-    },
-    None => tracking_profile.stats_private,
-  };
+  let privacy = privacy!(privacy, tracking_profile.stats_private);
 
   if privacy {
     ctx.defer_ephemeral().await?;

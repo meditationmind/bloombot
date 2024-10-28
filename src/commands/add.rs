@@ -1,6 +1,6 @@
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
-use crate::commands::helpers::tracking;
+use crate::commands::helpers::tracking::{self, privacy, Privacy};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::data::tracking_profile::TrackingProfile;
 use crate::database::DatabaseHandler;
@@ -10,14 +10,6 @@ use anyhow::{Context as AnyhowContext, Result};
 use chrono::Duration;
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::CreateReply;
-
-#[derive(poise::ChoiceParameter)]
-enum Privacy {
-  #[name = "private"]
-  Private,
-  #[name = "public"]
-  Public,
-}
 
 /// Add a meditation entry
 ///
@@ -60,13 +52,7 @@ pub async fn add(
       },
     };
 
-  let privacy = match privacy {
-    Some(privacy) => match privacy {
-      Privacy::Private => true,
-      Privacy::Public => false,
-    },
-    None => tracking_profile.anonymous_tracking,
-  };
+  let privacy = privacy!(privacy, tracking_profile.anonymous_tracking);
 
   // Usually not necessary, but defer to avoid possible unknown interaction
   // errors due to slow DB lookups, workload redeployment, etc.

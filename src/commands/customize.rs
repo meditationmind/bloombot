@@ -1,5 +1,6 @@
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
+use crate::commands::helpers::tracking::{privacy, Privacy};
 use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
 use crate::data::tracking_profile::TrackingProfile;
 use crate::database::DatabaseHandler;
@@ -8,14 +9,6 @@ use anyhow::{Context as AnyhowContext, Result};
 use log::error;
 use poise::serenity_prelude::{self as serenity, builder::*};
 use poise::{ChoiceParameter, CreateReply};
-
-#[derive(poise::ChoiceParameter)]
-enum Privacy {
-  #[name = "private"]
-  Private,
-  #[name = "public"]
-  Public,
-}
 
 #[derive(poise::ChoiceParameter)]
 enum OnOff {
@@ -325,13 +318,7 @@ async fn streak(
       None => existing_profile.streaks_active,
     };
 
-    let streaks_private = match privacy {
-      Some(privacy) => match privacy {
-        Privacy::Private => true,
-        Privacy::Public => false,
-      },
-      None => existing_profile.streaks_private,
-    };
+    let streaks_private = privacy!(privacy, existing_profile.streaks_private);
 
     if (streaks_active == existing_profile.streaks_active)
       && (streaks_private == existing_profile.streaks_private)
@@ -419,13 +406,7 @@ async fn streak(
       None => default.streaks_active,
     };
 
-    let streaks_private = match privacy {
-      Some(privacy) => match privacy {
-        Privacy::Private => true,
-        Privacy::Public => false,
-      },
-      None => default.streaks_private,
-    };
+    let streaks_private = privacy!(privacy, default.streaks_private);
 
     DatabaseHandler::create_tracking_profile(
       &mut transaction,
@@ -519,10 +500,7 @@ async fn stats(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  let stats_private = match privacy {
-    Privacy::Private => true,
-    Privacy::Public => false,
-  };
+  let stats_private = privacy!(privacy);
 
   if let Some(tracking_profile) =
     DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?

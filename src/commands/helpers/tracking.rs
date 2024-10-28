@@ -13,6 +13,58 @@ use crate::{
   Context,
 };
 
+#[derive(poise::ChoiceParameter)]
+pub enum Privacy {
+  #[name = "private"]
+  Private,
+  #[name = "public"]
+  Public,
+}
+
+/// Takes the [`Privacy`][priv] choice parameter as an argument and returns `true` if the user
+/// chose [`Privacy::Private`] or `false` if they chose [`Privacy::Public`].
+///
+/// [`Option<Privacy>`][priv] can also be passed as an argument, along with a default value,
+/// specified via a second argument. If [`Option<Privacy>`][priv] is `Some`, the same matching
+/// as above is applied. If `None`, the default value is returned. In most cases, the default
+/// value should be taken from the user's [`TrackingProfile`][tp].
+///
+/// # Examples
+///
+/// ```rust
+/// let privacy = Privacy::Private;
+/// assert!(privacy!(private));
+///
+/// let privacy = None;
+/// let profile = TrackingProfile::default().streaks_private(true);
+/// assert!(privacy!(privacy, profile.streaks_private));
+///
+/// let privacy = Privacy::Public;
+/// let profile = TrackingProfile::default().streaks_private(true);
+/// assert!(!(privacy!(privacy, profile.streaks_private)));
+/// ```
+///
+/// [priv]: self::Privacy
+/// [tp]: crate::data::tracking_profile::TrackingProfile
+macro_rules! privacy {
+  ($privacy:expr, $default:expr) => {
+    !(!(match $privacy {
+      Some(privacy) => match privacy {
+        Privacy::Private => true,
+        Privacy::Public => false,
+      },
+      None => $default,
+    }))
+  };
+  ($privacy:expr) => {
+    match $privacy {
+      Privacy::Private => true,
+      Privacy::Public => false,
+    }
+  };
+}
+pub(crate) use privacy;
+
 /// Queries the database for the total count of guild sessions and divides by 10. If there is no
 /// remainder, the function queries the database for the guild total of minutes meditated, divides
 /// this number by 60 to convert to hours, and returns this number. If the total count divided by
@@ -323,7 +375,17 @@ pub async fn update_streak_roles(
 
 #[cfg(test)]
 mod tests {
+  use crate::data::tracking_profile::TrackingProfile;
+
   use super::*;
+
+  #[test]
+  fn test_privacy_macro() {
+    let profile = TrackingProfile::default().streaks_private(true);
+    assert!(privacy!(Privacy::Private));
+    assert!(!(privacy!(Some(Privacy::Public), profile.streaks_private)));
+    assert!(privacy!(None, profile.streaks_private));
+  }
 
   #[test]
   fn test_minimize_markdown() {

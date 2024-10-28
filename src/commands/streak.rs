@@ -1,17 +1,9 @@
 use crate::commands::helpers::database::{self, MessageType};
-use crate::data::tracking_profile::TrackingProfile;
+use crate::commands::helpers::tracking::{privacy, Privacy};
 use crate::database::DatabaseHandler;
 use crate::{config, Context};
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude as serenity;
-
-#[derive(poise::ChoiceParameter)]
-enum Privacy {
-  #[name = "private"]
-  Private,
-  #[name = "public"]
-  Public,
-}
 
 /// See your current meditation streak
 ///
@@ -22,7 +14,7 @@ enum Privacy {
 pub async fn streak(
   ctx: Context<'_>,
   #[description = "The user to check the streak of"] user: Option<serenity::User>,
-  #[description = "Set visibility of response (Default is public)"] privacy: Option<Privacy>,
+  #[description = "Set visibility of response (Defaults to public)"] privacy: Option<Privacy>,
 ) -> Result<()> {
   let data = ctx.data();
 
@@ -45,13 +37,7 @@ pub async fn streak(
       },
     };
 
-  let privacy = match privacy {
-    Some(privacy) => match privacy {
-      Privacy::Private => true,
-      Privacy::Public => false,
-    },
-    None => tracking_profile.streaks_private,
-  };
+  let privacy = privacy!(privacy, tracking_profile.streaks_private);
 
   if user.is_some() && (user_id != ctx.author().id) {
     let user = user.with_context(|| "Failed to retrieve User")?;
