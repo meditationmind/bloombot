@@ -63,6 +63,11 @@ pub struct Leaderboards<'a> {
   pub year_str_top10_light: &'a str,
 }
 
+/// Filename consists of prefix `leaderboard_` followed by:
+/// - Timeframe as (`d`)aily, (`w`)eekly, (`m`)onthly, or (`y`)early
+/// - Sorting stat as (`min`)utes, (`ses`)sions, or (`str`)eak
+/// - Type as top (`5`) or top (`10`)
+/// - Theme as (`d`)ark mode or (`l`)ight mode
 pub const LEADERBOARDS: Leaderboards = Leaderboards {
   day_min_top5_dark: "leaderboard_dmin5d.webp",
   day_min_top5_light: "leaderboard_dmin5l.webp",
