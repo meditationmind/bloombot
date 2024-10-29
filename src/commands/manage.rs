@@ -203,7 +203,7 @@ async fn list(
 
   drop(transaction);
 
-  Paginator::new("Meditation Entries", &entries, ENTRIES_PER_PAGE)
+  Paginator::new("Meditation Entries", &entries, ENTRIES_PER_PAGE.default)
     .paginate(ctx, page, PageType::Standard, true)
     .await?;
 

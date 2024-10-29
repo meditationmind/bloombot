@@ -1,4 +1,4 @@
-use crate::config::{BloomBotEmbed, CHANNELS};
+use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 // use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
@@ -65,7 +65,7 @@ async fn list(
     sorted_terms.push((char, full_term));
   }
 
-  let terms_per_page = 15;
+  let terms_per_page = ENTRIES_PER_PAGE.glossary;
   let mut pages: Vec<Vec<(String, String)>> = vec![];
   while !sorted_terms.is_empty() {
     let mut page = vec![];

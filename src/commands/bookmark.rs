@@ -1,7 +1,7 @@
 use crate::commands::helpers::common;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
-use crate::config::EMOJI;
+use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
@@ -122,8 +122,7 @@ async fn list(
 
   drop(transaction);
 
-  let bookmarks_per_page = 5;
-  Paginator::new("Your Bookmarks", &bookmarks, bookmarks_per_page)
+  Paginator::new("Your Bookmarks", &bookmarks, ENTRIES_PER_PAGE.bookmarks)
     .paginate(ctx, page, PageType::Standard, true)
     .await?;
 

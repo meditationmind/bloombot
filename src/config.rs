@@ -4,7 +4,6 @@ use std::fmt;
 
 pub const MEDITATION_MIND: GuildId = GuildId::new(244917432383176705);
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
-pub const ENTRIES_PER_PAGE: usize = 10;
 pub const MIN_STARS: u64 = 5;
 
 /// Sensible defaults for use within our application.
@@ -20,6 +19,18 @@ impl BloomBotEmbed {
     serenity::CreateEmbed::from(embed).color(EMBED_COLOR)
   }
 }
+
+pub struct EntriesPerPage {
+  pub default: usize,
+  pub bookmarks: usize,
+  pub glossary: usize,
+}
+
+pub const ENTRIES_PER_PAGE: EntriesPerPage = EntriesPerPage {
+  default: 10,
+  bookmarks: 5,
+  glossary: 15,
+};
 
 pub struct Roles {
   pub welcome_team: u64,

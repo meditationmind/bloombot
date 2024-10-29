@@ -308,7 +308,7 @@ async fn list(
 
   drop(transaction);
 
-  Paginator::new("Courses", &courses, ENTRIES_PER_PAGE)
+  Paginator::new("Courses", &courses, ENTRIES_PER_PAGE.default)
     .paginate(ctx, page, PageType::Standard, true)
     .await?;
 

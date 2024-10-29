@@ -47,7 +47,7 @@ async fn list_keys(
 
   drop(transaction);
 
-  Paginator::new("Playne Keys", &keys, ENTRIES_PER_PAGE)
+  Paginator::new("Playne Keys", &keys, ENTRIES_PER_PAGE.default)
     .paginate(ctx, page, PageType::Standard, true)
     .await?;
 
@@ -208,9 +208,13 @@ async fn list_recipients(
 
   drop(transaction);
 
-  Paginator::new("Playne Key Recipients", &recipients, ENTRIES_PER_PAGE)
-    .paginate(ctx, page, PageType::Standard, true)
-    .await?;
+  Paginator::new(
+    "Playne Key Recipients",
+    &recipients,
+    ENTRIES_PER_PAGE.default,
+  )
+  .paginate(ctx, page, PageType::Standard, true)
+  .await?;
 
   Ok(())
 }

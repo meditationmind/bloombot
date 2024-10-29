@@ -592,7 +592,7 @@ async fn list(
   Paginator::new(
     format!("Erases for {user_nick_or_name}"),
     &erases,
-    ENTRIES_PER_PAGE,
+    ENTRIES_PER_PAGE.default,
   )
   .paginate(ctx, page, page_type, privacy)
   .await?;

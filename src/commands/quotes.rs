@@ -213,7 +213,7 @@ async fn list(
 
   drop(transaction);
 
-  Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE)
+  Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE.default)
     .paginate(ctx, page, PageType::Standard, true)
     .await?;
 
@@ -259,7 +259,7 @@ async fn search(
 
   drop(transaction);
 
-  Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE)
+  Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE.default)
     .paginate(ctx, page, PageType::Standard, true)
     .await?;
 
