@@ -1,8 +1,8 @@
 #![allow(clippy::unused_async)]
 
 use crate::commands::helpers::time::Timeframe;
-use crate::commands::helpers::tracking::{privacy, Privacy};
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
+use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::events::leaderboards::{self, LEADERBOARDS};
 use crate::Context;
@@ -110,7 +110,7 @@ async fn user(
       .await?
       .unwrap_or_default();
 
-  let privacy = privacy!(privacy, tracking_profile.stats_private);
+  let privacy = privacy!(privacy, tracking_profile.stats.privacy);
 
   if privacy {
     ctx.defer_ephemeral().await?;
@@ -119,7 +119,7 @@ async fn user(
   }
 
   if ctx.author().id != user.id
-    && tracking_profile.stats_private
+    && tracking_profile.stats.privacy == Privacy::Private
     && !ctx.author().has_role(&ctx, guild_id, ROLES.staff).await?
   {
     ctx
@@ -247,9 +247,9 @@ async fn user(
   };
 
   // Hide streak in footer if streaks disabled
-  if tracking_profile.streaks_active
+  if tracking_profile.streak.status == Status::Enabled
     // Hide streak in footer if streak set to private, unless own stats in ephemeral
-    && (!tracking_profile.streaks_private || (ctx.author().id == user.id && privacy))
+    && (tracking_profile.streak.privacy == Privacy::Public || (ctx.author().id == user.id && privacy))
   {
     embed = embed.footer(CreateEmbedFooter::new(format!(
       "Avg. {} {}: {}・Current streak: {}",

@@ -1,36 +1,80 @@
-#![allow(clippy::struct_excessive_bools, dead_code)]
-
 use poise::serenity_prelude::{self as serenity};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, poise::ChoiceParameter)]
+pub enum Privacy {
+  #[name = "private"]
+  Private,
+  #[default]
+  #[name = "public"]
+  Public,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, poise::ChoiceParameter)]
+pub enum Status {
+  #[default]
+  #[name = "enabled"]
+  Enabled,
+  #[name = "disabled"]
+  Disabled,
+}
+
+#[derive(Debug)]
+pub struct Tracking {
+  pub privacy: Privacy,
+}
+
+#[derive(Debug)]
+pub struct Streak {
+  pub status: Status,
+  pub privacy: Privacy,
+}
+
+#[derive(Debug)]
+pub struct Stats {
+  pub privacy: Privacy,
+}
 
 #[derive(Debug)]
 pub struct TrackingProfile {
   pub user_id: serenity::UserId,
   pub guild_id: serenity::GuildId,
   pub utc_offset: i16,
-  pub anonymous_tracking: bool,
-  pub streaks_active: bool,
-  pub streaks_private: bool,
-  pub stats_private: bool,
+  pub tracking: Tracking,
+  pub streak: Streak,
+  pub stats: Stats,
 }
 
 impl TrackingProfile {
-  pub fn new() -> Self {
-    Self::default()
+  /// Creates a new [`TrackingProfile`] with a specified [`UserID`][uid]
+  /// and [`GuildId`][gid]. All other values are set to their defaults.
+  ///
+  /// [uid]: poise::serenity_prelude::model::id::UserId
+  /// [gid]: poise::serenity_prelude::model::id::GuildId
+  pub fn new(guild_id: impl Into<serenity::GuildId>, user_id: impl Into<serenity::UserId>) -> Self {
+    Self {
+      user_id: user_id.into(),
+      guild_id: guild_id.into(),
+      ..Default::default()
+    }
   }
 
-  /// Manually assigns a user ID to a [`TrackingProfile`].
-  pub fn user_id(mut self, user_id: u64) -> Self {
-    self.user_id = serenity::UserId::new(user_id);
+  /// Assigns a [`UserID`][uid] to a [`TrackingProfile`].
+  ///
+  /// [uid]: poise::serenity_prelude::model::id::UserId
+  pub fn user_id(mut self, user_id: impl Into<serenity::UserId>) -> Self {
+    self.user_id = user_id.into();
     self
   }
 
-  /// Manually assigns a guild ID to a [`TrackingProfile`].
-  pub fn guild_id(mut self, guild_id: u64) -> Self {
-    self.guild_id = serenity::GuildId::new(guild_id);
+  /// Assigns a [`GuildId`][gid] to a [`TrackingProfile`].
+  ///
+  /// [gid]: poise::serenity_prelude::model::id::GuildId
+  pub fn guild_id(mut self, guild_id: impl Into<serenity::GuildId>) -> Self {
+    self.guild_id = guild_id.into();
     self
   }
 
-  /// Manually assigns a UTC offset in number of minutes to a [`TrackingProfile`].
+  /// Assigns a UTC offset, in number of minutes, to a [`TrackingProfile`].
   /// If the specified offset is not valid, the [`TrackingProfile`] is returned unchanged.
   /// Valid offsets can be found in [`PlusOffsetChoice`][poc] and [`MinusOffsetChoice`][moc].
   ///
@@ -48,31 +92,31 @@ impl TrackingProfile {
     }
   }
 
-  /// Manually sets the state of anonymous tracking for a [`TrackingProfile`],
-  /// with `true` for anonymous (private) reporting. Default is `false`.
-  pub fn anonymous_tracking(mut self, anonymous_tracking: bool) -> Self {
-    self.anonymous_tracking = anonymous_tracking;
+  /// Sets tracking [`Privacy`] for a [`TrackingProfile`].
+  /// Default is [`Privacy::Public`].
+  pub fn tracking_privacy(mut self, privacy: Privacy) -> Self {
+    self.tracking.privacy = privacy;
     self
   }
 
-  /// Manually sets the state of streak reporting for a [`TrackingProfile`],
-  /// with `true` for active and `false` for inactive. Default is `true`.
-  pub fn streaks_active(mut self, streaks_active: bool) -> Self {
-    self.streaks_active = streaks_active;
+  /// Sets streak reporting [`Status`] for a [`TrackingProfile`].
+  /// Default is [`Status::Enabled`].
+  pub fn streak_status(mut self, status: Status) -> Self {
+    self.streak.status = status;
     self
   }
 
-  /// Manually sets streak privacy for a [`TrackingProfile`], with `true` for
-  /// private and `false` for public. Default is `false`.
-  pub fn streaks_private(mut self, streaks_private: bool) -> Self {
-    self.streaks_private = streaks_private;
+  /// Sets streak [`Privacy`] for a [`TrackingProfile`].
+  /// Default is [`Privacy::Public`].
+  pub fn streak_privacy(mut self, privacy: Privacy) -> Self {
+    self.streak.privacy = privacy;
     self
   }
 
-  /// Manually sets stats privacy for a [`TrackingProfile`], with `true` for
-  /// private and `false` for public. Default is `false`.
-  pub fn stats_private(mut self, stats_private: bool) -> Self {
-    self.stats_private = stats_private;
+  /// Sets stats [`Privacy`] for a [`TrackingProfile`].
+  /// Default is [`Privacy::Public`].
+  pub fn stats_privacy(mut self, privacy: Privacy) -> Self {
+    self.stats.privacy = privacy;
     self
   }
 }
@@ -84,36 +128,134 @@ impl Default for TrackingProfile {
       user_id: serenity::UserId::default(),
       guild_id: serenity::GuildId::default(),
       utc_offset: 0,
-      anonymous_tracking: false,
-      streaks_active: true,
-      streaks_private: false,
-      stats_private: false,
+      tracking: Tracking {
+        privacy: Privacy::Public,
+      },
+      streak: Streak {
+        status: Status::Enabled,
+        privacy: Privacy::Public,
+      },
+      stats: Stats {
+        privacy: Privacy::Public,
+      },
     }
   }
 }
+
+/// Takes [`Privacy`][priv] as an argument and returns `true` for [`Privacy::Private`]
+/// or `false` for [`Privacy::Public`].
+///
+/// [`Option<Privacy>`][priv] can also be passed as an argument, along with a default value
+/// of type [`Privacy`][priv], specified via a second argument. If [`Option<Privacy>`][priv]
+/// is `Some`, the same matching as above is applied to the unwrapped value. If `None`, the
+/// matching is applied to the default value. This means the first value takes precedence.
+///
+/// In most cases, the default value should be taken from the user's [`TrackingProfile`][tp].
+///
+/// # Examples
+///
+/// ```rust
+/// let privacy = Privacy::Private;
+/// assert!(privacy!(privacy));
+///
+/// let privacy = None;
+/// let profile = TrackingProfile::default().streak_privacy(Privacy::Private);
+/// assert!(privacy!(privacy, profile.streak.privacy));
+///
+/// let privacy = Privacy::Public;
+/// let profile = TrackingProfile::default().streak_privacy(Privacy::Private);
+/// assert!(!(privacy!(privacy, profile.streak.privacy)));
+/// ```
+///
+/// [priv]: crate::data::tracking_profile::Privacy
+/// [tp]: crate::data::tracking_profile::TrackingProfile
+macro_rules! privacy {
+  ($privacy:expr, $default:expr) => {
+    !(!(match $privacy {
+      Some(privacy) => match privacy {
+        Privacy::Private => true,
+        Privacy::Public => false,
+      },
+      None => match $default {
+        Privacy::Private => true,
+        Privacy::Public => false,
+      },
+    }))
+  };
+  ($privacy:expr) => {
+    match $privacy {
+      Privacy::Private => true,
+      Privacy::Public => false,
+    }
+  };
+}
+pub(crate) use privacy;
 
 #[cfg(test)]
 mod tests {
   use super::*;
 
   #[test]
-  fn test_tracking_profile_builder() {
+  fn test_builder() {
     let profile1 = TrackingProfile {
       utc_offset: 180,
-      streaks_private: true,
-      stats_private: true,
+      streak: Streak {
+        status: Status::Enabled,
+        privacy: Privacy::Private,
+      },
+      stats: Stats {
+        privacy: Privacy::Private,
+      },
       ..Default::default()
     };
     let profile2 = TrackingProfile::default()
       .utc_offset(180)
-      .streaks_private(true)
-      .stats_private(true);
+      .streak_privacy(Privacy::Private)
+      .stats_privacy(Privacy::Private);
     assert_eq!(profile1.utc_offset, profile2.utc_offset);
-    assert_eq!(profile1.streaks_private, profile2.streaks_private);
-    assert_eq!(profile1.stats_private, profile2.stats_private);
+    assert_eq!(profile1.streak.privacy, profile2.streak.privacy);
+    assert_eq!(profile1.stats.privacy, profile2.stats.privacy);
 
     assert_eq!(TrackingProfile::default().utc_offset, 0);
     assert_eq!(TrackingProfile::default().utc_offset(5).utc_offset, 0);
     assert_eq!(TrackingProfile::default().utc_offset(540).utc_offset, 540);
+  }
+
+  #[test]
+  #[allow(clippy::unreadable_literal)]
+  fn test_id_methods() {
+    let guild_id = serenity::GuildId::new(1300863845429936139);
+    let profile = TrackingProfile::default().guild_id(guild_id);
+    assert_eq!(
+      profile.guild_id,
+      serenity::GuildId::new(1300863845429936139)
+    );
+
+    let int_user_id = 1300863845429936139;
+    let str_guild_id = 1300863845429936139;
+
+    let profile = TrackingProfile::default()
+      .user_id(int_user_id)
+      .guild_id(str_guild_id);
+    assert_eq!(profile.user_id, serenity::UserId::new(1300863845429936139));
+    assert_eq!(
+      profile.guild_id,
+      serenity::GuildId::new(1300863845429936139)
+    );
+
+    let profile = TrackingProfile::new(str_guild_id, int_user_id);
+    assert_eq!(profile.user_id, serenity::UserId::new(1300863845429936139));
+    assert_eq!(
+      profile.guild_id,
+      serenity::GuildId::new(1300863845429936139)
+    );
+  }
+
+  #[test]
+  fn test_privacy_macro() {
+    let profile = TrackingProfile::default().streak_privacy(Privacy::Private);
+    assert!(privacy!(Privacy::Private));
+    assert!(!(privacy!(Some(Privacy::Public), profile.streak.privacy)));
+    assert!(privacy!(None, profile.streak.privacy));
   }
 }

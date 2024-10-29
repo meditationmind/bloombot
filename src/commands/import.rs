@@ -2,6 +2,7 @@ use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, MEDITATION_MIND, ROLES};
 use crate::data::meditation::Meditation;
+use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -277,7 +278,7 @@ pub async fn import(
       .await?
       .unwrap_or_default();
 
-  let privacy = tracking_profile.anonymous_tracking;
+  let privacy = privacy!(tracking_profile.tracking.privacy);
 
   let import_type = import_type.unwrap_or(ImportType::NewEntries);
 
@@ -677,7 +678,7 @@ pub async fn import(
   )
   .await?;
 
-  let user_streak = if tracking_profile.streaks_active {
+  let user_streak = if tracking_profile.streak.status == Status::Enabled {
     let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
     streak.current
   } else {
@@ -722,7 +723,7 @@ pub async fn import(
 
   let member = guild_id.member(ctx, user_id).await?;
   tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
-  if tracking_profile.streaks_active {
+  if tracking_profile.streak.status == Status::Enabled {
     tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
   }
 

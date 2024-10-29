@@ -1,7 +1,8 @@
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
-use crate::commands::helpers::tracking::{self, privacy, Privacy};
+use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
+use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::events;
 use crate::Context;
@@ -48,7 +49,7 @@ pub async fn add(
       .await?
       .unwrap_or_default();
 
-  let privacy = privacy!(privacy, tracking_profile.anonymous_tracking);
+  let privacy = privacy!(privacy, tracking_profile.tracking.privacy);
 
   // Usually not necessary, but defer to avoid possible unknown interaction
   // errors due to slow DB lookups, workload redeployment, etc.
@@ -242,7 +243,7 @@ pub async fn add(
 
   // We only need to get the streak if streaks are active. If inactive,
   // this variable will be unused, so just assign a default value of 0.
-  let user_streak = if tracking_profile.streaks_active {
+  let user_streak = if tracking_profile.streak.status == Status::Enabled {
     let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
     streak.current
   } else {
@@ -273,7 +274,7 @@ pub async fn add(
 
   let member = guild_id.member(ctx, user_id).await?;
   tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
-  if tracking_profile.streaks_active {
+  if tracking_profile.streak.status == Status::Enabled {
     tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
   }
 

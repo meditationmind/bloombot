@@ -1,34 +1,30 @@
 #![allow(
   clippy::needless_raw_string_hashes,
-  clippy::fn_params_excessive_bools,
   clippy::too_many_arguments,
   clippy::missing_errors_doc,
   clippy::missing_panics_doc
 )]
 #![cfg_attr(any(), rustfmt::skip::macros(query, query_as))]
 
-use crate::data::stats;
 use crate::{
   commands::helpers::time::{ChallengeTimeframe, Timeframe},
   commands::stats::{LeaderboardType, SortBy},
-  data,
+  data::bookmark::Bookmark,
+  data::course::{Course, ExtendedCourse},
+  data::erase::Erase,
+  data::meditation::Meditation,
+  data::quote::Quote,
+  data::star_message::StarMessage,
+  data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User},
+  data::steam_key::{Recipient, SteamKey},
+  data::term::{Names, SearchResult, Term},
+  data::tracking_profile::{self, TrackingProfile},
 };
 use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike, Utc};
-use data::bookmark::Bookmark;
-use data::course::{Course, ExtendedCourse};
-use data::erase::Erase;
-use data::meditation::Meditation;
-use data::quote::Quote;
-use data::star_message::StarMessage;
-use data::stats::{Guild, LeaderboardUser, Streak, User};
-use data::steam_key::{Recipient, SteamKey};
-use data::term::{Names, SearchResult, Term};
-use data::tracking_profile::TrackingProfile;
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use poise::serenity_prelude::{self as serenity};
-use stats::Timeframe as TimeframeStats;
 use ulid::Ulid;
 
 #[derive(Debug)]
@@ -182,26 +178,32 @@ impl DatabaseHandler {
 
   pub async fn create_tracking_profile(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    utc_offset: i16,
-    anonymous_tracking: bool,
-    streaks_active: bool,
-    streaks_private: bool,
-    stats_private: bool,
+    tracking_profile: TrackingProfile,
   ) -> Result<()> {
     sqlx::query!(
       r#"
         INSERT INTO tracking_profile (record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       "#,
       Ulid::new().to_string(),
-      user_id.to_string(),
-      guild_id.to_string(),
-      utc_offset,
-      anonymous_tracking,
-      streaks_active,
-      streaks_private,
-      stats_private,
+      tracking_profile.user_id.to_string(),
+      tracking_profile.guild_id.to_string(),
+      tracking_profile.utc_offset,
+      match tracking_profile.tracking.privacy {
+          tracking_profile::Privacy::Private => true,
+          tracking_profile::Privacy::Public => false,
+      },
+      match tracking_profile.streak.status {
+          tracking_profile::Status::Enabled => true,
+          tracking_profile::Status::Disabled => false,
+      },
+      match tracking_profile.streak.privacy {
+          tracking_profile::Privacy::Private => true,
+          tracking_profile::Privacy::Public => false,
+      },
+      match tracking_profile.stats.privacy {
+          tracking_profile::Privacy::Private => true,
+          tracking_profile::Privacy::Public => false,
+      },
     )
     .execute(&mut **transaction)
     .await?;
@@ -211,25 +213,31 @@ impl DatabaseHandler {
 
   pub async fn update_tracking_profile(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    utc_offset: i16,
-    anonymous_tracking: bool,
-    streaks_active: bool,
-    streaks_private: bool,
-    stats_private: bool,
+    tracking_profile: TrackingProfile,
   ) -> Result<()> {
     sqlx::query!(
       r#"
         UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5 WHERE user_id = $6 AND guild_id = $7
       "#,
-      utc_offset,
-      anonymous_tracking,
-      streaks_active,
-      streaks_private,
-      stats_private,
-      user_id.to_string(),
-      guild_id.to_string(),
+      tracking_profile.utc_offset,
+      match tracking_profile.tracking.privacy {
+          tracking_profile::Privacy::Private => true,
+          tracking_profile::Privacy::Public => false,
+      },
+      match tracking_profile.streak.status {
+          tracking_profile::Status::Enabled => true,
+          tracking_profile::Status::Disabled => false,
+      },
+      match tracking_profile.streak.privacy {
+          tracking_profile::Privacy::Private => true,
+          tracking_profile::Privacy::Public => false,
+      },
+      match tracking_profile.stats.privacy {
+          tracking_profile::Privacy::Private => true,
+          tracking_profile::Privacy::Public => false,
+      },
+      tracking_profile.user_id.to_string(),
+      tracking_profile.guild_id.to_string(),
     )
     .execute(&mut **transaction)
     .await?;
@@ -295,10 +303,32 @@ impl DatabaseHandler {
         user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
         guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>()?),
         utc_offset: row.utc_offset,
-        anonymous_tracking: row.anonymous_tracking,
-        streaks_active: row.streaks_active,
-        streaks_private: row.streaks_private,
-        stats_private: row.stats_private,
+        tracking: tracking_profile::Tracking {
+          privacy: if row.anonymous_tracking {
+            tracking_profile::Privacy::Private
+          } else {
+            tracking_profile::Privacy::Public
+          },
+        },
+        streak: tracking_profile::Streak {
+          status: if row.streaks_active {
+            tracking_profile::Status::Enabled
+          } else {
+            tracking_profile::Status::Disabled
+          },
+          privacy: if row.streaks_private {
+            tracking_profile::Privacy::Private
+          } else {
+            tracking_profile::Privacy::Public
+          },
+        },
+        stats: tracking_profile::Stats {
+          privacy: if row.stats_private {
+            tracking_profile::Privacy::Private
+          } else {
+            tracking_profile::Privacy::Public
+          },
+        },
       }),
       None => None,
     };

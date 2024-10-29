@@ -1,5 +1,5 @@
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::tracking::{privacy, Privacy};
+use crate::data::tracking_profile::{privacy, Privacy};
 use crate::database::DatabaseHandler;
 use crate::{config, Context};
 use anyhow::{Context as AnyhowContext, Result};
@@ -34,7 +34,7 @@ pub async fn streak(
       .await?
       .unwrap_or_default();
 
-  let privacy = privacy!(privacy, tracking_profile.streaks_private);
+  let privacy = privacy!(privacy, tracking_profile.streak.privacy);
 
   if user.is_some() && (user_id != ctx.author().id) {
     let user = user.with_context(|| "Failed to retrieve User")?;
@@ -43,7 +43,7 @@ pub async fn streak(
       .await
       .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
 
-    if tracking_profile.streaks_private {
+    if tracking_profile.streak.privacy == Privacy::Private {
       //Show for staff even when private
       if ctx
         .author()

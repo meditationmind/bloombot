@@ -2,6 +2,7 @@
 
 use crate::commands::helpers::time::ChallengeTimeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
+use crate::data::tracking_profile::{Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -280,7 +281,7 @@ async fn stats(
           .await?
           .unwrap_or_default();
 
-      if tracking_profile.stats_private {
+      if tracking_profile.stats.privacy == Privacy::Private {
         ctx.defer_ephemeral().await?;
       } else {
         ctx.defer().await?;
@@ -375,9 +376,9 @@ async fn stats(
         );
 
       // Hide streaks if streaks disabled
-      if tracking_profile.streaks_active
+      if tracking_profile.streak.status == Status::Enabled
         // Hide streaks if streak set to private, unless own stats in ephemeral
-        && (!tracking_profile.streaks_private || tracking_profile.stats_private)
+        && (tracking_profile.streak.privacy == Privacy::Public || tracking_profile.stats.privacy == Privacy::Private)
       {
         embed = embed.field(
           "Streaks",
@@ -428,7 +429,7 @@ async fn stats(
         .await?
         .unwrap_or_default();
 
-    if tracking_profile.stats_private {
+    if tracking_profile.stats.privacy == Privacy::Private {
       ctx.defer_ephemeral().await?;
     } else {
       ctx.defer().await?;
@@ -521,9 +522,9 @@ async fn stats(
       );
 
     // Hide streaks if streaks disabled
-    if tracking_profile.streaks_active
+    if tracking_profile.streak.status == Status::Enabled
       // Hide streaks if streak set to private, unless own stats in ephemeral
-      && (!tracking_profile.streaks_private || tracking_profile.stats_private)
+      && (tracking_profile.streak.privacy == Privacy::Public || tracking_profile.stats.privacy == Privacy::Private)
     {
       embed = embed.field(
         "Streaks",
