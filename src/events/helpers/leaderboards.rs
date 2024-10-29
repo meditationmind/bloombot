@@ -159,23 +159,12 @@ pub async fn process_stats(
           .nick_in(&ctx, guild_id)
           .await
           .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
-        if name
+        name
           .chars()
-          .all(|c| c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c.is_ascii_whitespace())
-        {
-          name
-        } else {
-          name
-            .chars()
-            .map(|c| {
-              if c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c.is_ascii_whitespace() {
-                c.to_string()
-              } else {
-                String::new()
-              }
-            })
-            .collect::<String>()
-        }
+          .filter(|c| {
+            c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c.is_ascii_whitespace()
+          })
+          .collect()
       };
       leaderboard_data.push(vec![
         format!("{}. {}", rank, user_nick_or_name),
