@@ -33,7 +33,7 @@ pub enum Privacy {
 ///
 /// ```rust
 /// let privacy = Privacy::Private;
-/// assert!(privacy!(private));
+/// assert!(privacy!(privacy));
 ///
 /// let privacy = None;
 /// let profile = TrackingProfile::default().streaks_private(true);
