@@ -1,20 +1,15 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT record_id, term_name, meaning\n        FROM term\n        WHERE guild_id = $1\n        ORDER BY term_name ASC\n      ",
+  "query": "\n        SELECT term_name, meaning\n        FROM term\n        WHERE guild_id = $1\n        ORDER BY term_name ASC\n      ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "record_id",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 1,
         "name": "term_name",
         "type_info": "Text"
       },
       {
-        "ordinal": 2,
+        "ordinal": 1,
         "name": "meaning",
         "type_info": "Text"
       }
@@ -26,9 +21,8 @@
     },
     "nullable": [
       false,
-      false,
       false
     ]
   },
-  "hash": "0c5229c0c0430bbaa39f8faf1c127d6e9bb5e7652c44d735b9ee7284403e9920"
+  "hash": "f898fe4d4fcb25d98f4c8333a0d902b44d50fb38adff6caabfda024f87f920fa"
 }

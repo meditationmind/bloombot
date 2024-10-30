@@ -1,6 +1,5 @@
 #![allow(
   clippy::needless_raw_string_hashes,
-  clippy::too_many_arguments,
   clippy::missing_errors_doc,
   clippy::missing_panics_doc
 )]
@@ -1600,13 +1599,7 @@ impl DatabaseHandler {
 
   pub async fn add_term(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    term_name: &str,
-    meaning: &str,
-    usage: Option<&str>,
-    links: &[String],
-    category: Option<&str>,
-    aliases: &[String],
-    guild_id: &serenity::GuildId,
+    term: Term,
     vector: pgvector::Vector,
   ) -> Result<()> {
     sqlx::query(
@@ -1614,13 +1607,13 @@ impl DatabaseHandler {
         INSERT INTO term (record_id, term_name, meaning, usage, links, category, aliases, guild_id, embedding) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       "#)
       .bind(Ulid::new().to_string())
-      .bind(term_name)
-      .bind(meaning)
-      .bind(usage)
-      .bind(links)
-      .bind(category)
-      .bind(aliases)
-      .bind(guild_id.to_string())
+      .bind(term.name)
+      .bind(term.meaning)
+      .bind(term.usage)
+      .bind(term.links)
+      .bind(term.category)
+      .bind(term.aliases)
+      .bind(term.guild_id.to_string())
       .bind(vector)
       .execute(&mut **transaction)
       .await?;
@@ -1634,10 +1627,6 @@ impl DatabaseHandler {
     search_vector: pgvector::Vector,
     limit: usize,
   ) -> Result<Vec<SearchResult>> {
-    // For some reason, pgvector wants a vector to look like a string [1,2,3] instead of an array.
-    // I'm sorry for what you are about to see.
-    // let pgvector_format = format!("{:?}", search_vector);
-
     // limit should be a small integer
     #[allow(clippy::cast_possible_wrap)]
     let terms: Vec<SearchResult> = sqlx::query_as(
@@ -1665,7 +1654,7 @@ impl DatabaseHandler {
   ) -> Result<Option<Term>> {
     let row = sqlx::query!(
       r#"
-        SELECT record_id, term_name, meaning, usage, links, category, aliases
+        SELECT term_name, meaning, usage, links, category, aliases
         FROM term
         WHERE guild_id = $2
         AND (LOWER(term_name) = LOWER($1)) OR (f_textarr2text(aliases) ~* ('(?:^|,)' || $1 || '(?:$|,)'))
@@ -1678,7 +1667,7 @@ impl DatabaseHandler {
 
     let term = match row {
       Some(row) => Some(Term {
-        id: row.record_id,
+        guild_id: *guild_id,
         name: row.term_name,
         meaning: row.meaning,
         usage: row.usage,
@@ -1712,7 +1701,7 @@ impl DatabaseHandler {
 
     let term = match row {
       Some(row) => Some(Term {
-        id: String::new(),
+        guild_id: *guild_id,
         name: String::new(),
         meaning: row.meaning,
         usage: None,
@@ -1728,28 +1717,23 @@ impl DatabaseHandler {
 
   pub async fn edit_term(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    original_id: &str,
-    meaning: &str,
-    usage: Option<&str>,
-    links: &[String],
-    category: Option<&str>,
-    aliases: &[String],
+    term: Term,
     vector: Option<pgvector::Vector>,
   ) -> Result<()> {
     sqlx::query(
       r#"
         UPDATE term
         SET meaning = $1, usage = $2, links = $3, category = $4, aliases = $5, embedding = COALESCE($6, embedding)
-        WHERE record_id = $7
+        WHERE LOWER(term_name) = LOWER($7)
       "#,
     )
-    .bind(meaning)
-    .bind(usage)
-    .bind(links)
-    .bind(category)
-    .bind(aliases)
+    .bind(term.meaning)
+    .bind(term.usage)
+    .bind(term.links)
+    .bind(term.category)
+    .bind(term.aliases)
     .bind(vector)
-    .bind(original_id)
+    .bind(term.name)
     .execute(&mut **transaction)
     .await?;
 
@@ -1921,7 +1905,7 @@ impl DatabaseHandler {
   ) -> Result<Vec<Term>> {
     let row = sqlx::query!(
       r#"
-        SELECT record_id, term_name, meaning, usage, links, category, aliases, SET_LIMIT($2), SIMILARITY(LOWER(term_name), LOWER($1)) AS similarity_score
+        SELECT term_name, meaning, usage, links, category, aliases, SET_LIMIT($2), SIMILARITY(LOWER(term_name), LOWER($1)) AS similarity_score
         FROM term
         WHERE guild_id = $3
         AND (LOWER(term_name) % LOWER($1)) OR (f_textarr2text(aliases) ILIKE '%' || $1 || '%')
@@ -1939,7 +1923,7 @@ impl DatabaseHandler {
       row
         .into_iter()
         .map(|row| Term {
-          id: row.record_id,
+          guild_id: *guild_id,
           name: row.term_name,
           meaning: row.meaning,
           usage: row.usage,
@@ -2004,7 +1988,7 @@ impl DatabaseHandler {
   ) -> Result<Vec<Term>> {
     let rows = sqlx::query!(
       r#"
-        SELECT record_id, term_name, meaning
+        SELECT term_name, meaning
         FROM term
         WHERE guild_id = $1
         ORDER BY term_name ASC
@@ -2017,7 +2001,7 @@ impl DatabaseHandler {
     let glossary = rows
       .into_iter()
       .map(|row| Term {
-        id: row.record_id,
+        guild_id: *guild_id,
         name: row.term_name,
         meaning: row.meaning,
         usage: None,
@@ -2231,7 +2215,7 @@ impl DatabaseHandler {
   ) -> Result<bool> {
     let row = sqlx::query!(
       r#"
-        SELECT EXISTS(SELECT 1 FROM term WHERE term_name = $1 AND guild_id = $2)
+        SELECT EXISTS(SELECT 1 FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2)
       "#,
       term_name,
       guild_id.to_string(),
@@ -2251,7 +2235,7 @@ impl DatabaseHandler {
   ) -> Result<()> {
     sqlx::query!(
       r#"
-        DELETE FROM term WHERE term_name = $1 AND guild_id = $2
+        DELETE FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2
       "#,
       term_name,
       guild_id.to_string(),

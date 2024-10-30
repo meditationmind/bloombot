@@ -1,49 +1,48 @@
-use crate::commands::helpers::database::{self, MessageType};
-use crate::config::EMOJI;
-use crate::database::DatabaseHandler;
-use crate::{Context, Data as AppData, Error as AppError};
+use crate::{
+  commands::helpers::database::{self, MessageType},
+  config::EMOJI,
+  data::term::Term,
+  database::DatabaseHandler,
+  Context, Data as AppData, Error as AppError,
+};
 use anyhow::{Context as AnyhowContext, Result};
 use log::info;
 use poise::serenity_prelude as serenity;
 use poise::Modal;
-use std::cmp::Ordering;
 
 #[derive(Debug, Modal)]
-#[name = "Add a new term"]
-struct AddTermModal {
-  // #[name = "The term to add"]
-  // #[placeholder = "For acronyms, use the full name here"]
-  // term: String,
+#[name = "Add/Edit Term"]
+pub struct TermModal {
   #[name = "The definition of the term"]
-  #[placeholder = "Include the acronym at the beginning of your definition"]
+  #[placeholder = "The first paragraph should be a concise summary (used by /whatis)"]
   #[paragraph]
   #[max_length = 1000]
-  definition: String,
-  #[name = "An example sentence showing the term in use"]
-  example: Option<String>,
+  pub meaning: String,
+  #[name = "An example of the term in use"]
+  pub usage: Option<String>,
   #[name = "The category of the term"]
-  category: Option<String>,
+  pub category: Option<String>,
   #[name = "Links to further reading, comma separated"]
-  links: Option<String>,
+  pub links: Option<String>,
   #[name = "Term aliases, comma separated"]
-  aliases: Option<String>,
+  pub aliases: Option<String>,
 }
 
-#[derive(Debug, Modal)]
-#[name = "Edit this term"]
-struct UpdateTermModal {
-  #[name = "The definition of the term"]
-  #[paragraph]
-  #[max_length = 1000]
-  definition: String,
-  #[name = "An example sentence showing the term in use"]
-  example: Option<String>,
-  #[name = "The category of the term"]
-  category: Option<String>,
-  #[name = "Links to further reading, comma separated"]
-  links: Option<String>,
-  #[name = "Term aliases, comma separated"]
-  aliases: Option<String>,
+impl From<Term> for TermModal {
+  /// Converts a [`Term`] into a [`TermModal`]. Note that the [`GuildId`][gid]
+  /// and `name` fields will be lost in the conversion. To convert back to a [`Term`],
+  /// use the [`Term::from_modal()`] method with the original [`GuildId`][gid] and `name`.
+  ///
+  /// [gid]: poise::serenity_prelude::model::id::GuildId
+  fn from(term: Term) -> Self {
+    Self {
+      meaning: term.meaning,
+      usage: term.usage,
+      category: term.category,
+      links: term.links.map(|links| links.join(", ")),
+      aliases: term.aliases.map(|aliases| aliases.join(", ")),
+    }
+  }
 }
 
 async fn term_not_found(
@@ -55,49 +54,41 @@ async fn term_not_found(
   let possible_terms =
     DatabaseHandler::get_possible_terms(transaction, &guild_id, term_name.as_str(), 0.8).await?;
 
-  match possible_terms.len().cmp(&1) {
-    Ordering::Less => {
-      ctx
-        .send(
-          poise::CreateReply::default()
-            .content(format!("{} Term does not exist.", EMOJI.mminfo))
-            .ephemeral(true),
-        )
-        .await?;
-    }
-    Ordering::Equal => {
-      let possible_term = possible_terms
-        .first()
-        .with_context(|| "Failed to retrieve first element of possible_terms")?;
-
-      ctx
-        .send(
-          poise::CreateReply::default()
-            .content(format!(
-              "{} Term does not exist. Did you mean `{}`?",
-              EMOJI.mminfo, possible_term.name
-            ))
-            .ephemeral(true),
-        )
-        .await?;
-    }
-    Ordering::Greater => {
-      ctx
-        .send(
-          poise::CreateReply::default()
-            .content(format!(
-              "{} Term does not exist. Did you mean one of these?\n{}",
-              EMOJI.mminfo,
-              possible_terms
-                .iter()
-                .map(|term| format!("`{}`", term.name))
-                .collect::<Vec<String>>()
-                .join("\n")
-            ))
-            .ephemeral(true),
-        )
-        .await?;
-    }
+  if possible_terms.len() > 1 {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(format!(
+            "{} Term does not exist. Did you mean one of these?\n{}",
+            EMOJI.mminfo,
+            possible_terms
+              .iter()
+              .map(|term| format!("`{}`", term.name))
+              .collect::<Vec<String>>()
+              .join("\n")
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+  } else if let Some(possible_term) = possible_terms.first() {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(format!(
+            "{} Term does not exist. Did you mean `{}`?",
+            EMOJI.mminfo, possible_term.name
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+  } else {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(format!("{} Term does not exist.", EMOJI.mminfo))
+          .ephemeral(true),
+      )
+      .await?;
   }
 
   Ok(())
@@ -115,7 +106,6 @@ async fn term_not_found(
   category = "Moderator Commands",
   subcommands("add", "remove", "edit", "update_embeddings"),
   subcommand_required,
-  //hide_in_help,
   guild_only
 )]
 #[allow(clippy::unused_async)]
@@ -133,47 +123,29 @@ async fn add(
   #[rename = "term"]
   term_name: String,
 ) -> Result<()> {
-  use poise::Modal as _;
-
-  let term_data = AddTermModal::execute(ctx).await?;
+  let term_data = TermModal::execute(ctx).await?;
 
   if let Some(term_data) = term_data {
-    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-
     let guild_id = ctx
       .guild_id()
       .with_context(|| "Failed to retrieve guild ID from context")?;
-
-    let links = match term_data.links {
-      Some(links) => links.split(',').map(|s| s.trim().to_string()).collect(),
-      None => Vec::new(),
-    };
-
-    let aliases = match term_data.aliases {
-      Some(aliases) => aliases.split(',').map(|s| s.trim().to_string()).collect(),
-      None => Vec::new(),
-    };
 
     let vector = pgvector::Vector::from(
       ctx
         .data()
         .embeddings
         .create_embedding(
-          format!("{term_name} {}", term_data.definition),
+          format!("{term_name} {}", term_data.meaning),
           ctx.author().id,
         )
         .await?,
     );
 
+    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+
     DatabaseHandler::add_term(
       &mut transaction,
-      term_name.as_str(),
-      term_data.definition.as_str(),
-      term_data.example.as_deref(),
-      links.as_slice(),
-      term_data.category.as_deref(),
-      aliases.as_slice(),
-      &guild_id,
+      Term::from_modal(guild_id, term_name, term_data),
       vector,
     )
     .await?;
@@ -206,10 +178,46 @@ async fn edit(
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let existing_term =
-    DatabaseHandler::get_term(&mut transaction, &guild_id, term_name.as_str()).await?;
+  if let Some(existing_term) =
+    DatabaseHandler::get_term(&mut transaction, &guild_id, term_name.as_str()).await?
+  {
+    let existing_meaning = existing_term.meaning.clone();
+    let defaults = TermModal::from(existing_term);
 
-  if existing_term.is_none() {
+    let term_data = TermModal::execute_with_defaults(ctx, defaults).await?;
+
+    if let Some(term_data) = term_data {
+      let vector = if term_data.meaning == existing_meaning {
+        None
+      } else {
+        Some(pgvector::Vector::from(
+          ctx
+            .data()
+            .embeddings
+            .create_embedding(
+              format!("{} {}", term_name, term_data.meaning),
+              ctx.author().id,
+            )
+            .await?,
+        ))
+      };
+
+      DatabaseHandler::edit_term(
+        &mut transaction,
+        Term::from_modal(guild_id, term_name, term_data),
+        vector,
+      )
+      .await?;
+
+      database::commit_and_say(
+        poise::Context::Application(ctx),
+        transaction,
+        MessageType::TextOnly(format!("{} Term has been edited.", EMOJI.mmcheck)),
+        true,
+      )
+      .await?;
+    }
+  } else {
     term_not_found(
       poise::Context::Application(ctx),
       &mut transaction,
@@ -218,71 +226,6 @@ async fn edit(
     )
     .await?;
     return Ok(());
-  }
-
-  let existing_term = existing_term.with_context(|| "Failed to assign Term to existing_term")?;
-  let links = existing_term.links.map(|links| links.join(", "));
-  let aliases = existing_term.aliases.map(|aliases| aliases.join(", "));
-
-  let existing_definition = existing_term.meaning.clone();
-
-  let defaults = UpdateTermModal {
-    definition: existing_term.meaning,
-    example: existing_term.usage,
-    category: existing_term.category,
-    links,
-    aliases,
-  };
-
-  let term_data = UpdateTermModal::execute_with_defaults(ctx, defaults).await?;
-
-  if let Some(term_data) = term_data {
-    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-
-    let links = match term_data.links {
-      Some(links) => links.split(',').map(|s| s.trim().to_string()).collect(),
-      None => Vec::new(),
-    };
-
-    let vector = if term_data.definition == existing_definition {
-      None
-    } else {
-      Some(pgvector::Vector::from(
-        ctx
-          .data()
-          .embeddings
-          .create_embedding(
-            format!("{} {}", existing_term.name, term_data.definition),
-            ctx.author().id,
-          )
-          .await?,
-      ))
-    };
-
-    let aliases = match term_data.aliases {
-      Some(aliases) => aliases.split(',').map(|s| s.trim().to_string()).collect(),
-      None => Vec::new(),
-    };
-
-    DatabaseHandler::edit_term(
-      &mut transaction,
-      &existing_term.id,
-      term_data.definition.as_str(),
-      term_data.example.as_deref(),
-      links.as_slice(),
-      term_data.category.as_deref(),
-      aliases.as_slice(),
-      vector,
-    )
-    .await?;
-
-    database::commit_and_say(
-      poise::Context::Application(ctx),
-      transaction,
-      MessageType::TextOnly(format!("{} Term has been edited.", EMOJI.mmcheck)),
-      true,
-    )
-    .await?;
   }
 
   Ok(())
@@ -298,13 +241,11 @@ async fn remove(
   #[rename = "term"]
   term_name: String,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::term_exists(&mut transaction, &guild_id, term_name.as_str()).await? {
     ctx
       .send(
@@ -336,45 +277,39 @@ async fn remove(
 async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let terms = DatabaseHandler::get_term_list(&mut transaction, &guild_id).await?;
 
   for term in terms {
-    let existing_term =
+    if let Some(existing_term) =
       DatabaseHandler::get_term_meaning(&mut transaction, &guild_id, term.term_name.as_str())
-        .await?;
+        .await?
+    {
+      let vector = Some(pgvector::Vector::from(
+        ctx
+          .data()
+          .embeddings
+          .create_embedding(
+            format!("{} {}", term.term_name, existing_term.meaning),
+            ctx.author().id,
+          )
+          .await?,
+      ));
 
-    if existing_term.is_none() {
-      info!("Unable to retrieve term: {}", term.term_name);
-      continue;
+      DatabaseHandler::edit_term_embedding(
+        &mut transaction,
+        &guild_id,
+        term.term_name.as_str(),
+        vector,
+      )
+      .await?;
     }
-
-    let existing_term = existing_term.with_context(|| "Failed to assign Term to existing_term")?;
-
-    let vector = Some(pgvector::Vector::from(
-      ctx
-        .data()
-        .embeddings
-        .create_embedding(
-          format!("{} {}", term.term_name, existing_term.meaning),
-          ctx.author().id,
-        )
-        .await?,
-    ));
-
-    DatabaseHandler::edit_term_embedding(
-      &mut transaction,
-      &guild_id,
-      term.term_name.as_str(),
-      vector,
-    )
-    .await?;
+    info!("Unable to retrieve term: {}", term.term_name);
+    continue;
   }
 
   database::commit_and_say(

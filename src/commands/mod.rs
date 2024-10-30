@@ -25,7 +25,7 @@ mod report_message;
 pub mod stats;
 mod streak;
 mod suggest;
-mod terms;
+pub mod terms;
 mod uptime;
 mod whatis;
 
