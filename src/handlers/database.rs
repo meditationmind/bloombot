@@ -24,6 +24,9 @@ use chrono::{Datelike, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use poise::serenity_prelude::{self as serenity};
+use sqlx::postgres::PgArguments;
+use sqlx::query::Query;
+use sqlx::Postgres;
 use ulid::Ulid;
 
 #[derive(Debug)]
@@ -41,6 +44,18 @@ struct MeditationCountByDay {
 #[allow(clippy::module_name_repetitions)]
 pub struct DatabaseHandler {
   pool: sqlx::PgPool,
+}
+
+pub(crate) trait CreatesInDatabase {
+  fn create_query(&self) -> Query<Postgres, PgArguments>;
+}
+
+pub(crate) trait UpdatesInDatabase {
+  fn update_query(&self) -> Query<Postgres, PgArguments>;
+}
+
+pub(crate) trait DeletesInDatabase {
+  fn delete_query(id: String) -> Query<Postgres, PgArguments>;
 }
 
 impl DatabaseHandler {
@@ -537,23 +552,9 @@ impl DatabaseHandler {
 
   pub async fn add_bookmark(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    message_link: &str,
-    description: Option<&str>,
+    bookmark: &Bookmark,
   ) -> Result<()> {
-    sqlx::query!(
-      r#"
-        INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)
-      "#,
-      Ulid::new().to_string(),
-      user_id.to_string(),
-      guild_id.to_string(),
-      message_link,
-      description,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    bookmark.create_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -648,15 +649,10 @@ impl DatabaseHandler {
     bookmark_id: &str,
   ) -> Result<u64> {
     Ok(
-      sqlx::query!(
-        r#"
-          DELETE FROM bookmarks WHERE record_id = $1
-        "#,
-        bookmark_id,
-      )
-      .execute(&mut **transaction)
-      .await?
-      .rows_affected(),
+      Bookmark::delete_query(bookmark_id.to_string())
+        .execute(&mut **transaction)
+        .await?
+        .rows_affected(),
     )
   }
 
