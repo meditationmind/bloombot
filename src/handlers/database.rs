@@ -12,7 +12,7 @@ use crate::{
   data::course::{Course, ExtendedCourse},
   data::erase::Erase,
   data::meditation::Meditation,
-  data::quote::Quote,
+  data::quote::{Quote, QuoteModal},
   data::star_message::StarMessage,
   data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User},
   data::steam_key::{Recipient, SteamKey},
@@ -1241,17 +1241,15 @@ impl DatabaseHandler {
 
   pub async fn edit_quote(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    quote_id: &str,
-    quote: &str,
-    author: Option<&str>,
+    quote: Quote,
   ) -> Result<()> {
     sqlx::query!(
       r#"
         UPDATE quote SET quote = $1, author = $2 WHERE record_id = $3
       "#,
-      quote,
-      author,
-      quote_id,
+      quote.quote,
+      quote.author,
+      quote.id,
     )
     .execute(&mut **transaction)
     .await?;
@@ -1579,16 +1577,15 @@ impl DatabaseHandler {
   pub async fn add_quote(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-    quote: &str,
-    author: Option<&str>,
+    quote: QuoteModal,
   ) -> Result<()> {
     sqlx::query!(
       r#"
         INSERT INTO quote (record_id, quote, author, guild_id) VALUES ($1, $2, $3, $4)
       "#,
       Ulid::new().to_string(),
-      quote,
-      author,
+      quote.quote,
+      quote.author,
       guild_id.to_string(),
     )
     .execute(&mut **transaction)
