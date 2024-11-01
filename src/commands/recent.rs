@@ -1,4 +1,4 @@
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
 use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -29,7 +29,7 @@ pub async fn recent(
   drop(transaction);
 
   Paginator::new("Meditation Entries", &entries, ENTRIES_PER_PAGE.default)
-    .paginate(ctx, page, PageType::Standard, true)
+    .paginate(ctx, page, PageType::Standard, Visibility::Ephemeral)
     .await?;
 
   Ok(())

@@ -1,7 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -204,7 +204,7 @@ async fn list(
   drop(transaction);
 
   Paginator::new("Meditation Entries", &entries, ENTRIES_PER_PAGE.default)
-    .paginate(ctx, page, PageType::Standard, true)
+    .paginate(ctx, page, PageType::Standard, Visibility::Ephemeral)
     .await?;
 
   Ok(())

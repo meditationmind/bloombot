@@ -1,5 +1,5 @@
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
@@ -570,12 +570,6 @@ async fn list(
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
-  let user_nick_or_name = user
-    .nick_in(&ctx, guild_id)
-    .await
-    .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
-
-  let privacy = ctx.channel_id() != CHANNELS.logs;
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
@@ -584,18 +578,28 @@ async fn list(
 
   drop(transaction);
 
+  let title = {
+    let user_nick_or_name = user
+      .nick_in(&ctx, guild_id)
+      .await
+      .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
+    format!("Erases for {user_nick_or_name}")
+  };
+
   let page_type = match date_format {
     Some(DateFormat::Dmy) => PageType::Alternate,
     _ => PageType::Standard,
   };
 
-  Paginator::new(
-    format!("Erases for {user_nick_or_name}"),
-    &erases,
-    ENTRIES_PER_PAGE.default,
-  )
-  .paginate(ctx, page, page_type, privacy)
-  .await?;
+  let visibility = if ctx.channel_id() == CHANNELS.logs {
+    Visibility::Public
+  } else {
+    Visibility::Ephemeral
+  };
+
+  Paginator::new(title, &erases, ENTRIES_PER_PAGE.default)
+    .paginate(ctx, page, page_type, visibility)
+    .await?;
 
   Ok(())
 }

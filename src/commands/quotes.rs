@@ -1,5 +1,5 @@
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
 use crate::config::{BloomBotEmbed, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
@@ -214,7 +214,7 @@ async fn list(
   drop(transaction);
 
   Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE.default)
-    .paginate(ctx, page, PageType::Standard, true)
+    .paginate(ctx, page, PageType::Standard, Visibility::Ephemeral)
     .await?;
 
   Ok(())
@@ -260,7 +260,7 @@ async fn search(
   drop(transaction);
 
   Paginator::new("Quotes", &quotes, ENTRIES_PER_PAGE.default)
-    .paginate(ctx, page, PageType::Standard, true)
+    .paginate(ctx, page, PageType::Standard, Visibility::Ephemeral)
     .await?;
 
   Ok(())

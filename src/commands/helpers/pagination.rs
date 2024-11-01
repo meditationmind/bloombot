@@ -17,6 +17,11 @@ pub enum PageType {
   Alternate,
 }
 
+pub enum Visibility {
+  Public,
+  Ephemeral,
+}
+
 pub trait PageRow {
   fn title(&self, page_type: PageType) -> String;
   fn body(&self) -> String;
@@ -142,15 +147,20 @@ impl<'a> Paginator<'a> {
   /// Receives a [`Paginator`] initialized with [`Paginator::new()`] and initiates pagination.
   ///
   /// An optional `page` argument specifies the initial page, [`PageType`] allows for multiple
-  /// page variations, and setting `ephemeral` to `true` displays the pagination ephemerally,
-  /// meaning via private in-channel messages.
+  /// page variations, and [`Visibility`] determines whether the pagination is displayed publicly
+  /// or ephemerally, meaning via private in-channel messages.
   pub async fn paginate(
     self,
     ctx: Context<'_>,
     page: Option<usize>,
     page_type: PageType,
-    ephemeral: bool,
+    visibility: Visibility,
   ) -> Result<()> {
+    let ephemeral = match visibility {
+      Visibility::Public => false,
+      Visibility::Ephemeral => true,
+    };
+
     // Define some unique identifiers for the navigation buttons
     let ctx_id = ctx.id();
     let prev_button_id = format!("{ctx_id}prev");
