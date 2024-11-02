@@ -10,9 +10,22 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DISCORD_TOKEN: ''
+  TEST_GUILD_ID: ''
+  DATABASE_URL: postgres://postgres:password@postgres/bloom
+  OPENAI_API_KEY: ''
 
 jobs:
   test:
+    services:
+      postgres:
+        image: pgvector/pgvector:1.7
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
