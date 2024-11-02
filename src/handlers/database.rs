@@ -663,10 +663,7 @@ impl DatabaseHandler {
   pub async fn add_erase(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    message_link: &str,
-    reason: Option<&str>,
-    occurred_at: chrono::DateTime<Utc>,
+    erase: Erase,
   ) -> Result<()> {
     sqlx::query!(
       r#"
@@ -674,11 +671,11 @@ impl DatabaseHandler {
         ON CONFLICT (message_link) DO UPDATE SET reason = $5
       "#,
       Ulid::new().to_string(),
-      user_id.to_string(),
+      erase.user_id.to_string(),
       guild_id.to_string(),
-      message_link,
-      reason,
-      occurred_at,
+      erase.message_link,
+      erase.reason,
+      erase.occurred_at,
     )
     .execute(&mut **transaction)
     .await?;
