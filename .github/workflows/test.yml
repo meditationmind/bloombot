@@ -12,7 +12,7 @@ env:
   CARGO_TERM_COLOR: always
   DISCORD_TOKEN: ''
   TEST_GUILD_ID: ''
-  DATABASE_URL: postgres://postgres:password@postgres/bloom
+  DATABASE_URL: postgres://postgres:password@localhost:5432/bloom
   OPENAI_API_KEY: ''
 
 jobs:
