@@ -171,7 +171,7 @@ impl Default for TrackingProfile {
 /// [tp]: crate::data::tracking_profile::TrackingProfile
 macro_rules! privacy {
   ($privacy:expr, $default:expr) => {
-    !(!(match $privacy {
+    match $privacy {
       Some(privacy) => match privacy {
         Privacy::Private => true,
         Privacy::Public => false,
@@ -180,7 +180,7 @@ macro_rules! privacy {
         Privacy::Private => true,
         Privacy::Public => false,
       },
-    }))
+    }
   };
   ($privacy:expr) => {
     match $privacy {
