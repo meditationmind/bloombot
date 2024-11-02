@@ -1,6 +1,6 @@
-use crate::commands::helpers::common;
+use crate::commands::helpers::common::{self, Visibility};
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
@@ -74,7 +74,7 @@ pub async fn add_bookmark(
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Bookmark has been added.", EMOJI.mmcheck)),
-      true,
+      Visibility::Ephemeral,
     )
     .await?;
   }
@@ -176,7 +176,7 @@ async fn add(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Bookmark has been added.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -202,7 +202,7 @@ async fn remove(
       ctx,
       transaction,
       MessageType::TextOnly(format!("{} Bookmark has been removed.", EMOJI.mmcheck)),
-      true,
+      Visibility::Ephemeral,
     )
     .await?;
   } else {

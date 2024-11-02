@@ -1,3 +1,4 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
@@ -165,7 +166,7 @@ async fn offset(
       "{} UTC offset successfully updated.",
       EMOJI.mmcheck
     )),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -235,7 +236,7 @@ async fn tracking(
       EMOJI.mmcheck,
       anonymous.name()
     )),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -384,7 +385,7 @@ async fn streak(
       "{} Streak settings successfully updated.",
       EMOJI.mmcheck
     )),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -449,7 +450,7 @@ async fn stats(
       EMOJI.mmcheck,
       privacy.name()
     )),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

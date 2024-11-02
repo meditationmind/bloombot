@@ -1,5 +1,6 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, EMOJI, ENTRIES_PER_PAGE};
 use crate::data::quote::QuoteModal;
 use crate::database::DatabaseHandler;
@@ -46,7 +47,7 @@ async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Result<()
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Quote has been added.", EMOJI.mmcheck)),
-      true,
+      Visibility::Ephemeral,
     )
     .await?;
   }
@@ -84,7 +85,7 @@ async fn edit(
         poise::Context::Application(ctx),
         transaction,
         MessageType::TextOnly(format!("{} Quote has been edited.", EMOJI.mmcheck)),
-        true,
+        Visibility::Ephemeral,
       )
       .await?;
     }
@@ -124,7 +125,7 @@ async fn remove(
       ctx,
       transaction,
       MessageType::TextOnly(format!("{} Quote has been removed.", EMOJI.mmcheck)),
-      true,
+      Visibility::Ephemeral,
     )
     .await?;
   } else {

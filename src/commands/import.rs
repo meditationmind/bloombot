@@ -1,3 +1,4 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, MEDITATION_MIND, ROLES};
@@ -706,7 +707,7 @@ pub async fn import(
     ctx,
     transaction,
     MessageType::TextOnly(success_response),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

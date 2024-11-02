@@ -1,5 +1,6 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
@@ -546,7 +547,7 @@ async fn message(
       "{} Message deleted. User will be notified via DM or private thread.",
       EMOJI.mmcheck
     )),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -660,7 +661,7 @@ async fn populate(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Erase data has been added.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

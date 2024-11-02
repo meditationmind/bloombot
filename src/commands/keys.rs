@@ -1,5 +1,6 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -86,7 +87,7 @@ async fn add_key(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Key has been added.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -125,7 +126,7 @@ async fn remove_key(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Key has been removed.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -277,7 +278,7 @@ async fn update_recipient(
           "{} Recipient has been added to the database.",
           EMOJI.mmcheck
         )),
-        true,
+        Visibility::Ephemeral,
       )
       .await?;
       return Ok(());
@@ -407,7 +408,7 @@ async fn update_recipient(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Recipient has been updated.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

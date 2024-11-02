@@ -1,3 +1,4 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::commands::helpers::tracking;
@@ -258,7 +259,7 @@ pub async fn add(
       ctx,
       transaction,
       MessageType::TextOnly(private_response),
-      true,
+      Visibility::Ephemeral,
     )
     .await?;
 
@@ -267,7 +268,13 @@ pub async fn add(
       .send_message(ctx, CreateMessage::new().content(response))
       .await?;
   } else {
-    database::commit_and_say(ctx, transaction, MessageType::TextOnly(response), false).await?;
+    database::commit_and_say(
+      ctx,
+      transaction,
+      MessageType::TextOnly(response),
+      Visibility::Public,
+    )
+    .await?;
   }
 
   tracking::post_guild_hours(&ctx, &guild_time_in_hours).await?;

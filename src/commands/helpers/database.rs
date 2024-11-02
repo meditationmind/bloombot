@@ -1,3 +1,4 @@
+use crate::commands::helpers::common::Visibility;
 use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -29,8 +30,13 @@ pub async fn commit_and_say(
   ctx: Context<'_>,
   transaction: sqlx::Transaction<'_, sqlx::Postgres>,
   message: MessageType,
-  ephemeral: bool,
+  visibility: Visibility,
 ) -> Result<()> {
+  let ephemeral = match visibility {
+    Visibility::Public => false,
+    Visibility::Ephemeral => true,
+  };
+
   let response = match message {
     MessageType::TextOnly(message) => {
       ctx

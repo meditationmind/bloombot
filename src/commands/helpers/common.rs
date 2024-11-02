@@ -1,7 +1,23 @@
 use anyhow::Result;
 use poise::serenity_prelude::RoleId;
 
-use crate::{config::ROLES, Context};
+use crate::{config::ROLES, data::tracking_profile::Privacy, Context};
+
+pub enum Visibility {
+  Public,
+  Ephemeral,
+}
+
+impl From<Privacy> for Visibility {
+  /// Converts [`Privacy`] into [`Visibility`], with [`Privacy::Private`]
+  /// implying [`Visibility::Ephemeral`].
+  fn from(privacy: Privacy) -> Self {
+    match privacy {
+      Privacy::Private => Self::Ephemeral,
+      Privacy::Public => Self::Public,
+    }
+  }
+}
 
 /// Takes [`Context`] as an argument and attempts to retrieve the author of the invoking
 /// interaction as a [`serenity::Member`] via [`author_member()`][am]. If successful, checks

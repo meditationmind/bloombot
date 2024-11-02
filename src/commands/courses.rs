@@ -1,6 +1,7 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::courses;
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -138,7 +139,7 @@ async fn add(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Course has been added.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -280,7 +281,7 @@ async fn edit(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Course roles have been updated.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -345,7 +346,7 @@ async fn remove(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Course has been removed.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

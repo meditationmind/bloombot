@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::commands::helpers::common::Visibility;
 use crate::config::BloomBotEmbed;
 use crate::Context;
 use anyhow::Result;
@@ -15,11 +16,6 @@ use poise::{
 pub enum PageType {
   Standard,
   Alternate,
-}
-
-pub enum Visibility {
-  Public,
-  Ephemeral,
 }
 
 pub trait PageRow {

@@ -1,4 +1,5 @@
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
+use crate::commands::helpers::common::Visibility;
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::ENTRIES_PER_PAGE;
 use crate::database::DatabaseHandler;
 use crate::Context;

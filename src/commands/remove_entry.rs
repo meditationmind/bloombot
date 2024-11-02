@@ -1,3 +1,4 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
@@ -63,7 +64,7 @@ pub async fn remove_entry(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Entry has been removed.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

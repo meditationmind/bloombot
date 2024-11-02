@@ -1,4 +1,5 @@
 use crate::{
+  commands::helpers::common::Visibility,
   commands::helpers::database::{self, MessageType},
   config::EMOJI,
   data::term::Term,
@@ -154,7 +155,7 @@ async fn add(
       poise::Context::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Term has been added.", EMOJI.mmcheck)),
-      true,
+      Visibility::Ephemeral,
     )
     .await?;
   }
@@ -263,7 +264,7 @@ async fn remove(
     ctx,
     transaction,
     MessageType::TextOnly(format!("{} Term has been removed.", EMOJI.mmcheck)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -319,7 +320,7 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
       "{} Term embeddings have been updated.",
       EMOJI.mmcheck
     )),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

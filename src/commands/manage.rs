@@ -1,7 +1,8 @@
 #![allow(clippy::too_many_arguments)]
 
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
-use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
+use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -155,7 +156,7 @@ async fn create(
     ctx,
     transaction,
     MessageType::EmbedOnly(Box::new(success_embed)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 
@@ -366,7 +367,7 @@ async fn update(
       ctx,
       transaction,
       MessageType::EmbedOnly(Box::new(success_embed)),
-      true,
+      Visibility::Ephemeral,
     )
     .await?;
 
@@ -477,7 +478,7 @@ async fn delete(
     ctx,
     transaction,
     MessageType::EmbedOnly(Box::new(success_embed)),
-    true,
+    Visibility::Ephemeral,
   )
   .await?;
 

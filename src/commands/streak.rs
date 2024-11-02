@@ -1,5 +1,6 @@
+use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
-use crate::data::tracking_profile::{privacy, Privacy};
+use crate::data::tracking_profile::Privacy;
 use crate::database::DatabaseHandler;
 use crate::{config, Context};
 use anyhow::{Context as AnyhowContext, Result};
@@ -34,7 +35,7 @@ pub async fn streak(
       .await?
       .unwrap_or_default();
 
-  let privacy = privacy!(privacy, tracking_profile.streak.privacy);
+  let visibility = privacy.unwrap_or(tracking_profile.streak.privacy).into();
 
   if user.is_some() && (user_id != ctx.author().id) {
     let user = user.with_context(|| "Failed to retrieve User")?;
@@ -62,7 +63,13 @@ pub async fn streak(
           )
         };
 
-        database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), true).await?;
+        database::commit_and_say(
+          ctx,
+          transaction,
+          MessageType::TextOnly(message),
+          Visibility::Ephemeral,
+        )
+        .await?;
 
         return Ok(());
       }
@@ -73,7 +80,7 @@ pub async fn streak(
         MessageType::TextOnly(format!(
           "Sorry, {user_nick_or_name}'s meditation streak is set to private."
         )),
-        true,
+        Visibility::Ephemeral,
       )
       .await?;
 
@@ -92,7 +99,7 @@ pub async fn streak(
       )
     };
 
-    database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
+    database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), visibility).await?;
 
     return Ok(());
   }
@@ -109,7 +116,7 @@ pub async fn streak(
     )
   };
 
-  database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), privacy).await?;
+  database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), visibility).await?;
 
   Ok(())
 }
