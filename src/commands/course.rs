@@ -32,29 +32,21 @@ async fn join(
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   // Default to Mindfulness Course since it's the only course currently
-  let course_name = if let Some(course_name) = course_name {
-    course_name
-  } else {
-    "Mindfulness Course".to_owned()
-  };
+  let course_name = course_name.unwrap_or("Mindfulness Course".to_owned());
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
-  let course =
-    DatabaseHandler::get_course(&mut transaction, &guild_id, course_name.as_str()).await?;
-
-  // Verify that the course exists
-  if course.is_none() {
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+  let Some(course) =
+    DatabaseHandler::get_course(&mut transaction, &guild_id, course_name.as_str()).await?
+  else {
     courses::course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
     return Ok(());
-  }
+  };
 
-  let course = course.with_context(|| "Failed to assign CourseData to course")?;
   let member = ctx
     .author_member()
     .await
@@ -90,14 +82,36 @@ async fn join(
     return Ok(());
   }
 
-  member.add_role(ctx, course.participant_role).await?;
+  if let Err(e) = member.add_role(ctx, course.participant_role).await {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(format!(
+            "{} Failed to add the course role. Please try again or contact staff for assistance.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+    return Err(anyhow::anyhow!("Failed to add course role: {e}"));
+  }
 
   // Add course-specific embeds when more courses are added
   let embed = if course_name == "Mindfulness Course" {
     BloomBotEmbed::new()
-    .title("Thank you for joining the Mindfulness Course!")
-    .description("You have two options for accessing the course materials.\n\n- If you prefer the Discord environment, you can access the full course directly from the Meditation Mind server: <#1257709248847155240>\n- If you prefer an online course platform, you may enroll and begin your journey on Thinkific: [Getting Started with Mindfulness](<https://meditation-mind.thinkific.com/courses/mindfulness>)\n\nIf you decide you would like to opt out of the course-specific channels at a later time, just use the `/course leave` command.\n\nWe hope you find the course helpful!")
-    .image("https://meditationmind.org/wp-content/uploads/2022/01/Meditation_CHallenge_kopie.png")
+      .title("Thank you for joining the Mindfulness Course!")
+      .description(
+        "You have two options for accessing the course materials.\
+      \n\n\
+      - If you prefer the Discord environment, you can access the full course directly from the \
+      Meditation Mind server: <#1257709248847155240>\n\
+      - If you prefer an online course platform, you may enroll and begin your journey on \
+      Thinkific: [Getting Started with Mindfulness](<https://meditation-mind.thinkific.com/courses/mindfulness>)\
+      \n\n\
+      If you decide you would like to opt out of the course-specific channels at a later time, \
+      just use the `/course leave` command.\n\nWe hope you find the course helpful!",
+      )
+      .image("https://meditationmind.org/wp-content/uploads/2022/01/Meditation_CHallenge_kopie.png")
   } else {
     BloomBotEmbed::new()
   };
@@ -135,29 +149,21 @@ async fn leave(
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   // Default to Mindfulness Course since it's the only course currently
-  let course_name = if let Some(course_name) = course_name {
-    course_name
-  } else {
-    "Mindfulness Course".to_owned()
-  };
+  let course_name = course_name.unwrap_or("Mindfulness Course".to_owned());
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
-  let course =
-    DatabaseHandler::get_course(&mut transaction, &guild_id, course_name.as_str()).await?;
-
-  // Verify that the course exists
-  if course.is_none() {
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+  let Some(course) =
+    DatabaseHandler::get_course(&mut transaction, &guild_id, course_name.as_str()).await?
+  else {
     courses::course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
     return Ok(());
-  }
+  };
 
-  let course = course.with_context(|| "Failed to assign CourseData to course")?;
   let member = ctx
     .author_member()
     .await
@@ -178,13 +184,33 @@ async fn leave(
     return Ok(());
   }
 
-  member.remove_role(ctx, course.participant_role).await?;
+  if let Err(e) = member.remove_role(ctx, course.participant_role).await {
+    ctx
+      .send(
+        poise::CreateReply::default()
+          .content(format!(
+            "{} Failed to remove the course role. Please try again or contact staff for assistance.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true),
+      )
+      .await?;
+    return Err(anyhow::anyhow!("Failed to remove course role: {e}"));
+  }
 
   // Adjust when new courses are added
   ctx
     .send(
       CreateReply::default()
-        .content(format!("You have successfully opted out of the **{course_name}** course-specific channels.\n\nIf you also enrolled on Thinkific and would like to be unenrolled there, please send a DM to <@575252669443211264> or email us at `info@meditationmind.org` and let us know your Thinkific username or the email address you used to sign up.\n\nWe wish you all the best on your journey!"))
+        .content(format!(
+          "You have successfully opted out of the **{course_name}** course-specific channels.\
+          \n\n\
+          If you also enrolled on Thinkific and would like to be unenrolled there, please send \
+          a DM to <@575252669443211264> or email us at `info@meditationmind.org` and let us know \
+          your Thinkific username or the email address you used to sign up.\
+          \n\n\
+          We wish you all the best on your journey!"
+        ))
         .ephemeral(true),
     )
     .await?;
