@@ -1,8 +1,6 @@
-use crate::commands::{
-  helpers::pagination::{PageRow, PageType},
-  terms::TermModal,
-};
+use crate::commands::helpers::pagination::{PageRow, PageType};
 use poise::serenity_prelude::{self as serenity};
+use poise::Modal;
 
 #[derive(Debug)]
 pub struct Term {
@@ -12,6 +10,38 @@ pub struct Term {
   pub usage: Option<String>,
   pub links: Option<Vec<String>>,
   pub category: Option<String>,
+  pub aliases: Option<Vec<String>>,
+}
+
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Modal)]
+#[name = "Add/Edit Term"]
+pub struct TermModal {
+  #[name = "The definition of the term"]
+  #[placeholder = "The first paragraph should be a concise summary (used by /whatis)"]
+  #[paragraph]
+  #[max_length = 1000]
+  pub meaning: String,
+  #[name = "An example of the term in use"]
+  pub usage: Option<String>,
+  #[name = "The category of the term"]
+  pub category: Option<String>,
+  #[name = "Links to further reading, comma separated"]
+  pub links: Option<String>,
+  #[name = "Term aliases, comma separated"]
+  pub aliases: Option<String>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct SearchResult {
+  pub term_name: String,
+  pub meaning: String,
+  pub distance_score: Option<f64>,
+}
+
+#[derive(Debug)]
+pub struct Names {
+  pub term_name: String,
   pub aliases: Option<Vec<String>>,
 }
 
@@ -63,7 +93,8 @@ impl Term {
   }
 
   /// Takes an [`Option<String>`], with [`String`] being one or more hyperlinks
-  /// separated by commas, and assigns them to a [`Term`].
+  /// separated by commas, splits the hyperlinks into a [`Vec<String>`] and assigns
+  /// them to a [`Term`].
   pub fn links(mut self, links: Option<String>) -> Self {
     if let Some(links) = links {
       self.links = Some(links.split(',').map(|s| s.trim().to_string()).collect());
@@ -81,7 +112,8 @@ impl Term {
   }
 
   /// Takes an [`Option<String>`], with [`String`] being one or more aliases
-  /// separated by commas, and assigns them to a [`Term`].
+  /// separated by commas, splits the aliases into a [`Vec<String>`] and assigns
+  /// them to a [`Term`].
   pub fn aliases(mut self, aliases: Option<String>) -> Self {
     if let Some(aliases) = aliases {
       self.aliases = Some(aliases.split(',').map(|s| s.trim().to_string()).collect());
@@ -127,15 +159,19 @@ impl PageRow for Term {
   }
 }
 
-#[derive(Debug, sqlx::FromRow)]
-pub struct SearchResult {
-  pub term_name: String,
-  pub meaning: String,
-  pub distance_score: Option<f64>,
-}
-
-#[derive(Debug)]
-pub struct Names {
-  pub term_name: String,
-  pub aliases: Option<Vec<String>>,
+impl From<Term> for TermModal {
+  /// Converts a [`Term`] into a [`TermModal`]. Note that the [`GuildId`][gid]
+  /// and `name` fields will be lost in the conversion. To convert back to a [`Term`],
+  /// use the [`Term::from_modal()`] method with the original [`GuildId`][gid] and `name`.
+  ///
+  /// [gid]: poise::serenity_prelude::model::id::GuildId
+  fn from(term: Term) -> Self {
+    Self {
+      meaning: term.meaning,
+      usage: term.usage,
+      category: term.category,
+      links: term.links.map(|links| links.join(", ")),
+      aliases: term.aliases.map(|aliases| aliases.join(", ")),
+    }
+  }
 }
