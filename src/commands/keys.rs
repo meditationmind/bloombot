@@ -153,16 +153,16 @@ async fn use_key(ctx: Context<'_>) -> Result<()> {
       .await?
       .with_context(|| "Failed to retrieve key despite unused_key_exists returning true")?;
 
-    ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} Key retrieved and marked used: `{key}`",
-            EMOJI.mmcheck
-          ))
-          .ephemeral(true),
-      )
-      .await?;
+    database::commit_and_say(
+      ctx,
+      transaction,
+      MessageType::TextOnly(format!(
+        "{} Key retrieved and marked used: `{key}`",
+        EMOJI.mmcheck
+      )),
+      Visibility::Ephemeral,
+    )
+    .await?;
   } else {
     ctx
       .send(
