@@ -2,6 +2,7 @@ use crate::commands::helpers::common;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator, Visibility};
 use crate::config::{EMOJI, ENTRIES_PER_PAGE};
+use crate::data::bookmark::Bookmark;
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
 use anyhow::{Context as AnyhowContext, Result};
@@ -58,17 +59,9 @@ pub async fn add_bookmark(
   let bookmark_data = AddBookmarkModal::execute(ctx).await?;
 
   if let Some(bookmark) = bookmark_data {
-    let message_link = message.link();
-    let description = bookmark.description;
+    let new_bookmark = Bookmark::new(guild_id, user_id, message.link(), bookmark.description);
 
-    DatabaseHandler::add_bookmark(
-      &mut transaction,
-      &guild_id,
-      &user_id,
-      message_link.as_str(),
-      description.as_deref(),
-    )
-    .await?;
+    DatabaseHandler::add_bookmark(&mut transaction, &new_bookmark).await?;
 
     database::commit_and_say(
       poise::Context::Application(ctx),
@@ -163,14 +156,9 @@ async fn add(
     return Ok(());
   }
 
-  DatabaseHandler::add_bookmark(
-    &mut transaction,
-    &guild_id,
-    &user_id,
-    message.link().as_str(),
-    description.as_deref(),
-  )
-  .await?;
+  let new_bookmark = Bookmark::new(guild_id, user_id, message.link(), description);
+
+  DatabaseHandler::add_bookmark(&mut transaction, &new_bookmark).await?;
 
   database::commit_and_say(
     ctx,

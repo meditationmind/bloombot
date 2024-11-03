@@ -24,6 +24,9 @@ use chrono::{Datelike, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use poise::serenity_prelude::{self as serenity};
+use sqlx::postgres::PgArguments;
+use sqlx::query::Query;
+use sqlx::Postgres;
 use ulid::Ulid;
 
 #[derive(Debug)]
@@ -43,7 +46,19 @@ pub struct DatabaseHandler {
   pool: sqlx::PgPool,
 }
 
+pub(crate) trait CreatesInDatabase {
+  fn create_query(&self) -> Query<Postgres, PgArguments>;
+}
+
+pub(crate) trait DeletesInDatabase {
+  fn delete_query<'a>(id: String) -> Query<'a, Postgres, PgArguments>;
+}
+
 impl DatabaseHandler {
+  pub fn from_pool(pool: sqlx::PgPool) -> Self {
+    Self { pool }
+  }
+
   pub async fn new() -> Result<Self> {
     let database_url =
       std::env::var("DATABASE_URL").with_context(|| "Missing DATABASE_URL environment variable")?;
@@ -537,23 +552,9 @@ impl DatabaseHandler {
 
   pub async fn add_bookmark(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    message_link: &str,
-    description: Option<&str>,
+    bookmark: &Bookmark,
   ) -> Result<()> {
-    sqlx::query!(
-      r#"
-        INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)
-      "#,
-      Ulid::new().to_string(),
-      user_id.to_string(),
-      guild_id.to_string(),
-      message_link,
-      description,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    bookmark.create_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -585,27 +586,18 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
   ) -> Result<Vec<Bookmark>> {
-    let rows = sqlx::query!(
+    let bookmarks = sqlx::query_as!(
+      Bookmark,
       r#"
-        SELECT record_id, message_link, user_desc, occurred_at FROM bookmarks WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at ASC
+        SELECT record_id AS id, guild_id, user_id, message_link AS link, user_desc AS description, occurred_at AS added FROM bookmarks WHERE guild_id = $1 AND user_id = $2 ORDER BY occurred_at ASC
       "#,
-      user_id.to_string(),
       guild_id.to_string(),
+      user_id.to_string(),
     )
     .fetch_all(&mut **transaction)
     .await?;
 
-    let bookmark_data = rows
-      .into_iter()
-      .map(|row| Bookmark {
-        id: row.record_id,
-        link: row.message_link,
-        description: row.user_desc,
-        added: row.occurred_at,
-      })
-      .collect();
-
-    Ok(bookmark_data)
+    Ok(bookmarks)
   }
 
   pub async fn search_bookmarks(
@@ -614,14 +606,14 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
     keyword: &str,
   ) -> Result<Vec<Bookmark>> {
-    let rows = sqlx::query!(
+    let bookmarks = sqlx::query_as!(
+      Bookmark,
       r#"
-        SELECT record_id, message_link, user_desc, occurred_at,
-        ts_rank(desc_tsv, websearch_to_tsquery('english', $3)) AS rank
+        SELECT record_id AS id, guild_id, user_id, message_link AS link, user_desc AS description, occurred_at AS added
         FROM bookmarks
         WHERE user_id = $1 AND guild_id = $2
         AND (desc_tsv @@ websearch_to_tsquery('english', $3))
-        ORDER BY rank DESC
+        ORDER BY ts_rank(desc_tsv, websearch_to_tsquery('english', $3)) DESC
       "#,
       user_id.to_string(),
       guild_id.to_string(),
@@ -630,17 +622,7 @@ impl DatabaseHandler {
     .fetch_all(&mut **transaction)
     .await?;
 
-    let bookmark_data = rows
-      .into_iter()
-      .map(|row| Bookmark {
-        id: row.record_id,
-        link: row.message_link,
-        description: row.user_desc,
-        added: row.occurred_at,
-      })
-      .collect();
-
-    Ok(bookmark_data)
+    Ok(bookmarks)
   }
 
   pub async fn remove_bookmark(
@@ -648,15 +630,10 @@ impl DatabaseHandler {
     bookmark_id: &str,
   ) -> Result<u64> {
     Ok(
-      sqlx::query!(
-        r#"
-          DELETE FROM bookmarks WHERE record_id = $1
-        "#,
-        bookmark_id,
-      )
-      .execute(&mut **transaction)
-      .await?
-      .rows_affected(),
+      Bookmark::delete_query(bookmark_id.to_string())
+        .execute(&mut **transaction)
+        .await?
+        .rows_affected(),
     )
   }
 
@@ -3195,7 +3172,7 @@ impl DatabaseHandler {
   }
 
   pub async fn insert_star_message(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut sqlx::Transaction<'_, Postgres>,
     starred_message_id: &serenity::MessageId,
     board_message_id: &serenity::MessageId,
     starred_channel_id: &serenity::ChannelId,
@@ -3212,6 +3189,110 @@ impl DatabaseHandler {
     )
     .execute(&mut **transaction)
     .await?;
+
+    Ok(())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::data::bookmark::Bookmark;
+  use crate::handlers::database::DatabaseHandler;
+  use poise::serenity_prelude::{GuildId, UserId};
+  use sqlx::PgPool;
+
+  #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
+  async fn test_get_bookmarks(pool: PgPool) -> Result<(), anyhow::Error> {
+    let handler = DatabaseHandler { pool };
+    let mut transaction = handler.start_transaction().await?;
+    let bookmarks = DatabaseHandler::get_bookmarks(
+      &mut transaction,
+      &GuildId::new(123u64),
+      &UserId::new(123u64),
+    )
+    .await?;
+
+    assert_eq!(bookmarks.len(), 4);
+    assert_eq!(bookmarks[0].link, "https://foo.bar/1234");
+    assert_eq!(bookmarks[0].description, Some("A bar of foo".to_string()));
+    assert_eq!(bookmarks[0].id, "01JBPTWBXJNAKK288S3D89JK7G".to_string());
+    assert_eq!(
+      bookmarks[0].added,
+      chrono::DateTime::from_timestamp(1_704_067_200, 0)
+    );
+
+    assert_eq!(bookmarks[1].link, "https://foo.bar/1235");
+    assert_eq!(bookmarks[1].id, "01JBPTWBXJNAKK288S3D89JK7H".to_string());
+    assert_eq!(
+      bookmarks[1].added,
+      chrono::DateTime::from_timestamp(1_704_070_800, 0)
+    );
+
+    assert_eq!(bookmarks[2].description, None);
+
+    Ok(())
+  }
+
+  #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
+  async fn test_bookmark_count(pool: PgPool) -> Result<(), anyhow::Error> {
+    let handler = DatabaseHandler { pool };
+    let mut transaction = handler.start_transaction().await?;
+    let count = DatabaseHandler::get_bookmark_count(
+      &mut transaction,
+      &GuildId::new(123u64),
+      &UserId::new(123u64),
+    )
+    .await?;
+
+    assert_eq!(count, 4);
+
+    Ok(())
+  }
+
+  #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
+  async fn test_remove_bookmark(pool: PgPool) -> Result<(), anyhow::Error> {
+    let handler = DatabaseHandler { pool };
+    let mut transaction = handler.start_transaction().await?;
+    let count =
+      DatabaseHandler::remove_bookmark(&mut transaction, "01JBPTWBXJNAKK288S3D89JK7J").await?;
+
+    assert_eq!(count, 1);
+
+    let new_count = DatabaseHandler::get_bookmark_count(
+      &mut transaction,
+      &GuildId::new(123u64),
+      &UserId::new(123u64),
+    )
+    .await?;
+
+    assert_eq!(new_count, 3);
+
+    Ok(())
+  }
+
+  #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
+  async fn test_add_bookmark(pool: PgPool) -> Result<(), anyhow::Error> {
+    let handler = DatabaseHandler { pool };
+    let mut transaction = handler.start_transaction().await?;
+    () = DatabaseHandler::add_bookmark(
+      &mut transaction,
+      &Bookmark::new(
+        GuildId::new(123u64),
+        UserId::new(123u64),
+        "https://polyglot.engineer/".to_string(),
+        None,
+      ),
+    )
+    .await?;
+
+    let new_count = DatabaseHandler::get_bookmark_count(
+      &mut transaction,
+      &GuildId::new(123u64),
+      &UserId::new(123u64),
+    )
+    .await?;
+
+    assert_eq!(new_count, 5);
 
     Ok(())
   }

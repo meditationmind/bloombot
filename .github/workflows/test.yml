@@ -10,14 +10,31 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DISCORD_TOKEN: ''
+  TEST_GUILD_ID: ''
+  DATABASE_URL: postgres://postgres:password@localhost:5432/bloom
+  OPENAI_API_KEY: ''
 
 jobs:
   test:
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Rust toolchain installation
-        run: rustup toolchain install stable --profile minimal --no-self-update
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          cargo install sqlx-cli --no-default-features --features postgres
+          cargo sqlx database create
+          cargo sqlx migrate run
       - name: Caching setup
         uses: Swatinem/rust-cache@v2
       - name: Checks
