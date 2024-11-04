@@ -217,9 +217,9 @@ impl DatabaseHandler {
     tracking_profile: TrackingProfile,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5 WHERE user_id = $6 AND guild_id = $7
-      "#,
+      ",
       tracking_profile.utc_offset,
       match tracking_profile.tracking.privacy {
           tracking_profile::Privacy::Private => true,
@@ -252,9 +252,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM tracking_profile WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -271,9 +271,9 @@ impl DatabaseHandler {
     new_user_id: &serenity::UserId,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE tracking_profile SET user_id = $3 WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       old_user_id.to_string(),
       guild_id.to_string(),
       new_user_id.to_string(),
@@ -290,9 +290,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<Option<TrackingProfile>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private FROM tracking_profile WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -346,9 +346,9 @@ impl DatabaseHandler {
     total_keys: i16,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO steamkey_recipients (record_id, user_id, guild_id, challenge_prize, donator_perk, total_keys) VALUES ($1, $2, $3, $4, $5, $6)
-      "#,
+      ",
       Ulid::new().to_string(),
       user_id.to_string(),
       guild_id.to_string(),
@@ -371,9 +371,9 @@ impl DatabaseHandler {
     total_keys: i16,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
       UPDATE steamkey_recipients SET challenge_prize = $1, donator_perk = $2, total_keys = $3 WHERE user_id = $4 AND guild_id = $5
-      "#,
+      ",
       challenge_prize,
       donator_perk,
       total_keys,
@@ -392,9 +392,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM steamkey_recipients WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -410,9 +410,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<Option<Recipient>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT user_id, guild_id, challenge_prize, donator_perk, total_keys FROM steamkey_recipients WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -438,9 +438,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Vec<Recipient>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT user_id, guild_id, challenge_prize, donator_perk, total_keys FROM steamkey_recipients WHERE guild_id = $1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_all(&mut **transaction)
@@ -490,9 +490,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<()> {
     let possible_record = sqlx::query!(
-      r#"
+      "
         SELECT total_keys FROM steamkey_recipients WHERE guild_id = $1 AND user_id = $2
-      "#,
+      ",
       guild_id.to_string(),
       user_id.to_string(),
     )
@@ -503,9 +503,9 @@ impl DatabaseHandler {
       Some(existing_record) => {
         let updated_keys = existing_record.total_keys + 1;
         sqlx::query!(
-          r#"
+          "
           UPDATE steamkey_recipients SET challenge_prize = TRUE, total_keys = $1 WHERE user_id = $2 AND guild_id = $3
-          "#,
+          ",
           updated_keys,
           user_id.to_string(),
           guild_id.to_string(),
@@ -515,9 +515,9 @@ impl DatabaseHandler {
       }
       None => {
         sqlx::query!(
-          r#"
+          "
             INSERT INTO steamkey_recipients (record_id, user_id, guild_id, challenge_prize, total_keys) VALUES ($1, $2, $3, TRUE, 1)
-          "#,
+          ",
           Ulid::new().to_string(),
           user_id.to_string(),
           guild_id.to_string(),
@@ -545,9 +545,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<u64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT COUNT(record_id) AS bookmark_count FROM bookmarks WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -625,10 +625,10 @@ impl DatabaseHandler {
     erase: Erase,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO erases (record_id, user_id, guild_id, message_link, reason, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (message_link) DO UPDATE SET reason = $5
-      "#,
+      ",
       Ulid::new().to_string(),
       erase.user_id.to_string(),
       guild_id.to_string(),
@@ -648,9 +648,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<Vec<Erase>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT record_id, user_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -685,9 +685,9 @@ impl DatabaseHandler {
     seconds: i32,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id) VALUES ($1, $2, $3, $4, $5)
-      "#,
+      ",
       Ulid::new().to_string(),
       user_id.to_string(),
       minutes,
@@ -709,9 +709,9 @@ impl DatabaseHandler {
     occurred_at: chrono::DateTime<Utc>,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)
-      "#,
+      ",
       Ulid::new().to_string(),
       user_id.to_string(),
       minutes,
@@ -743,9 +743,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<Vec<Meditation>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -780,13 +780,13 @@ impl DatabaseHandler {
     end_time: chrono::DateTime<Utc>,
   ) -> Result<Vec<MeditationData>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT record_id, user_id, meditation_minutes, occurred_at
         FROM meditation
         WHERE user_id = $1 AND guild_id = $2
         AND occurred_at >= $3 AND occurred_at <= $4
         ORDER BY occurred_at DESC
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
       start_time,
@@ -820,9 +820,9 @@ impl DatabaseHandler {
     meditation_id: &str,
   ) -> Result<Option<Meditation>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE record_id = $1 AND guild_id = $2
-      "#,
+      ",
       meditation_id,
       guild_id.to_string(),
     )
@@ -849,13 +849,13 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<Option<Meditation>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at
         FROM meditation
         WHERE user_id = $1 AND guild_id = $2
         ORDER BY occurred_at DESC
         LIMIT 1
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -884,9 +884,9 @@ impl DatabaseHandler {
     occurred_at: chrono::DateTime<Utc>,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4
-      "#,
+      ",
       minutes,
       seconds,
       occurred_at,
@@ -903,9 +903,9 @@ impl DatabaseHandler {
     meditation_id: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM meditation WHERE record_id = $1
-      "#,
+      ",
       meditation_id,
     )
     .execute(&mut **transaction)
@@ -920,9 +920,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM meditation WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -939,9 +939,9 @@ impl DatabaseHandler {
     new_user_id: &serenity::UserId,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE meditation SET user_id = $3 WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       old_user_id.to_string(),
       guild_id.to_string(),
       new_user_id.to_string(),
@@ -961,9 +961,9 @@ impl DatabaseHandler {
     // All entries that are greater than 0 minutes and within the start and end date
     // We only want a user ID to show up once, so we group by user ID and sum the meditation minutes
     let rows_stream = sqlx::query!(
-      r#"
+      "
         SELECT user_id FROM meditation WHERE meditation_minutes > 0 AND occurred_at >= $1 AND occurred_at <= $2 AND guild_id = $3 GROUP BY user_id ORDER BY RANDOM()
-      "#,
+      ",
       start_date,
       end_date,
       guild_id.to_string(),
@@ -986,9 +986,9 @@ impl DatabaseHandler {
     end_date: chrono::DateTime<Utc>,
   ) -> Result<i64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS winner_candidate_total FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
       start_date,
@@ -1012,9 +1012,9 @@ impl DatabaseHandler {
     end_date: chrono::DateTime<Utc>,
   ) -> Result<u64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT COUNT(record_id) AS winner_candidate_total FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
       start_date,
@@ -1036,9 +1036,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<i64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS user_total FROM meditation WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -1058,9 +1058,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<u64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT COUNT(record_id) AS user_total FROM meditation WHERE user_id = $1 AND guild_id = $2
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -1079,9 +1079,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<i64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS guild_total FROM meditation WHERE guild_id = $1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_one(&mut **transaction)
@@ -1099,9 +1099,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<u64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT COUNT(record_id) AS guild_total FROM meditation WHERE guild_id = $1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_one(&mut **transaction)
@@ -1119,9 +1119,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Vec<Quote>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT record_id, quote, author FROM quote WHERE guild_id = $1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_all(&mut **transaction)
@@ -1145,11 +1145,11 @@ impl DatabaseHandler {
     keyword: &str,
   ) -> Result<Vec<Quote>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT record_id, quote, author
         FROM quote
         WHERE guild_id = $1 AND (quote_tsv @@ websearch_to_tsquery('english', $2))
-      "#,
+      ",
       guild_id.to_string(),
       keyword.to_string(),
     )
@@ -1174,9 +1174,9 @@ impl DatabaseHandler {
     quote_id: &str,
   ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT record_id, quote, author FROM quote WHERE record_id = $1 AND guild_id = $2
-      "#,
+      ",
       quote_id,
       guild_id.to_string(),
     )
@@ -1200,9 +1200,9 @@ impl DatabaseHandler {
     quote: Quote,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE quote SET quote = $1, author = $2 WHERE record_id = $3
-      "#,
+      ",
       quote.quote,
       quote.author,
       quote.id,
@@ -1218,9 +1218,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Option<String>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT quote FROM quote WHERE guild_id = $1 ORDER BY RANDOM() LIMIT 1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_optional(&mut **transaction)
@@ -1237,10 +1237,10 @@ impl DatabaseHandler {
     longest: i32,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO streak (record_id, user_id, guild_id, current_streak, longest_streak) VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (user_id) DO UPDATE SET current_streak = $4, longest_streak = $5
-      "#,
+      ",
       Ulid::new().to_string(),
       user_id.to_string(),
       guild_id.to_string(),
@@ -1260,9 +1260,9 @@ impl DatabaseHandler {
   ) -> Result<Streak> {
     let mut streak_data = sqlx::query_as!(
       Streak,
-      r#"
+      "
         SELECT current_streak AS current, longest_streak AS longest FROM streak WHERE guild_id = $1 AND user_id = $2
-      "#,
+      ",
       guild_id.to_string(),
       user_id.to_string(),
     )
@@ -1272,18 +1272,18 @@ impl DatabaseHandler {
 
     let mut row = sqlx::query_as!(
       MeditationCountByDay,
-      r#"
+      "
       WITH cte AS (
-        SELECT date_part('day', NOW() - DATE_TRUNC('day', "occurred_at")) AS "days_ago"
+        SELECT date_part('day', NOW() - DATE_TRUNC('day', occurred_at)) AS days_ago
         FROM meditation 
         WHERE user_id = $1 AND guild_id = $2
-        AND "occurred_at"::date <= NOW()::date
+        AND occurred_at::date <= NOW()::date
       )
-      SELECT "days_ago"
+      SELECT days_ago
       FROM cte
-      GROUP BY "days_ago"
-      ORDER BY "days_ago" ASC;
-      "#,
+      GROUP BY days_ago
+      ORDER BY days_ago ASC
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -1410,9 +1410,9 @@ impl DatabaseHandler {
     graduate_role: &serenity::Role,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO course (record_id, course_name, participant_role, graduate_role, guild_id) VALUES ($1, $2, $3, $4, $5)
-      "#,
+      ",
       Ulid::new().to_string(),
       course_name,
       participant_role.id.to_string(),
@@ -1432,9 +1432,9 @@ impl DatabaseHandler {
     graduate_role: String,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE course SET participant_role = $1, graduate_role = $2 WHERE LOWER(course_name) = LOWER($3)
-      "#,
+      ",
       participant_role,
       graduate_role,
       course_name,
@@ -1464,9 +1464,9 @@ impl DatabaseHandler {
     key: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO steamkey (record_id, steam_key, guild_id, used) VALUES ($1, $2, $3, $4)
-      "#,
+      ",
       Ulid::new().to_string(),
       key,
       guild_id.to_string(),
@@ -1483,9 +1483,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Vec<SteamKey>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT steam_key, reserved, used, guild_id FROM steamkey WHERE guild_id = $1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_all(&mut **transaction)
@@ -1522,9 +1522,9 @@ impl DatabaseHandler {
     quote: QuoteModal,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         INSERT INTO quote (record_id, quote, author, guild_id) VALUES ($1, $2, $3, $4)
-      "#,
+      ",
       Ulid::new().to_string(),
       quote.quote,
       quote.author,
@@ -1542,9 +1542,9 @@ impl DatabaseHandler {
     vector: pgvector::Vector,
   ) -> Result<()> {
     sqlx::query(
-      r#"
+      "
         INSERT INTO term (record_id, term_name, meaning, usage, links, category, aliases, guild_id, embedding) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      "#)
+      ")
       .bind(Ulid::new().to_string())
       .bind(term.name)
       .bind(term.meaning)
@@ -1569,13 +1569,13 @@ impl DatabaseHandler {
     // limit should be a small integer
     #[allow(clippy::cast_possible_wrap)]
     let terms: Vec<SearchResult> = sqlx::query_as(
-      r#"
+      "
         SELECT term_name, meaning, embedding <=> $1 AS distance_score
         FROM term
         WHERE guild_id = $2
         ORDER BY distance_score ASC
         LIMIT $3
-      "#,
+      ",
     )
     .bind(search_vector)
     .bind(guild_id.to_string())
@@ -1592,12 +1592,12 @@ impl DatabaseHandler {
     term_name: &str,
   ) -> Result<Option<Term>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT term_name, meaning, usage, links, category, aliases
         FROM term
         WHERE guild_id = $2
         AND (LOWER(term_name) = LOWER($1)) OR (f_textarr2text(aliases) ~* ('(?:^|,)' || $1 || '(?:$|,)'))
-      "#,
+      ",
       term_name,
       guild_id.to_string(),
     )
@@ -1626,12 +1626,12 @@ impl DatabaseHandler {
     term_name: &str,
   ) -> Result<Option<Term>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT meaning
         FROM term
         WHERE guild_id = $2
         AND (LOWER(term_name) = LOWER($1))
-      "#,
+      ",
       term_name,
       guild_id.to_string(),
     )
@@ -1660,11 +1660,11 @@ impl DatabaseHandler {
     vector: Option<pgvector::Vector>,
   ) -> Result<()> {
     sqlx::query(
-      r#"
+      "
         UPDATE term
         SET meaning = $1, usage = $2, links = $3, category = $4, aliases = $5, embedding = COALESCE($6, embedding)
         WHERE LOWER(term_name) = LOWER($7)
-      "#,
+      ",
     )
     .bind(term.meaning)
     .bind(term.usage)
@@ -1686,12 +1686,12 @@ impl DatabaseHandler {
     vector: Option<pgvector::Vector>,
   ) -> Result<()> {
     sqlx::query(
-      r#"
+      "
         UPDATE term
         SET embedding = $3
         WHERE guild_id = $1
         AND (LOWER(term_name) = LOWER($2))
-      "#,
+      ",
     )
     .bind(guild_id.to_string())
     .bind(term_name)
@@ -1707,12 +1707,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Vec<Course>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT course_name, participant_role, graduate_role
         FROM course
         WHERE guild_id = $1
         ORDER BY course_name ASC
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_all(&mut **transaction)
@@ -1747,11 +1747,11 @@ impl DatabaseHandler {
     course_name: &str,
   ) -> Result<Option<Course>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT course_name, participant_role, graduate_role
         FROM course
         WHERE LOWER(course_name) = LOWER($1) AND guild_id = $2
-      "#,
+      ",
       course_name,
       guild_id.to_string(),
     )
@@ -1775,11 +1775,11 @@ impl DatabaseHandler {
     course_name: &str,
   ) -> Result<Option<ExtendedCourse>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT course_name, participant_role, graduate_role, guild_id
         FROM course
         WHERE LOWER(course_name) = LOWER($1)
-      "#,
+      ",
       course_name,
     )
     .fetch_optional(&mut **transaction)
@@ -1810,13 +1810,13 @@ impl DatabaseHandler {
     similarity: f32,
   ) -> Result<Option<Course>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT course_name, participant_role, graduate_role, SET_LIMIT($2), SIMILARITY(LOWER(course_name), LOWER($1)) AS similarity_score
         FROM course
         WHERE LOWER(course_name) % LOWER($1) AND guild_id = $3
         ORDER BY similarity_score DESC
         LIMIT 1
-      "#,
+      ",
       course_name,
       similarity,
       guild_id.to_string(),
@@ -1843,14 +1843,14 @@ impl DatabaseHandler {
     similarity: f32,
   ) -> Result<Vec<Term>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT term_name, meaning, usage, links, category, aliases, SET_LIMIT($2), SIMILARITY(LOWER(term_name), LOWER($1)) AS similarity_score
         FROM term
         WHERE guild_id = $3
         AND (LOWER(term_name) % LOWER($1)) OR (f_textarr2text(aliases) ILIKE '%' || $1 || '%')
         ORDER BY similarity_score DESC
         LIMIT 5
-      "#,
+      ",
       term_name,
       similarity,
       guild_id.to_string(),
@@ -1879,9 +1879,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<u64> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT COUNT(record_id) AS term_count FROM term WHERE guild_id = $1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_one(&mut **transaction)
@@ -1899,12 +1899,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Vec<Names>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT term_name, aliases
         FROM term
         WHERE guild_id = $1
         ORDER BY term_name DESC
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_all(&mut **transaction)
@@ -1926,12 +1926,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Vec<Term>> {
     let rows = sqlx::query!(
-      r#"
+      "
         SELECT term_name, meaning
         FROM term
         WHERE guild_id = $1
         ORDER BY term_name ASC
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_all(&mut **transaction)
@@ -1971,9 +1971,9 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
   ) -> Result<Option<String>> {
     let row = sqlx::query!(
-      r#"
+      "
         UPDATE steamkey SET reserved = $1 WHERE steam_key = (SELECT steam_key FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $2 ORDER BY RANDOM() LIMIT 1) RETURNING steam_key
-      "#,
+      ",
       user_id.to_string(),
       guild_id.to_string(),
     )
@@ -1988,9 +1988,9 @@ impl DatabaseHandler {
     key: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE steamkey SET reserved = NULL WHERE steam_key = $1
-      "#,
+      ",
       key,
     )
     .execute(&mut **connection)
@@ -2004,9 +2004,9 @@ impl DatabaseHandler {
     key: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         UPDATE steamkey SET used = TRUE WHERE steam_key = $1
-      "#,
+      ",
       key,
     )
     .execute(&mut **connection)
@@ -2020,9 +2020,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Option<String>> {
     let row = sqlx::query!(
-      r#"
+      "
         UPDATE steamkey SET used = TRUE WHERE steam_key = (SELECT steam_key FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $1 ORDER BY RANDOM() LIMIT 1) RETURNING steam_key
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_optional(&mut **transaction)
@@ -2036,9 +2036,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT record_id, quote, author FROM quote WHERE guild_id = $1 ORDER BY RANDOM() LIMIT 1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_optional(&mut **transaction)
@@ -2062,13 +2062,13 @@ impl DatabaseHandler {
     keyword: &str,
   ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT record_id, quote, author
         FROM quote
         WHERE guild_id = $1 AND (quote_tsv @@ websearch_to_tsquery('english', $2))
         ORDER BY RANDOM()
         LIMIT 1
-      "#,
+      ",
       guild_id.to_string(),
       keyword.to_string(),
     )
@@ -2093,9 +2093,9 @@ impl DatabaseHandler {
     course_name: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM course WHERE course_name = $1 AND guild_id = $2
-      "#,
+      ",
       course_name,
       guild_id.to_string(),
     )
@@ -2111,9 +2111,9 @@ impl DatabaseHandler {
     key: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM steamkey WHERE steam_key = $1 AND guild_id = $2
-      "#,
+      ",
       key,
       guild_id.to_string(),
     )
@@ -2129,9 +2129,9 @@ impl DatabaseHandler {
     quote: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM quote WHERE record_id = $1 AND guild_id = $2
-      "#,
+      ",
       quote,
       guild_id.to_string(),
     )
@@ -2160,9 +2160,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
+      "
         DELETE FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2
-      "#,
+      ",
       term_name,
       guild_id.to_string(),
     )
@@ -2201,11 +2201,11 @@ impl DatabaseHandler {
 
     let timeframe_data = sqlx::query_as!(
       TimeframeStats,
-      r#"
+      "
         SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
         FROM meditation
         WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      "#,
+      ",
       guild_id.to_string(),
       user_id.to_string(),
       start_time,
@@ -2241,13 +2241,13 @@ impl DatabaseHandler {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM daily_leaderboard
                 WHERE guild = $1
                 ORDER BY minutes DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2255,13 +2255,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Sessions => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM daily_leaderboard
                 WHERE guild = $1
                 ORDER BY sessions DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2269,13 +2269,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Streak => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM daily_leaderboard
                 WHERE guild = $1
                 ORDER BY streak DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2289,13 +2289,13 @@ impl DatabaseHandler {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM weekly_leaderboard
                 WHERE guild = $1
                 ORDER BY minutes DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2303,13 +2303,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Sessions => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM weekly_leaderboard
                 WHERE guild = $1
                 ORDER BY sessions DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2317,13 +2317,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Streak => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM weekly_leaderboard
                 WHERE guild = $1
                 ORDER BY streak DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2337,13 +2337,13 @@ impl DatabaseHandler {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM monthly_leaderboard
                 WHERE guild = $1
                 ORDER BY minutes DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2351,13 +2351,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Sessions => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM monthly_leaderboard
                 WHERE guild = $1
                 ORDER BY sessions DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2365,13 +2365,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Streak => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM monthly_leaderboard
                 WHERE guild = $1
                 ORDER BY streak DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2385,13 +2385,13 @@ impl DatabaseHandler {
         let leaderboard_data = match sort_by {
           SortBy::Minutes => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM yearly_leaderboard
                 WHERE guild = $1
                 ORDER BY minutes DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2399,13 +2399,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Sessions => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM yearly_leaderboard
                 WHERE guild = $1
                 ORDER BY sessions DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2413,13 +2413,13 @@ impl DatabaseHandler {
             .await?,
           SortBy::Streak => sqlx::query_as!(
               LeaderboardUser,
-              r#"
+              "
                 SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
                 FROM yearly_leaderboard
                 WHERE guild = $1
                 ORDER BY streak DESC
                 LIMIT $2
-              "#,
+              ",
               guild_id.to_string(),
               limit,
             )
@@ -2439,36 +2439,36 @@ impl DatabaseHandler {
     match timeframe {
       Timeframe::Yearly => {
         sqlx::query!(
-          r#"
+          "
             REFRESH MATERIALIZED VIEW CONCURRENTLY yearly_leaderboard;
-          "#
+          "
         )
         .execute(&mut **transaction)
         .await?;
       }
       Timeframe::Monthly => {
         sqlx::query!(
-          r#"
+          "
             REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_leaderboard;
-          "#
+          "
         )
         .execute(&mut **transaction)
         .await?;
       }
       Timeframe::Weekly => {
         sqlx::query!(
-          r#"
+          "
             REFRESH MATERIALIZED VIEW CONCURRENTLY weekly_leaderboard;
-          "#
+          "
         )
         .execute(&mut **transaction)
         .await?;
       }
       Timeframe::Daily => {
         sqlx::query!(
-          r#"
+          "
             REFRESH MATERIALIZED VIEW CONCURRENTLY daily_leaderboard;
-          "#
+          "
         )
         .execute(&mut **transaction)
         .await?;
@@ -2494,11 +2494,11 @@ impl DatabaseHandler {
     };
 
     let total_data = sqlx::query!(
-      r#"
+      "
         SELECT COUNT(record_id) AS total_count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS total_sum
         FROM meditation
         WHERE guild_id = $1 AND user_id = $2
-      "#,
+      ",
       guild_id.to_string(),
       user_id.to_string(),
     )
@@ -2507,11 +2507,11 @@ impl DatabaseHandler {
 
     let timeframe_data = sqlx::query_as!(
       TimeframeStats,
-      r#"
+      "
         SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
         FROM meditation
         WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      "#,
+      ",
       guild_id.to_string(),
       user_id.to_string(),
       start_time,
@@ -2545,11 +2545,11 @@ impl DatabaseHandler {
     };
 
     let total_data = sqlx::query!(
-      r#"
+      "
         SELECT COUNT(record_id) AS total_count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS total_sum
         FROM meditation
         WHERE guild_id = $1
-      "#,
+      ",
       guild_id.to_string(),
     )
     .fetch_one(&mut **transaction)
@@ -2557,11 +2557,11 @@ impl DatabaseHandler {
 
     let timeframe_data = sqlx::query_as!(
       TimeframeStats,
-      r#"
+      "
         SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
         FROM meditation
         WHERE guild_id = $1 AND occurred_at >= $2 AND occurred_at <= $3
-      "#,
+      ",
       guild_id.to_string(),
       start_time,
       end_time,
@@ -2606,7 +2606,7 @@ impl DatabaseHandler {
       Timeframe::Daily => {
         sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH daily_data AS
             (
               SELECT
@@ -2623,7 +2623,7 @@ impl DatabaseHandler {
             FROM daily_data
             WHERE times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           now_offset,
           guild_id.to_string(),
           user_id.to_string(),
@@ -2635,7 +2635,7 @@ impl DatabaseHandler {
       Timeframe::Weekly => {
         fresh_data = sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH current_week_data AS
             (
               SELECT
@@ -2655,14 +2655,14 @@ impl DatabaseHandler {
             FROM current_week_data
             WHERE times_ago = 0
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_optional(&mut **transaction).await?;
 
         sqlx::query_as!(
           Res,
-          r#"
+          "
             SELECT
               times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
@@ -2670,7 +2670,7 @@ impl DatabaseHandler {
             FROM weekly_data
             WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
           user_id.to_string(),
         )
@@ -2681,7 +2681,7 @@ impl DatabaseHandler {
       Timeframe::Monthly => {
         fresh_data = sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH current_month_data AS
             (
               SELECT
@@ -2701,14 +2701,14 @@ impl DatabaseHandler {
             FROM current_month_data
             WHERE times_ago = 0
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_optional(&mut **transaction).await?;
 
         sqlx::query_as!(
           Res,
-          r#"
+          "
             SELECT
               times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
@@ -2716,7 +2716,7 @@ impl DatabaseHandler {
             FROM monthly_data
             WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
           user_id.to_string(),
         )
@@ -2727,7 +2727,7 @@ impl DatabaseHandler {
       Timeframe::Yearly => {
         fresh_data = sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH current_year_data AS
             (
               SELECT
@@ -2747,14 +2747,14 @@ impl DatabaseHandler {
             FROM current_year_data
             WHERE times_ago = 0
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
           user_id.to_string(),
         ).fetch_optional(&mut **transaction).await?;
 
         sqlx::query_as!(
           Res,
-          r#"
+          "
             SELECT
               times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
@@ -2762,7 +2762,7 @@ impl DatabaseHandler {
             FROM yearly_data
             WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
           user_id.to_string(),
         )
@@ -2830,7 +2830,7 @@ impl DatabaseHandler {
       Timeframe::Daily => {
         sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH daily_data AS
             (
               SELECT
@@ -2847,7 +2847,7 @@ impl DatabaseHandler {
             FROM daily_data
             WHERE times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
         )
         .fetch_all(&mut **transaction)
@@ -2857,7 +2857,7 @@ impl DatabaseHandler {
       Timeframe::Weekly => {
         fresh_data = sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH current_week_data AS
             (
               SELECT
@@ -2877,13 +2877,13 @@ impl DatabaseHandler {
             FROM current_week_data
             WHERE times_ago = 0
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
         ).fetch_optional(&mut **transaction).await?;
 
         sqlx::query_as!(
           Res,
-          r#"
+          "
             SELECT
               times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
@@ -2891,7 +2891,7 @@ impl DatabaseHandler {
             FROM weekly_data
             WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
         )
         .fetch_all(&mut **transaction)
@@ -2901,7 +2901,7 @@ impl DatabaseHandler {
       Timeframe::Monthly => {
         fresh_data = sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH current_month_data AS
             (
               SELECT
@@ -2921,13 +2921,13 @@ impl DatabaseHandler {
             FROM current_month_data
             WHERE times_ago = 0
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
         ).fetch_optional(&mut **transaction).await?;
 
         sqlx::query_as!(
           Res,
-          r#"
+          "
             SELECT
               times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
@@ -2935,7 +2935,7 @@ impl DatabaseHandler {
             FROM monthly_data
             WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
         )
         .fetch_all(&mut **transaction)
@@ -2945,7 +2945,7 @@ impl DatabaseHandler {
       Timeframe::Yearly => {
         fresh_data = sqlx::query_as!(
           Res,
-          r#"
+          "
             WITH current_year_data AS
             (
               SELECT
@@ -2965,13 +2965,13 @@ impl DatabaseHandler {
             FROM current_year_data
             WHERE times_ago = 0
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
         ).fetch_optional(&mut **transaction).await?;
 
         sqlx::query_as!(
           Res,
-          r#"
+          "
             SELECT
               times_ago,
               (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
@@ -2979,7 +2979,7 @@ impl DatabaseHandler {
             FROM yearly_data
             WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
             GROUP BY times_ago
-          "#,
+          ",
           guild_id.to_string(),
         )
         .fetch_all(&mut **transaction)
@@ -3041,27 +3041,27 @@ impl DatabaseHandler {
     match timeframe {
       Timeframe::Yearly => {
         sqlx::query!(
-          r#"
+          "
             REFRESH MATERIALIZED VIEW yearly_data;
-          "#
+          "
         )
         .execute(&mut **transaction)
         .await?;
       }
       Timeframe::Monthly => {
         sqlx::query!(
-          r#"
+          "
             REFRESH MATERIALIZED VIEW monthly_data;
-          "#
+          "
         )
         .execute(&mut **transaction)
         .await?;
       }
       Timeframe::Weekly => {
         sqlx::query!(
-          r#"
+          "
             REFRESH MATERIALIZED VIEW weekly_data;
-          "#
+          "
         )
         .execute(&mut **transaction)
         .await?;
@@ -3077,11 +3077,11 @@ impl DatabaseHandler {
     message_id: &serenity::MessageId,
   ) -> Result<Option<StarMessage>> {
     let row = sqlx::query!(
-      r#"
+      "
         SELECT record_id, starred_message_id, board_message_id, starred_channel_id
-        FROM "star"
+        FROM star
         WHERE starred_message_id = $1
-      "#,
+      ",
       message_id.to_string(),
     )
     .fetch_optional(&mut **transaction)
@@ -3105,9 +3105,9 @@ impl DatabaseHandler {
     record_id: &str,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
-        DELETE FROM "star" WHERE record_id = $1
-      "#,
+      "
+        DELETE FROM star WHERE record_id = $1
+      ",
       record_id,
     )
     .execute(&mut **transaction)
@@ -3123,10 +3123,10 @@ impl DatabaseHandler {
     starred_channel_id: &serenity::ChannelId,
   ) -> Result<()> {
     sqlx::query!(
-      r#"
-        INSERT INTO "star" (record_id, starred_message_id, board_message_id, starred_channel_id) VALUES ($1, $2, $3, $4)
+      "
+        INSERT INTO star (record_id, starred_message_id, board_message_id, starred_channel_id) VALUES ($1, $2, $3, $4)
         ON CONFLICT (starred_message_id) DO UPDATE SET board_message_id = $3
-      "#,
+      ",
       Ulid::new().to_string(),
       starred_message_id.to_string(),
       board_message_id.to_string(),
