@@ -127,7 +127,7 @@ async fn create_star_message(
       }
     };
 
-    DatabaseHandler::insert_star_message(
+    DatabaseHandler::add_star_message(
       transaction,
       &reaction.message_id,
       &starboard_message.id,
@@ -188,7 +188,7 @@ pub async fn add_star(
           starboard_channel
             .delete_message(&ctx, starboard_message.id)
             .await?;
-          DatabaseHandler::delete_star_message(&mut transaction, &star_message.record_id).await?;
+          DatabaseHandler::remove_star_message(&mut transaction, &star_message.record_id).await?;
 
           create_star_message(ctx, &mut transaction, reaction, star_count).await?;
           transaction.commit().await?;
@@ -251,7 +251,7 @@ pub async fn remove_star(
             starboard_channel
               .delete_message(&ctx, starboard_message.id)
               .await?;
-            DatabaseHandler::delete_star_message(&mut transaction, &star_message.record_id).await?;
+            DatabaseHandler::remove_star_message(&mut transaction, &star_message.record_id).await?;
 
             create_star_message(ctx, &mut transaction, reaction, star_count).await?;
             transaction.commit().await?;
@@ -260,7 +260,7 @@ pub async fn remove_star(
           starboard_channel
             .delete_message(&ctx, star_message.board_message_id)
             .await?;
-          DatabaseHandler::delete_star_message(&mut transaction, &star_message.record_id).await?;
+          DatabaseHandler::remove_star_message(&mut transaction, &star_message.record_id).await?;
           transaction.commit().await?;
         }
       }

@@ -190,7 +190,7 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn create_tracking_profile(
+  pub async fn add_tracking_profile(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     tracking_profile: TrackingProfile,
   ) -> Result<()> {
@@ -718,7 +718,7 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn create_meditation_entry(
+  pub async fn add_meditation_entry(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
@@ -916,7 +916,7 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn delete_meditation_entry(
+  pub async fn remove_meditation_entry(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     meditation_id: &str,
   ) -> Result<()> {
@@ -1213,7 +1213,7 @@ impl DatabaseHandler {
     Ok(quote)
   }
 
-  pub async fn edit_quote(
+  pub async fn update_quote(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     quote: Quote,
   ) -> Result<()> {
@@ -1686,7 +1686,7 @@ impl DatabaseHandler {
     Ok(term)
   }
 
-  pub async fn edit_term(
+  pub async fn update_term(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     term: Term,
     vector: Option<pgvector::Vector>,
@@ -1711,7 +1711,7 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn edit_term_embedding(
+  pub async fn update_term_embedding(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
     term_name: &str,
@@ -3152,7 +3152,7 @@ impl DatabaseHandler {
     Ok(star_message)
   }
 
-  pub async fn delete_star_message(
+  pub async fn remove_star_message(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     record_id: &str,
   ) -> Result<()> {
@@ -3168,7 +3168,7 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn insert_star_message(
+  pub async fn add_star_message(
     transaction: &mut sqlx::Transaction<'_, Postgres>,
     starred_message_id: &serenity::MessageId,
     board_message_id: &serenity::MessageId,

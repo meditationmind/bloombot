@@ -13,7 +13,7 @@ pub async fn message_delete(
 
   if let Some(star_message) = star_message {
     let star_message_id = star_message.record_id;
-    DatabaseHandler::delete_star_message(&mut transaction, &star_message_id).await?;
+    DatabaseHandler::remove_star_message(&mut transaction, &star_message_id).await?;
   }
 
   transaction.commit().await?;

@@ -86,7 +86,7 @@ pub async fn add(
     DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes, seconds).await?;
   } else {
     let adjusted_datetime = chrono::Utc::now() + Duration::minutes(i64::from(offset));
-    DatabaseHandler::create_meditation_entry(
+    DatabaseHandler::add_meditation_entry(
       &mut transaction,
       &guild_id,
       &user_id,

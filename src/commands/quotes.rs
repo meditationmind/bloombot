@@ -79,7 +79,7 @@ async fn edit(
     if let Some(quote_data) = QuoteModal::execute_with_defaults(ctx, defaults).await? {
       let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-      DatabaseHandler::edit_quote(&mut transaction, quote_data.into_quote(quote_id)).await?;
+      DatabaseHandler::update_quote(&mut transaction, quote_data.into_quote(quote_id)).await?;
 
       database::commit_and_say(
         poise::Context::Application(ctx),

@@ -138,7 +138,7 @@ async fn edit(
       ))
     };
 
-    if let Err(e) = DatabaseHandler::edit_term(
+    if let Err(e) = DatabaseHandler::update_term(
       &mut transaction,
       Term::from_modal(guild_id, term_name, term_data),
       vector,
@@ -257,7 +257,7 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
         .await?,
     ));
 
-    DatabaseHandler::edit_term_embedding(
+    DatabaseHandler::update_term_embedding(
       &mut transaction,
       &guild_id,
       term.term_name.as_str(),

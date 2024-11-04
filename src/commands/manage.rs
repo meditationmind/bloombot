@@ -120,7 +120,7 @@ async fn create(
 
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
 
-  DatabaseHandler::create_meditation_entry(
+  DatabaseHandler::add_meditation_entry(
     &mut transaction,
     &guild_id,
     &user.id,
@@ -448,7 +448,7 @@ async fn delete(
     return Ok(());
   };
 
-  DatabaseHandler::delete_meditation_entry(&mut transaction, &entry_id).await?;
+  DatabaseHandler::remove_meditation_entry(&mut transaction, &entry_id).await?;
 
   let description = if entry.seconds > 0 {
     format!(

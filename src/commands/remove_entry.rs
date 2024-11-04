@@ -58,7 +58,7 @@ pub async fn remove_entry(
     return Ok(());
   }
 
-  DatabaseHandler::delete_meditation_entry(&mut transaction, id.as_str()).await?;
+  DatabaseHandler::remove_meditation_entry(&mut transaction, id.as_str()).await?;
 
   database::commit_and_say(
     ctx,
