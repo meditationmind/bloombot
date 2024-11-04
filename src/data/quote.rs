@@ -1,6 +1,9 @@
 use poise::Modal;
 
-use crate::commands::helpers::pagination::{PageRow, PageType};
+use crate::{
+  commands::helpers::pagination::{PageRow, PageType},
+  handlers::database::ExistsQuery,
+};
 
 #[allow(clippy::struct_field_names)]
 pub struct Quote {
@@ -46,6 +49,17 @@ impl PageRow for Quote {
       self.quote.clone(),
       self.author.clone().unwrap_or("Anonymous".to_owned())
     )
+  }
+}
+
+impl ExistsQuery for Quote {
+  fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
+    guild_id: poise::serenity_prelude::GuildId,
+    quote_id: impl Into<String>,
+  ) -> sqlx::query::QueryAs<'a, sqlx::Postgres, T, sqlx::postgres::PgArguments> {
+    sqlx::query_as("SELECT EXISTS (SELECT 1 FROM quote WHERE record_id = $1 AND guild_id = $2)")
+      .bind(quote_id.into())
+      .bind(guild_id.to_string())
   }
 }
 

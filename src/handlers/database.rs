@@ -25,7 +25,7 @@ use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use poise::serenity_prelude::{self as serenity};
 use sqlx::postgres::PgArguments;
-use sqlx::query::Query;
+use sqlx::query::{Query, QueryAs};
 use sqlx::Postgres;
 use ulid::Ulid;
 
@@ -41,6 +41,11 @@ struct MeditationCountByDay {
   days_ago: Option<f64>,
 }
 
+#[derive(sqlx::FromRow)]
+struct Exists {
+  exists: bool,
+}
+
 #[allow(clippy::module_name_repetitions)]
 pub struct DatabaseHandler {
   pool: sqlx::PgPool,
@@ -52,6 +57,13 @@ pub(crate) trait CreatesInDatabase {
 
 pub(crate) trait DeletesInDatabase {
   fn delete_query<'a>(id: String) -> Query<'a, Postgres, PgArguments>;
+} //
+
+pub(crate) trait ExistsQuery {
+  fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
+    guild_id: serenity::GuildId,
+    unique_id: impl Into<String>,
+  ) -> QueryAs<'a, Postgres, T, PgArguments>;
 }
 
 impl DatabaseHandler {
@@ -489,19 +501,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
   ) -> Result<bool> {
-    let row = sqlx::query!(
-      r#"
-        SELECT EXISTS(SELECT 1 FROM steamkey_recipients WHERE guild_id = $1 AND user_id = $2)
-      "#,
-      guild_id.to_string(),
-      user_id.to_string(),
+    Ok(
+      Recipient::exists_query::<Exists>(*guild_id, user_id.to_string())
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    row
-      .exists
-      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn record_steamkey_receipt(
@@ -1413,19 +1418,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     course_name: &str,
   ) -> Result<bool> {
-    let row = sqlx::query!(
-      r#"
-        SELECT EXISTS(SELECT 1 FROM course WHERE course_name = $1 AND guild_id = $2)
-      "#,
-      course_name,
-      guild_id.to_string(),
+    Ok(
+      Course::exists_query::<Exists>(*guild_id, course_name)
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    row
-      .exists
-      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn add_course(
@@ -1476,19 +1474,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     key: &str,
   ) -> Result<bool> {
-    let row = sqlx::query!(
-      r#"
-        SELECT EXISTS(SELECT 1 FROM steamkey WHERE steam_key = $1 AND guild_id = $2)
-      "#,
-      key,
-      guild_id.to_string(),
+    Ok(
+      SteamKey::exists_query::<Exists>(*guild_id, key.to_string())
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    row
-      .exists
-      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn add_steam_key(
@@ -1990,18 +1981,12 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     guild_id: &serenity::GuildId,
   ) -> Result<bool> {
-    let row = sqlx::query!(
-      r#"
-        SELECT EXISTS(SELECT 1 FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $1)
-      "#,
-      guild_id.to_string(),
+    Ok(
+      SteamKey::exists_query::<Exists>(*guild_id, "none".to_string())
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    row
-      .exists
-      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn reserve_key(
@@ -2185,19 +2170,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     term_name: &str,
   ) -> Result<bool> {
-    let row = sqlx::query!(
-      r#"
-        SELECT EXISTS(SELECT 1 FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2)
-      "#,
-      term_name,
-      guild_id.to_string(),
+    Ok(
+      Term::exists_query::<Exists>(*guild_id, term_name.to_string())
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    row
-      .exists
-      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn remove_term(
@@ -2629,19 +2607,12 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     quote_id: &str,
   ) -> Result<bool> {
-    let row = sqlx::query!(
-      r#"
-        SELECT EXISTS(SELECT 1 FROM quote WHERE record_id = $1 AND guild_id = $2)
-      "#,
-      quote_id,
-      guild_id.to_string(),
+    Ok(
+      Quote::exists_query::<Exists>(*guild_id, quote_id.to_string())
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    row
-      .exists
-      .with_context(|| "Failed to return bool from EXISTS query")
   }
 
   pub async fn get_user_chart_stats(

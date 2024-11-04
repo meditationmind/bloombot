@@ -1,4 +1,5 @@
 use crate::commands::helpers::pagination::{PageRow, PageType};
+use crate::handlers::database::ExistsQuery;
 use poise::serenity_prelude::{self as serenity};
 use poise::Modal;
 
@@ -156,6 +157,19 @@ impl PageRow for Term {
 
   fn body(&self) -> String {
     self.meaning.clone()
+  }
+}
+
+impl ExistsQuery for Term {
+  fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
+    guild_id: serenity::GuildId,
+    term_name: impl Into<String>,
+  ) -> sqlx::query::QueryAs<'a, sqlx::Postgres, T, sqlx::postgres::PgArguments> {
+    sqlx::query_as(
+      "SELECT EXISTS (SELECT 1 FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2)",
+    )
+    .bind(term_name.into())
+    .bind(guild_id.to_string())
   }
 }
 
