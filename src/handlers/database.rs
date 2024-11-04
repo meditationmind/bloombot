@@ -586,14 +586,16 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
   ) -> Result<Vec<Bookmark>> {
-    let bookmarks = sqlx::query_as!(
-      Bookmark,
-      r#"
-        SELECT record_id AS id, guild_id, user_id, message_link AS link, user_desc AS description, occurred_at AS added FROM bookmarks WHERE guild_id = $1 AND user_id = $2 ORDER BY occurred_at ASC
-      "#,
-      guild_id.to_string(),
-      user_id.to_string(),
+    let bookmarks: Vec<Bookmark> = sqlx::query_as(
+      "
+        SELECT record_id, message_link, user_desc, occurred_at
+        FROM bookmarks
+        WHERE guild_id = $1 AND user_id = $2
+        ORDER BY occurred_at ASC
+      ",
     )
+    .bind(guild_id.to_string())
+    .bind(user_id.to_string())
     .fetch_all(&mut **transaction)
     .await?;
 
@@ -606,19 +608,18 @@ impl DatabaseHandler {
     user_id: &serenity::UserId,
     keyword: &str,
   ) -> Result<Vec<Bookmark>> {
-    let bookmarks = sqlx::query_as!(
-      Bookmark,
-      r#"
-        SELECT record_id AS id, guild_id, user_id, message_link AS link, user_desc AS description, occurred_at AS added
+    let bookmarks: Vec<Bookmark> = sqlx::query_as(
+      "
+        SELECT record_id, message_link, user_desc, occurred_at
         FROM bookmarks
         WHERE user_id = $1 AND guild_id = $2
         AND (desc_tsv @@ websearch_to_tsquery('english', $3))
         ORDER BY ts_rank(desc_tsv, websearch_to_tsquery('english', $3)) DESC
-      "#,
-      user_id.to_string(),
-      guild_id.to_string(),
-      keyword.to_string(),
+      ",
     )
+    .bind(user_id.to_string())
+    .bind(guild_id.to_string())
+    .bind(keyword.to_string())
     .fetch_all(&mut **transaction)
     .await?;
 

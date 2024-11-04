@@ -7,13 +7,18 @@ use sqlx::query::Query;
 use sqlx::Postgres;
 use ulid::Ulid;
 
-#[derive(sqlx::FromRow)]
+#[derive(Default, sqlx::FromRow)]
+#[sqlx(default)]
 pub struct Bookmark {
+  #[sqlx(rename = "record_id")]
   pub id: String,
-  pub guild_id: String,
-  pub user_id: String,
+  guild_id: String,
+  user_id: String,
+  #[sqlx(rename = "message_link")]
   pub link: String,
+  #[sqlx(rename = "user_desc")]
   pub description: Option<String>,
+  #[sqlx(rename = "occurred_at")]
   pub added: Option<DateTime<Utc>>,
 }
 
