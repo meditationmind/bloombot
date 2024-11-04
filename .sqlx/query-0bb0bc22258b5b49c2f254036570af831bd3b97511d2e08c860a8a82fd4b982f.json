@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO\n          tracking_profile (\n            record_id,\n            user_id,\n            guild_id,\n            utc_offset,\n            anonymous_tracking,\n            streaks_active,\n            streaks_private,\n            stats_private\n          )\n        VALUES\n          ($1, $2, $3, $4, $5, $6, $7, $8)\n      ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int2",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0bb0bc22258b5b49c2f254036570af831bd3b97511d2e08c860a8a82fd4b982f"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n      WITH cte AS (\n        SELECT date_part('day', NOW() - DATE_TRUNC('day', occurred_at)) AS days_ago\n        FROM meditation \n        WHERE user_id = $1 AND guild_id = $2\n        AND occurred_at::date <= NOW()::date\n      )\n      SELECT days_ago\n      FROM cte\n      GROUP BY days_ago\n      ORDER BY days_ago ASC\n      ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "days_ago",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "46e042849351977ca56871e1617d764b3320fece6a264238b36a6876efbbfd76"
+}
