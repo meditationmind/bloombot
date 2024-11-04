@@ -1,9 +1,4 @@
-#![allow(
-  clippy::needless_raw_string_hashes,
-  clippy::missing_errors_doc,
-  clippy::missing_panics_doc
-)]
-#![cfg_attr(any(), rustfmt::skip::macros(query, query_as))]
+#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
 use crate::{
   commands::helpers::time::{ChallengeTimeframe, Timeframe},
@@ -55,9 +50,12 @@ pub(crate) trait InsertQuery {
   fn insert_query(&self) -> Query<Postgres, PgArguments>;
 }
 
-  fn delete_query<'a>(id: String) -> Query<'a, Postgres, PgArguments>;
-} //
 pub(crate) trait DeleteQuery {
+  fn delete_query<'a>(
+    guild_id: serenity::GuildId,
+    unique_id: impl Into<String>,
+  ) -> Query<'a, Postgres, PgArguments>;
+}
 
 pub(crate) trait ExistsQuery {
   fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
@@ -633,10 +631,11 @@ impl DatabaseHandler {
 
   pub async fn remove_bookmark(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &serenity::GuildId,
     bookmark_id: &str,
   ) -> Result<u64> {
     Ok(
-      Bookmark::delete_query(bookmark_id.to_string())
+      Bookmark::delete_query(*guild_id, bookmark_id)
         .execute(&mut **transaction)
         .await?
         .rows_affected(),
@@ -3222,8 +3221,12 @@ mod tests {
   async fn test_remove_bookmark(pool: PgPool) -> Result<(), anyhow::Error> {
     let handler = DatabaseHandler { pool };
     let mut transaction = handler.start_transaction().await?;
-    let count =
-      DatabaseHandler::remove_bookmark(&mut transaction, "01JBPTWBXJNAKK288S3D89JK7J").await?;
+    let count = DatabaseHandler::remove_bookmark(
+      &mut transaction,
+      &GuildId::new(123u64),
+      "01JBPTWBXJNAKK288S3D89JK7J",
+    )
+    .await?;
 
     assert_eq!(count, 1);
 

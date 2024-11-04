@@ -33,7 +33,6 @@ pub async fn add_bookmark(
   ctx: poise::ApplicationContext<'_, AppData, AppError>,
   #[description = "Message to bookmark"] message: serenity::Message,
 ) -> Result<()> {
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -41,7 +40,7 @@ pub async fn add_bookmark(
 
   let supporter = common::is_supporter(poise::Context::Application(ctx)).await?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let bookmark_count =
     DatabaseHandler::get_bookmark_count(&mut transaction, &guild_id, &user_id).await?;
 
@@ -56,9 +55,7 @@ pub async fn add_bookmark(
     return Ok(());
   }
 
-  let bookmark_data = AddBookmarkModal::execute(ctx).await?;
-
-  if let Some(bookmark) = bookmark_data {
+  if let Some(bookmark) = AddBookmarkModal::execute(ctx).await? {
     let new_bookmark = Bookmark::new(guild_id, user_id, message.link(), bookmark.description);
 
     DatabaseHandler::add_bookmark(&mut transaction, &new_bookmark).await?;
@@ -98,14 +95,12 @@ async fn list(
   ctx: Context<'_>,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let bookmarks = DatabaseHandler::get_bookmarks(&mut transaction, &guild_id, &user_id).await?;
   let bookmarks: Vec<PageRowRef> = bookmarks
@@ -133,7 +128,6 @@ async fn add(
   #[description = "Include a short description (optional)"]
   description: Option<String>,
 ) -> Result<()> {
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -141,7 +135,7 @@ async fn add(
 
   let supporter = common::is_supporter(ctx).await?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let bookmark_count =
     DatabaseHandler::get_bookmark_count(&mut transaction, &guild_id, &user_id).await?;
 
@@ -179,12 +173,16 @@ async fn remove(
   ctx: Context<'_>,
   #[description = "The ID of the bookmark to remove"] id: String,
 ) -> Result<()> {
-  let data = ctx.data();
+  let guild_id = ctx
+    .guild_id()
+    .with_context(|| "Failed to retrieve guild ID from context")?;
+
   let bookmark_id = id.to_ascii_uppercase().clone();
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  let result = DatabaseHandler::remove_bookmark(&mut transaction, bookmark_id.as_str()).await?;
+  let result =
+    DatabaseHandler::remove_bookmark(&mut transaction, &guild_id, bookmark_id.as_str()).await?;
   if result > 0 {
     database::commit_and_say(
       ctx,
@@ -220,14 +218,12 @@ async fn search(
   #[description = "One or more keywords in search engine format"] keyword: String,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let bookmarks =
     DatabaseHandler::search_bookmarks(&mut transaction, &guild_id, &user_id, &keyword).await?;

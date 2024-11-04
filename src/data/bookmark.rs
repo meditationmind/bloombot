@@ -66,9 +66,7 @@ impl PageRow for Bookmark {
 impl InsertQuery for Bookmark {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
-      r#"
-        INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)
-      "#,
+      "INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)",
       self.id,
       self.user_id,
       self.guild_id,
@@ -78,13 +76,11 @@ impl InsertQuery for Bookmark {
   }
 }
 
-  fn delete_query<'a>(id: String) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
-      r#"
-        DELETE FROM bookmarks WHERE record_id = $1
-      "#,
-      id,
-    )
 impl DeleteQuery for Bookmark {
+  fn delete_query<'a>(
+    _guild_id: serenity::GuildId,
+    id: impl Into<String>,
+  ) -> Query<'a, Postgres, PgArguments> {
+    sqlx::query!("DELETE FROM bookmarks WHERE record_id = $1", id.into())
   }
 }
