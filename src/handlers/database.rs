@@ -51,13 +51,13 @@ pub struct DatabaseHandler {
   pool: sqlx::PgPool,
 }
 
-pub(crate) trait CreatesInDatabase {
-  fn create_query(&self) -> Query<Postgres, PgArguments>;
+pub(crate) trait InsertQuery {
+  fn insert_query(&self) -> Query<Postgres, PgArguments>;
 }
 
-pub(crate) trait DeletesInDatabase {
   fn delete_query<'a>(id: String) -> Query<'a, Postgres, PgArguments>;
 } //
+pub(crate) trait DeleteQuery {
 
 pub(crate) trait ExistsQuery {
   fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
@@ -559,7 +559,7 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     bookmark: &Bookmark,
   ) -> Result<()> {
-    bookmark.create_query().execute(&mut **transaction).await?;
+    bookmark.insert_query().execute(&mut **transaction).await?;
 
     Ok(())
   }

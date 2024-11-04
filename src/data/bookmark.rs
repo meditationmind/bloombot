@@ -1,5 +1,5 @@
 use crate::commands::helpers::pagination::{PageRow, PageType};
-use crate::handlers::database::{CreatesInDatabase, DeletesInDatabase};
+use crate::handlers::database::{DeleteQuery, InsertQuery};
 use chrono::{DateTime, Utc};
 use poise::serenity_prelude::{self as serenity};
 use sqlx::postgres::PgArguments;
@@ -63,8 +63,8 @@ impl PageRow for Bookmark {
   }
 }
 
-impl CreatesInDatabase for Bookmark {
-  fn create_query(&self) -> Query<Postgres, PgArguments> {
+impl InsertQuery for Bookmark {
+  fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
       r#"
         INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)
@@ -78,7 +78,6 @@ impl CreatesInDatabase for Bookmark {
   }
 }
 
-impl DeletesInDatabase for Bookmark {
   fn delete_query<'a>(id: String) -> Query<'a, Postgres, PgArguments> {
     sqlx::query!(
       r#"
@@ -86,5 +85,6 @@ impl DeletesInDatabase for Bookmark {
       "#,
       id,
     )
+impl DeleteQuery for Bookmark {
   }
 }
