@@ -3245,4 +3245,23 @@ mod tests {
 
     Ok(())
   }
+
+  #[sqlx::test(fixtures(path = "fixtures", scripts("quote")))]
+  async fn test_quote_exists(pool: PgPool) -> Result<(), anyhow::Error> {
+    let handler = DatabaseHandler { pool };
+    let mut transaction = handler.start_transaction().await?;
+
+    let guild_id = &GuildId::new(123u64);
+    let valid_id = "01JBPTWBXJNAKK288S3D89JK7I";
+    let invalid_id = "The time is now";
+
+    assert!(DatabaseHandler::quote_exists(&mut transaction, guild_id, valid_id).await?);
+    assert!(!DatabaseHandler::quote_exists(&mut transaction, guild_id, invalid_id).await?);
+
+    DatabaseHandler::remove_quote(&mut transaction, guild_id, valid_id).await?;
+
+    assert!(!DatabaseHandler::quote_exists(&mut transaction, guild_id, valid_id).await?);
+
+    Ok(())
+  }
 }

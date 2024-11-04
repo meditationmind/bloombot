@@ -1,0 +1,11 @@
+INSERT INTO quote (record_id, quote, author, guild_id, created_at)
+VALUES
+    ('01JBPTWBXJNAKK288S3D89JK7G', 'A bar of foo', 'John Doe', '123', CAST('2024-01-01 00:00:00+00' AS TIMESTAMPTZ)),
+    ('01JBPTWBXJNAKK288S3D89JK7H', 'A baz of bat', 'Betty', '123', CAST('2024-01-01 01:00:00+00' AS TIMESTAMPTZ)),
+    ('01JBPTWBXJNAKK288S3D89JK7I', 'The time is now', null, '123', CAST('2024-01-01 02:00:00+00' AS TIMESTAMPTZ)),
+    ('01JBPTWBXJNAKK288S3D89JK7J', 'A quu of quux', 'Mr. Buddha', '123', CAST('2024-01-01 03:00:00+00' AS TIMESTAMPTZ)),
+    ('01JBPTWBXJNAKK288S3D89JK7K', 'A quick brown fox', 'Shaka Baklava', '123', CAST('2024-01-01 00:00:00+00' AS TIMESTAMPTZ)),
+    ('01JBPTWBXJNAKK288S3D89JK7L', 'Jumping over the lazy dog', 'John Deere', '123', CAST('2024-01-01 00:00:00+00' AS TIMESTAMPTZ)),
+    ('01JBPV1XJNAKK288S3D89JK7M1', 'This little piggy', 'Frank Sinatra', '123', CAST('2024-01-01 00:00:00+00' AS TIMESTAMPTZ)),
+    ('01JBPV1XJNAKK288S3D89JK7N2', 'Pancakes > waffles', 'Anthony A.', '123', CAST('2024-01-01 00:00:00+00' AS TIMESTAMPTZ))
+;
