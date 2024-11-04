@@ -204,33 +204,10 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     tracking_profile: TrackingProfile,
   ) -> Result<()> {
-    sqlx::query!(
-      r#"
-        INSERT INTO tracking_profile (record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      "#,
-      Ulid::new().to_string(),
-      tracking_profile.user_id.to_string(),
-      tracking_profile.guild_id.to_string(),
-      tracking_profile.utc_offset,
-      match tracking_profile.tracking.privacy {
-          tracking_profile::Privacy::Private => true,
-          tracking_profile::Privacy::Public => false,
-      },
-      match tracking_profile.streak.status {
-          tracking_profile::Status::Enabled => true,
-          tracking_profile::Status::Disabled => false,
-      },
-      match tracking_profile.streak.privacy {
-          tracking_profile::Privacy::Private => true,
-          tracking_profile::Privacy::Public => false,
-      },
-      match tracking_profile.stats.privacy {
-          tracking_profile::Privacy::Private => true,
-          tracking_profile::Privacy::Public => false,
-      },
-    )
-    .execute(&mut **transaction)
-    .await?;
+    tracking_profile
+      .insert_query()
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }

@@ -1,4 +1,6 @@
+use crate::handlers::database::InsertQuery;
 use poise::serenity_prelude::{self as serenity};
+use ulid::Ulid;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, poise::ChoiceParameter)]
 pub enum Privacy {
@@ -139,6 +141,36 @@ impl Default for TrackingProfile {
         privacy: Privacy::Public,
       },
     }
+  }
+}
+
+impl InsertQuery for TrackingProfile {
+  fn insert_query(&self) -> sqlx::query::Query<sqlx::Postgres, sqlx::postgres::PgArguments> {
+    sqlx::query!(
+      "
+        INSERT INTO
+          tracking_profile (
+            record_id,
+            user_id,
+            guild_id,
+            utc_offset,
+            anonymous_tracking,
+            streaks_active,
+            streaks_private,
+            stats_private
+          )
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7, $8)
+      ",
+      Ulid::new().to_string(),
+      self.user_id.to_string(),
+      self.guild_id.to_string(),
+      self.utc_offset,
+      privacy!(self.tracking.privacy),
+      matches!(self.streak.status, Status::Enabled),
+      privacy!(self.streak.privacy),
+      privacy!(self.stats.privacy),
+    )
   }
 }
 
