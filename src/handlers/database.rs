@@ -50,6 +50,10 @@ pub(crate) trait InsertQuery {
   fn insert_query(&self) -> Query<Postgres, PgArguments>;
 }
 
+pub(crate) trait UpdateQuery {
+  fn update_query(&self) -> Query<Postgres, PgArguments>;
+}
+
 pub(crate) trait DeleteQuery {
   fn delete_query<'a>(
     guild_id: serenity::GuildId,
