@@ -1,11 +1,15 @@
+use poise::serenity_prelude::GuildId;
+use poise::Modal;
+use sqlx::postgres::{PgArguments, PgRow};
+use sqlx::query::QueryAs;
+use sqlx::{FromRow, Postgres};
+
 use crate::commands::helpers::pagination::{PageRow, PageType};
 use crate::handlers::database::ExistsQuery;
-use poise::serenity_prelude::{self as serenity};
-use poise::Modal;
 
 #[derive(Debug)]
 pub struct Term {
-  pub guild_id: serenity::GuildId,
+  pub guild_id: GuildId,
   pub name: String,
   pub meaning: String,
   pub usage: Option<String>,
@@ -33,7 +37,7 @@ pub struct TermModal {
   pub aliases: Option<String>,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, FromRow)]
 pub struct SearchResult {
   pub term_name: String,
   pub meaning: String,
@@ -52,7 +56,7 @@ impl Term {
   ///
   /// [gid]: poise::serenity_prelude::model::id::GuildId
   pub fn new(
-    guild_id: impl Into<serenity::GuildId>,
+    guild_id: impl Into<GuildId>,
     name: impl Into<String>,
     meaning: impl Into<String>,
   ) -> Self {
@@ -70,7 +74,7 @@ impl Term {
   /// Assigns a [`GuildId`][gid] to a [`Term`].
   ///
   /// [gid]: poise::serenity_prelude::model::id::GuildId
-  pub fn guild_id(mut self, guild_id: impl Into<serenity::GuildId>) -> Self {
+  pub fn guild_id(mut self, guild_id: impl Into<GuildId>) -> Self {
     self.guild_id = guild_id.into();
     self
   }
@@ -130,7 +134,7 @@ impl Term {
   ///
   /// [gid]: poise::serenity_prelude::model::id::GuildId
   pub fn from_modal(
-    guild_id: impl Into<serenity::GuildId>,
+    guild_id: impl Into<GuildId>,
     name: impl Into<String>,
     modal: TermModal,
   ) -> Self {
@@ -161,10 +165,10 @@ impl PageRow for Term {
 }
 
 impl ExistsQuery for Term {
-  fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
-    guild_id: serenity::GuildId,
+  fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
     term_name: impl Into<String>,
-  ) -> sqlx::query::QueryAs<'a, sqlx::Postgres, T, sqlx::postgres::PgArguments> {
+  ) -> QueryAs<'a, Postgres, T, PgArguments> {
     sqlx::query_as(
       "SELECT EXISTS (SELECT 1 FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2)",
     )

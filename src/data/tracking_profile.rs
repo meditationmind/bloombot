@@ -1,8 +1,14 @@
-use crate::handlers::database::{InsertQuery, UpdateQuery};
-use poise::serenity_prelude::{self as serenity};
+use poise::serenity_prelude::{GuildId, UserId};
+use poise::ChoiceParameter;
+use sqlx::postgres::PgArguments;
+use sqlx::query::Query;
+use sqlx::Postgres;
 use ulid::Ulid;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, poise::ChoiceParameter)]
+use crate::commands::helpers::time;
+use crate::handlers::database::{InsertQuery, UpdateQuery};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, ChoiceParameter)]
 pub enum Privacy {
   #[name = "private"]
   Private,
@@ -11,7 +17,7 @@ pub enum Privacy {
   Public,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, poise::ChoiceParameter)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, ChoiceParameter)]
 pub enum Status {
   #[default]
   #[name = "enabled"]
@@ -38,8 +44,8 @@ pub struct Stats {
 
 #[derive(Debug)]
 pub struct TrackingProfile {
-  pub user_id: serenity::UserId,
-  pub guild_id: serenity::GuildId,
+  pub user_id: UserId,
+  pub guild_id: GuildId,
   pub utc_offset: i16,
   pub tracking: Tracking,
   pub streak: Streak,
@@ -52,7 +58,7 @@ impl TrackingProfile {
   ///
   /// [uid]: poise::serenity_prelude::model::id::UserId
   /// [gid]: poise::serenity_prelude::model::id::GuildId
-  pub fn new(guild_id: impl Into<serenity::GuildId>, user_id: impl Into<serenity::UserId>) -> Self {
+  pub fn new(guild_id: impl Into<GuildId>, user_id: impl Into<UserId>) -> Self {
     Self {
       user_id: user_id.into(),
       guild_id: guild_id.into(),
@@ -63,7 +69,7 @@ impl TrackingProfile {
   /// Assigns a [`UserID`][uid] to a [`TrackingProfile`].
   ///
   /// [uid]: poise::serenity_prelude::model::id::UserId
-  pub fn user_id(mut self, user_id: impl Into<serenity::UserId>) -> Self {
+  pub fn user_id(mut self, user_id: impl Into<UserId>) -> Self {
     self.user_id = user_id.into();
     self
   }
@@ -71,7 +77,7 @@ impl TrackingProfile {
   /// Assigns a [`GuildId`][gid] to a [`TrackingProfile`].
   ///
   /// [gid]: poise::serenity_prelude::model::id::GuildId
-  pub fn guild_id(mut self, guild_id: impl Into<serenity::GuildId>) -> Self {
+  pub fn guild_id(mut self, guild_id: impl Into<GuildId>) -> Self {
     self.guild_id = guild_id.into();
     self
   }
@@ -83,10 +89,7 @@ impl TrackingProfile {
   /// [poc]: crate::commands::helpers::time::PlusOffsetChoice
   /// [moc]: crate::commands::helpers::time::MinusOffsetChoice
   pub fn utc_offset(mut self, utc_offset: i16) -> Self {
-    if matches!(
-      crate::commands::helpers::time::choice_from_offset(utc_offset),
-      (None, None)
-    ) {
+    if matches!(time::choice_from_offset(utc_offset), (None, None)) {
       self
     } else {
       self.utc_offset = utc_offset;
@@ -127,8 +130,8 @@ impl TrackingProfile {
 impl Default for TrackingProfile {
   fn default() -> Self {
     Self {
-      user_id: serenity::UserId::default(),
-      guild_id: serenity::GuildId::default(),
+      user_id: UserId::default(),
+      guild_id: GuildId::default(),
       utc_offset: 0,
       tracking: Tracking {
         privacy: Privacy::Public,
@@ -145,7 +148,7 @@ impl Default for TrackingProfile {
 }
 
 impl InsertQuery for TrackingProfile {
-  fn insert_query(&self) -> sqlx::query::Query<sqlx::Postgres, sqlx::postgres::PgArguments> {
+  fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
       "
         INSERT INTO
@@ -175,7 +178,7 @@ impl InsertQuery for TrackingProfile {
 }
 
 impl UpdateQuery for TrackingProfile {
-  fn update_query(&self) -> sqlx::query::Query<sqlx::Postgres, sqlx::postgres::PgArguments> {
+  fn update_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
       "
         UPDATE tracking_profile
@@ -280,12 +283,9 @@ mod tests {
   #[test]
   #[allow(clippy::unreadable_literal)]
   fn test_id_methods() {
-    let guild_id = serenity::GuildId::new(1300863845429936139);
+    let guild_id = GuildId::new(1300863845429936139);
     let profile = TrackingProfile::default().guild_id(guild_id);
-    assert_eq!(
-      profile.guild_id,
-      serenity::GuildId::new(1300863845429936139)
-    );
+    assert_eq!(profile.guild_id, GuildId::new(1300863845429936139));
 
     let int_user_id = 1300863845429936139;
     let str_guild_id = 1300863845429936139;
@@ -293,18 +293,12 @@ mod tests {
     let profile = TrackingProfile::default()
       .user_id(int_user_id)
       .guild_id(str_guild_id);
-    assert_eq!(profile.user_id, serenity::UserId::new(1300863845429936139));
-    assert_eq!(
-      profile.guild_id,
-      serenity::GuildId::new(1300863845429936139)
-    );
+    assert_eq!(profile.user_id, UserId::new(1300863845429936139));
+    assert_eq!(profile.guild_id, GuildId::new(1300863845429936139));
 
     let profile = TrackingProfile::new(str_guild_id, int_user_id);
-    assert_eq!(profile.user_id, serenity::UserId::new(1300863845429936139));
-    assert_eq!(
-      profile.guild_id,
-      serenity::GuildId::new(1300863845429936139)
-    );
+    assert_eq!(profile.user_id, UserId::new(1300863845429936139));
+    assert_eq!(profile.guild_id, GuildId::new(1300863845429936139));
   }
 
   #[test]

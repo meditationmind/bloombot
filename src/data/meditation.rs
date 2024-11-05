@@ -1,13 +1,14 @@
+use chrono::{DateTime, Utc};
+use poise::serenity_prelude::UserId;
+
 use crate::commands::helpers::pagination::{PageRow, PageType};
-use chrono::Utc;
-use poise::serenity_prelude::{self as serenity};
 
 pub struct Meditation {
   pub id: String,
-  pub user_id: serenity::UserId,
+  pub user_id: UserId,
   pub minutes: i32,
   pub seconds: i32,
-  pub occurred_at: chrono::DateTime<Utc>,
+  pub occurred_at: DateTime<Utc>,
 }
 
 impl PageRow for Meditation {

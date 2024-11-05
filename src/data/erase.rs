@@ -1,13 +1,14 @@
+use chrono::{DateTime, Utc};
+use poise::serenity_prelude::UserId;
+
 use crate::commands::helpers::pagination::{PageRow, PageType};
-use chrono::Utc;
-use poise::serenity_prelude::{self as serenity};
 
 pub struct Erase {
   pub id: String,
-  pub user_id: serenity::UserId,
+  pub user_id: UserId,
   pub message_link: String,
   pub reason: String,
-  pub occurred_at: chrono::DateTime<Utc>,
+  pub occurred_at: DateTime<Utc>,
 }
 
 impl Erase {
@@ -15,7 +16,7 @@ impl Erase {
   /// All other values are set to their defaults.
   ///
   /// [uid]: poise::serenity_prelude::model::id::UserId
-  pub fn new(user_id: impl Into<serenity::UserId>) -> Self {
+  pub fn new(user_id: impl Into<UserId>) -> Self {
     Self {
       user_id: user_id.into(),
       ..Default::default()
@@ -25,7 +26,7 @@ impl Erase {
   /// Assigns a [`UserID`][uid] to an [`Erase`].
   ///
   /// [uid]: poise::serenity_prelude::model::id::UserId
-  pub fn user_id(mut self, user_id: impl Into<serenity::UserId>) -> Self {
+  pub fn user_id(mut self, user_id: impl Into<UserId>) -> Self {
     self.user_id = user_id.into();
     self
   }
@@ -43,7 +44,7 @@ impl Erase {
   }
 
   /// Sets the time and date when an [`Erase`] occurred.
-  pub fn datetime(mut self, datetime: impl Into<chrono::DateTime<Utc>>) -> Self {
+  pub fn datetime(mut self, datetime: impl Into<DateTime<Utc>>) -> Self {
     self.occurred_at = datetime.into();
     self
   }
@@ -53,10 +54,10 @@ impl Default for Erase {
   fn default() -> Self {
     Self {
       id: String::default(),
-      user_id: serenity::UserId::default(),
+      user_id: UserId::default(),
       message_link: "None".to_string(),
       reason: "No reason provided.".to_string(),
-      occurred_at: chrono::DateTime::<Utc>::default(),
+      occurred_at: DateTime::<Utc>::default(),
     }
   }
 }
@@ -65,14 +66,14 @@ impl PageRow for Erase {
   fn title(&self, page_type: PageType) -> String {
     match page_type {
       PageType::Standard => {
-        if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
+        if self.occurred_at == (DateTime::<Utc>::default()) {
           "Date: `Not Available`".to_owned()
         } else {
           format!("Date: `{}`", self.occurred_at.format("%Y-%m-%d %H:%M"))
         }
       }
       PageType::Alternate => {
-        if self.occurred_at == (chrono::DateTime::<Utc>::default()) {
+        if self.occurred_at == (DateTime::<Utc>::default()) {
           "Date: `Not Available`".to_owned()
         } else {
           format!("Date: `{}`", self.occurred_at.format("%e %B %Y %H:%M"))

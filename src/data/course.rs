@@ -1,14 +1,23 @@
-use crate::{
-  commands::helpers::pagination::{PageRow, PageType},
-  handlers::database::ExistsQuery,
-};
-use poise::serenity_prelude::{self as serenity, Mentionable};
-use sqlx::{postgres::PgArguments, query::QueryAs, Postgres};
+use poise::serenity_prelude::{GuildId, Mentionable, RoleId};
+use sqlx::postgres::{PgArguments, PgRow};
+use sqlx::query::QueryAs;
+use sqlx::{FromRow, Postgres};
+
+use crate::commands::helpers::pagination::{PageRow, PageType};
+use crate::handlers::database::ExistsQuery;
 
 pub struct Course {
   pub name: String,
-  pub participant_role: serenity::RoleId,
-  pub graduate_role: serenity::RoleId,
+  pub participant_role: RoleId,
+  pub graduate_role: RoleId,
+}
+
+#[allow(clippy::module_name_repetitions)]
+pub struct ExtendedCourse {
+  pub name: String,
+  pub participant_role: RoleId,
+  pub graduate_role: RoleId,
+  pub guild_id: GuildId,
 }
 
 impl PageRow for Course {
@@ -26,20 +35,12 @@ impl PageRow for Course {
 }
 
 impl ExistsQuery for Course {
-  fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
-    guild_id: serenity::GuildId,
+  fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
     course_name: impl Into<String>,
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
     sqlx::query_as("SELECT EXISTS (SELECT 1 FROM course WHERE course_name = $1 AND guild_id = $2)")
       .bind(course_name.into())
       .bind(guild_id.to_string())
   }
-}
-
-#[allow(clippy::module_name_repetitions)]
-pub struct ExtendedCourse {
-  pub name: String,
-  pub participant_role: serenity::RoleId,
-  pub graduate_role: serenity::RoleId,
-  pub guild_id: serenity::GuildId,
 }

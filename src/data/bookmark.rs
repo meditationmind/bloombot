@@ -1,13 +1,14 @@
-use crate::commands::helpers::pagination::{PageRow, PageType};
-use crate::handlers::database::{DeleteQuery, InsertQuery};
 use chrono::{DateTime, Utc};
-use poise::serenity_prelude::{self as serenity};
+use poise::serenity_prelude::{GuildId, UserId};
 use sqlx::postgres::PgArguments;
 use sqlx::query::Query;
-use sqlx::Postgres;
+use sqlx::{FromRow, Postgres};
 use ulid::Ulid;
 
-#[derive(Default, sqlx::FromRow)]
+use crate::commands::helpers::pagination::{PageRow, PageType};
+use crate::handlers::database::{DeleteQuery, InsertQuery};
+
+#[derive(Default, FromRow)]
 #[sqlx(default)]
 pub struct Bookmark {
   #[sqlx(rename = "record_id")]
@@ -24,8 +25,8 @@ pub struct Bookmark {
 
 impl Bookmark {
   pub(crate) fn new(
-    guild_id: serenity::GuildId,
-    user_id: serenity::UserId,
+    guild_id: GuildId,
+    user_id: UserId,
     link: String,
     description: Option<String>,
   ) -> Self {
@@ -78,7 +79,7 @@ impl InsertQuery for Bookmark {
 
 impl DeleteQuery for Bookmark {
   fn delete_query<'a>(
-    _guild_id: serenity::GuildId,
+    _guild_id: GuildId,
     id: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
     sqlx::query!("DELETE FROM bookmarks WHERE record_id = $1", id.into())

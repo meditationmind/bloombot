@@ -4,10 +4,8 @@ use sqlx::query::{Query, QueryAs};
 use sqlx::{FromRow, Postgres};
 use ulid::Ulid;
 
-use crate::{
-  commands::helpers::pagination::{PageRow, PageType},
-  handlers::database::{DeleteQuery, ExistsQuery, InsertQuery, UpdateQuery},
-};
+use crate::commands::helpers::pagination::{PageRow, PageType};
+use crate::handlers::database::{DeleteQuery, ExistsQuery, InsertQuery, UpdateQuery};
 
 #[derive(Default)]
 pub struct SteamKey {
