@@ -6,7 +6,7 @@ use sqlx::Postgres;
 use ulid::Ulid;
 
 use crate::commands::helpers::time;
-use crate::handlers::database::{InsertQuery, UpdateQuery};
+use crate::handlers::database::{DeleteQuery, InsertQuery, UpdateQuery};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, ChoiceParameter)]
 pub enum Privacy {
@@ -197,6 +197,19 @@ impl UpdateQuery for TrackingProfile {
       privacy!(self.stats.privacy),
       self.user_id.to_string(),
       self.guild_id.to_string(),
+    )
+  }
+}
+
+impl DeleteQuery for TrackingProfile {
+  fn delete_query<'a>(
+    guild_id: GuildId,
+    user_id: impl Into<String>,
+  ) -> Query<'a, Postgres, PgArguments> {
+    sqlx::query!(
+      "DELETE FROM tracking_profile WHERE user_id = $1 AND guild_id = $2",
+      user_id.into(),
+      guild_id.to_string(),
     )
   }
 }

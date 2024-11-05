@@ -229,15 +229,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM tracking_profile WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    TrackingProfile::delete_query(*guild_id, user_id.to_string())
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
