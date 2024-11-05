@@ -1,4 +1,4 @@
-use crate::handlers::database::InsertQuery;
+use crate::handlers::database::{InsertQuery, UpdateQuery};
 use poise::serenity_prelude::{self as serenity};
 use ulid::Ulid;
 
@@ -170,6 +170,30 @@ impl InsertQuery for TrackingProfile {
       matches!(self.streak.status, Status::Enabled),
       privacy!(self.streak.privacy),
       privacy!(self.stats.privacy),
+    )
+  }
+}
+
+impl UpdateQuery for TrackingProfile {
+  fn update_query(&self) -> sqlx::query::Query<sqlx::Postgres, sqlx::postgres::PgArguments> {
+    sqlx::query!(
+      "
+        UPDATE tracking_profile
+        SET 
+          utc_offset = $1,
+          anonymous_tracking = $2,
+          streaks_active = $3,
+          streaks_private = $4,
+          stats_private = $5
+        WHERE user_id = $6 AND guild_id = $7
+      ",
+      self.utc_offset,
+      privacy!(self.tracking.privacy),
+      matches!(self.streak.status, Status::Enabled),
+      privacy!(self.streak.privacy),
+      privacy!(self.stats.privacy),
+      self.user_id.to_string(),
+      self.guild_id.to_string(),
     )
   }
 }

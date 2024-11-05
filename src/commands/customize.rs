@@ -148,13 +148,13 @@ async fn offset(
 
     DatabaseHandler::update_tracking_profile(
       &mut transaction,
-      existing_profile.utc_offset(utc_offset),
+      &existing_profile.utc_offset(utc_offset),
     )
     .await?;
   } else {
     DatabaseHandler::add_tracking_profile(
       &mut transaction,
-      TrackingProfile::new(guild_id, user_id).utc_offset(utc_offset),
+      &TrackingProfile::new(guild_id, user_id).utc_offset(utc_offset),
     )
     .await?;
   }
@@ -217,13 +217,13 @@ async fn tracking(
 
     DatabaseHandler::update_tracking_profile(
       &mut transaction,
-      existing_profile.tracking_privacy(tracking_privacy),
+      &existing_profile.tracking_privacy(tracking_privacy),
     )
     .await?;
   } else {
     DatabaseHandler::add_tracking_profile(
       &mut transaction,
-      TrackingProfile::new(guild_id, user_id).tracking_privacy(tracking_privacy),
+      &TrackingProfile::new(guild_id, user_id).tracking_privacy(tracking_privacy),
     )
     .await?;
   }
@@ -294,7 +294,7 @@ async fn streak(
 
     DatabaseHandler::update_tracking_profile(
       &mut transaction,
-      existing_profile
+      &existing_profile
         .streak_status(streak_status)
         .streak_privacy(streak_privacy),
     )
@@ -351,7 +351,7 @@ async fn streak(
 
     DatabaseHandler::add_tracking_profile(
       &mut transaction,
-      TrackingProfile::new(guild_id, user_id)
+      &TrackingProfile::new(guild_id, user_id)
         .streak_status(streak_status)
         .streak_privacy(streak_privacy),
     )
@@ -431,13 +431,13 @@ async fn stats(
 
     DatabaseHandler::update_tracking_profile(
       &mut transaction,
-      existing_profile.stats_privacy(privacy),
+      &existing_profile.stats_privacy(privacy),
     )
     .await?;
   } else {
     DatabaseHandler::add_tracking_profile(
       &mut transaction,
-      TrackingProfile::new(guild_id, user_id).stats_privacy(privacy),
+      &TrackingProfile::new(guild_id, user_id).stats_privacy(privacy),
     )
     .await?;
   }

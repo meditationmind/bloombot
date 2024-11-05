@@ -202,7 +202,7 @@ impl DatabaseHandler {
 
   pub async fn add_tracking_profile(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tracking_profile: TrackingProfile,
+    tracking_profile: &TrackingProfile,
   ) -> Result<()> {
     tracking_profile
       .insert_query()
@@ -214,34 +214,12 @@ impl DatabaseHandler {
 
   pub async fn update_tracking_profile(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tracking_profile: TrackingProfile,
+    tracking_profile: &TrackingProfile,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5 WHERE user_id = $6 AND guild_id = $7
-      ",
-      tracking_profile.utc_offset,
-      match tracking_profile.tracking.privacy {
-          tracking_profile::Privacy::Private => true,
-          tracking_profile::Privacy::Public => false,
-      },
-      match tracking_profile.streak.status {
-          tracking_profile::Status::Enabled => true,
-          tracking_profile::Status::Disabled => false,
-      },
-      match tracking_profile.streak.privacy {
-          tracking_profile::Privacy::Private => true,
-          tracking_profile::Privacy::Public => false,
-      },
-      match tracking_profile.stats.privacy {
-          tracking_profile::Privacy::Private => true,
-          tracking_profile::Privacy::Public => false,
-      },
-      tracking_profile.user_id.to_string(),
-      tracking_profile.guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    tracking_profile
+      .update_query()
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
