@@ -1,12 +1,15 @@
+use anyhow::{Context as AnyhowContext, Result};
+use poise::serenity_prelude::{builder::*, ButtonStyle, ChannelId};
+use poise::serenity_prelude::{ComponentInteractionCollector, Mentionable, User};
+use poise::CreateReply;
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
-use crate::config::{EMOJI, ENTRIES_PER_PAGE};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
+use crate::data::steam_key::{Recipient, SteamKey};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
-use poise::CreateReply;
 
 /// Commands for managing Playne keys
 ///
@@ -19,7 +22,6 @@ use poise::CreateReply;
   default_member_permissions = "ADMINISTRATOR",
   category = "Admin Commands",
   subcommands("list_keys", "add_key", "remove_key", "use_key", "recipients"),
-  //hide_in_help,
   guild_only
 )]
 #[allow(clippy::unused_async)]
@@ -35,13 +37,11 @@ async fn list_keys(
   ctx: Context<'_>,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let keys = DatabaseHandler::get_all_steam_keys(&mut transaction, &guild_id).await?;
   let keys: Vec<PageRowRef> = keys.iter().map(|key| key as PageRowRef).collect();
@@ -63,13 +63,11 @@ async fn add_key(
   ctx: Context<'_>,
   #[description = "The Playne key to add"] key: String,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   if DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
     ctx
       .send(
@@ -81,7 +79,7 @@ async fn add_key(
     return Ok(());
   }
 
-  DatabaseHandler::add_steam_key(&mut transaction, &guild_id, key.as_str()).await?;
+  DatabaseHandler::add_steam_key(&mut transaction, &SteamKey::new(guild_id, key)).await?;
 
   database::commit_and_say(
     ctx,
@@ -102,13 +100,11 @@ async fn remove_key(
   ctx: Context<'_>,
   #[description = "The Playne key to remove"] key: String,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
     ctx
       .send(
@@ -140,30 +136,13 @@ async fn remove_key(
 async fn use_key(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  if DatabaseHandler::unused_key_exists(&mut transaction, &guild_id).await? {
-    let key = DatabaseHandler::get_key_and_mark_used(&mut transaction, &guild_id)
-      .await?
-      .with_context(|| "Failed to retrieve key despite unused_key_exists returning true")?;
-
-    database::commit_and_say(
-      ctx,
-      transaction,
-      MessageType::TextOnly(format!(
-        "{} Key retrieved and marked used: `{key}`",
-        EMOJI.mmcheck
-      )),
-      Visibility::Ephemeral,
-    )
-    .await?;
-  } else {
+  if !DatabaseHandler::unused_key_exists(&mut transaction, &guild_id).await? {
     ctx
       .send(
         CreateReply::default()
@@ -171,7 +150,43 @@ async fn use_key(ctx: Context<'_>) -> Result<()> {
           .ephemeral(true),
       )
       .await?;
+
+    return Ok(());
   };
+
+  let key = DatabaseHandler::get_key_and_mark_used(&mut transaction, &guild_id)
+    .await?
+    .with_context(|| "Failed to retrieve key despite unused_key_exists returning true")?;
+
+  database::commit_and_say(
+    ctx,
+    transaction,
+    MessageType::TextOnly(format!(
+      "{} Key retrieved and marked used: `{key}`",
+      EMOJI.mmcheck
+    )),
+    Visibility::Ephemeral,
+  )
+  .await?;
+
+  let log_embed = BloomBotEmbed::new()
+    .title("Playne Key Retrieved")
+    .description(format!("**Key**: {key}"))
+    .footer(
+      CreateEmbedFooter::new(format!(
+        "Retrieved by {} ({})",
+        ctx.author().name,
+        ctx.author().id
+      ))
+      .icon_url(ctx.author().avatar_url().unwrap_or_default()),
+    )
+    .clone();
+
+  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+
+  log_channel
+    .send_message(ctx, CreateMessage::new().embed(log_embed))
+    .await?;
 
   Ok(())
 }
@@ -193,13 +208,11 @@ async fn list_recipients(
   ctx: Context<'_>,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let recipients = DatabaseHandler::get_steamkey_recipients(&mut transaction, &guild_id).await?;
   let recipients: Vec<PageRowRef> = recipients
@@ -228,7 +241,7 @@ async fn list_recipients(
 #[poise::command(slash_command, rename = "update")]
 async fn update_recipient(
   ctx: Context<'_>,
-  #[description = "Playne key recipient"] recipient: serenity::User,
+  #[description = "Playne key recipient"] recipient: User,
   #[description = "Received key as challenge prize"] challenge_prize: Option<bool>,
   #[description = "Received key as donator perk"] donator_perk: Option<bool>,
   #[description = "Total number of Playne keys received"]
@@ -249,27 +262,23 @@ async fn update_recipient(
     return Ok(());
   }
 
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
-  let steamkey_recipient =
-    DatabaseHandler::get_steamkey_recipient(&mut transaction, &guild_id, &recipient.id).await?;
-
-  if steamkey_recipient.is_none() {
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+  let Some(steamkey_recipient) =
+    DatabaseHandler::get_steamkey_recipient(&mut transaction, &guild_id, &recipient.id).await?
+  else {
     if let Some(total_keys) = total_keys {
-      DatabaseHandler::add_steamkey_recipient(
-        &mut transaction,
-        &guild_id,
-        &recipient.id,
+      let recipient = Recipient::new(
+        guild_id,
+        recipient.id,
         challenge_prize,
         donator_perk,
         total_keys,
-      )
-      .await?;
+      );
+      DatabaseHandler::add_steamkey_recipient(&mut transaction, &recipient).await?;
 
       database::commit_and_say(
         ctx,
@@ -285,17 +294,23 @@ async fn update_recipient(
     }
 
     ctx
-      .send(CreateReply::default().content(format!("{} No existing record for recipient. Please specify a number of keys to create a new record.", EMOJI.mminfo)).ephemeral(true))
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} No existing record for recipient. Please specify a number of keys to create a new record.",
+            EMOJI.mminfo
+          ))
+          .ephemeral(true),
+      )
       .await?;
     DatabaseHandler::rollback_transaction(transaction).await?;
     return Ok(());
-  }
+  };
 
   if total_keys.is_some_and(|total| total == 0) {
     DatabaseHandler::remove_steamkey_recipient(&mut transaction, &guild_id, &recipient.id).await?;
 
     let ctx_id = ctx.id();
-
     let confirm_id = format!("{ctx_id}confirm");
     let cancel_id = format!("{ctx_id}cancel");
 
@@ -310,32 +325,30 @@ async fn update_recipient(
           .components(vec![CreateActionRow::Buttons(vec![
             CreateButton::new(confirm_id.clone())
               .label("Yes")
-              .style(serenity::ButtonStyle::Success),
+              .style(ButtonStyle::Success),
             CreateButton::new(cancel_id.clone())
               .label("No")
-              .style(serenity::ButtonStyle::Danger),
+              .style(ButtonStyle::Danger),
           ])]),
       )
       .await?;
 
-    // Loop through incoming interactions with the navigation buttons
-    while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
-      // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-      // button was pressed
+    // Loop through incoming interactions with the buttons.
+    while let Some(press) = ComponentInteractionCollector::new(ctx)
+      // Only collect presses when button IDs start with ctx_id.
       .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-      // Timeout when no navigation button has been pressed in one minute
+      // Timeout when no button has been pressed for one minute.
       .timeout(std::time::Duration::from_secs(60))
       .await
     {
-      // Depending on which button was pressed, go to next or previous page
       if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
-        // This is an unrelated button interaction
+        // This is an unrelated button interaction.
         continue;
       }
 
       let confirmed = press.data.custom_id == confirm_id;
 
-      // Update the message with the new page contents
+      // Update the response.
       if confirmed {
         match press
           .create_response(
@@ -375,34 +388,31 @@ async fn update_recipient(
         )
         .await?;
     }
-    // This happens when the user didn't press any button for 60 seconds
+    // This happens when the user didn't press any button for 60 seconds.
     return Ok(());
   }
 
-  let steamkey_recipient = steamkey_recipient
-    .with_context(|| "Failed to assign SteamKeyRecipientData to steamkey_recipient")?;
-  let challenge_prize = match challenge_prize {
-    Some(_) => challenge_prize,
-    None => steamkey_recipient.challenge_prize,
+  let challenge_prize = if challenge_prize.is_none() {
+    steamkey_recipient.challenge_prize
+  } else {
+    challenge_prize
   };
-  let donator_perk = match donator_perk {
-    Some(_) => donator_perk,
-    None => steamkey_recipient.donator_perk,
+  let donator_perk = if donator_perk.is_none() {
+    steamkey_recipient.donator_perk
+  } else {
+    donator_perk
   };
-  let total_keys = match total_keys {
-    Some(total_keys) => total_keys,
-    None => steamkey_recipient.total_keys,
-  };
+  let total_keys = total_keys.unwrap_or(steamkey_recipient.total_keys);
 
-  DatabaseHandler::update_steamkey_recipient(
-    &mut transaction,
-    &guild_id,
-    &recipient.id,
+  let recipient = Recipient::new(
+    guild_id,
+    recipient.id,
     challenge_prize,
     donator_perk,
     total_keys,
-  )
-  .await?;
+  );
+
+  DatabaseHandler::update_steamkey_recipient(&mut transaction, &recipient).await?;
 
   database::commit_and_say(
     ctx,

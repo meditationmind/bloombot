@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO steamkey (record_id, steam_key, guild_id, used) VALUES ($1, $2, $3, $4)\n      ",
+  "query": "INSERT INTO steamkey (record_id, steam_key, guild_id, used) VALUES ($1, $2, $3, $4)",
   "describe": {
     "columns": [],
     "parameters": {
@@ -13,5 +13,5 @@
     },
     "nullable": []
   },
-  "hash": "aa95b5ec9c69b8b2763c00de7fd75b2a616ad38efe24a27691c0fcb8cb08ffa7"
+  "hash": "11cec19b9ebd22727944c9cb2f745e3e64d56ff93ad5e333311feb4514912e12"
 }

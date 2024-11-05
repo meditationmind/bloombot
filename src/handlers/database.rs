@@ -20,9 +20,9 @@ use chrono::{Datelike, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use poise::serenity_prelude::{self as serenity};
-use sqlx::postgres::PgArguments;
+use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
-use sqlx::Postgres;
+use sqlx::{FromRow, Postgres};
 use ulid::Ulid;
 
 #[derive(Debug)]
@@ -58,7 +58,7 @@ pub(crate) trait DeleteQuery {
 }
 
 pub(crate) trait ExistsQuery {
-  fn exists_query<'a, T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(
+  fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
     guild_id: serenity::GuildId,
     unique_id: impl Into<String>,
   ) -> QueryAs<'a, Postgres, T, PgArguments>;
@@ -306,49 +306,18 @@ impl DatabaseHandler {
 
   pub async fn add_steamkey_recipient(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    challenge_prize: Option<bool>,
-    donator_perk: Option<bool>,
-    total_keys: i16,
+    recipient: &Recipient,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO steamkey_recipients (record_id, user_id, guild_id, challenge_prize, donator_perk, total_keys) VALUES ($1, $2, $3, $4, $5, $6)
-      ",
-      Ulid::new().to_string(),
-      user_id.to_string(),
-      guild_id.to_string(),
-      challenge_prize,
-      donator_perk,
-      total_keys
-    )
-    .execute(&mut **transaction)
-    .await?;
+    recipient.insert_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
 
   pub async fn update_steamkey_recipient(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    challenge_prize: Option<bool>,
-    donator_perk: Option<bool>,
-    total_keys: i16,
+    recipient: &Recipient,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-      UPDATE steamkey_recipients SET challenge_prize = $1, donator_perk = $2, total_keys = $3 WHERE user_id = $4 AND guild_id = $5
-      ",
-      challenge_prize,
-      donator_perk,
-      total_keys,
-      user_id.to_string(),
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    recipient.update_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -358,15 +327,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     user_id: &serenity::UserId,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM steamkey_recipients WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    Recipient::delete_query(*guild_id, user_id.to_string())
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
@@ -1416,20 +1379,9 @@ impl DatabaseHandler {
 
   pub async fn add_steam_key(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    key: &str,
+    steam_key: &SteamKey,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO steamkey (record_id, steam_key, guild_id, used) VALUES ($1, $2, $3, $4)
-      ",
-      Ulid::new().to_string(),
-      key,
-      guild_id.to_string(),
-      false,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    steam_key.insert_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -2066,15 +2018,9 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
     key: &str,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM steamkey WHERE steam_key = $1 AND guild_id = $2
-      ",
-      key,
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    SteamKey::delete_query(*guild_id, key)
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
