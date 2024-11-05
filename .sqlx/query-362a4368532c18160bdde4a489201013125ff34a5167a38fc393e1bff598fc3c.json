@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE meditation SET user_id = $3 WHERE user_id = $1 AND guild_id = $2\n      ",
+  "query": "UPDATE meditation SET user_id = $3 WHERE user_id = $1 AND guild_id = $2",
   "describe": {
     "columns": [],
     "parameters": {
@@ -12,5 +12,5 @@
     },
     "nullable": []
   },
-  "hash": "1d9baae172c89e58180667d88aa6c59e77ec614ff96ddc8d0e23dcf47fbb37be"
+  "hash": "362a4368532c18160bdde4a489201013125ff34a5167a38fc393e1bff598fc3c"
 }

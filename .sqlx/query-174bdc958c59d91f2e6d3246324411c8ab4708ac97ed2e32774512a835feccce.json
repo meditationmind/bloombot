@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE tracking_profile SET user_id = $3 WHERE user_id = $1 AND guild_id = $2\n      ",
+  "query": "UPDATE tracking_profile SET user_id = $3 WHERE user_id = $1 AND guild_id = $2",
   "describe": {
     "columns": [],
     "parameters": {
@@ -12,5 +12,5 @@
     },
     "nullable": []
   },
-  "hash": "6f1aef017e5faa83f1cf968729f18376c06cf9774da66317986765ba9cef8927"
+  "hash": "174bdc958c59d91f2e6d3246324411c8ab4708ac97ed2e32774512a835feccce"
 }
