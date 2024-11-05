@@ -4,6 +4,7 @@ use crate::{
   commands::helpers::time::{ChallengeTimeframe, Timeframe},
   commands::stats::{LeaderboardType, SortBy},
   data::bookmark::Bookmark,
+  data::common::{Exists, Migration},
   data::course::{Course, ExtendedCourse},
   data::erase::Erase,
   data::meditation::Meditation,
@@ -34,11 +35,6 @@ struct Res {
 #[derive(Debug)]
 struct MeditationCountByDay {
   days_ago: Option<f64>,
-}
-
-#[derive(sqlx::FromRow)]
-struct Exists {
-  exists: bool,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -270,20 +266,9 @@ impl DatabaseHandler {
 
   pub async fn migrate_tracking_profile(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    old_user_id: &serenity::UserId,
-    new_user_id: &serenity::UserId,
+    migration: &Migration,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE tracking_profile SET user_id = $3 WHERE user_id = $1 AND guild_id = $2
-      ",
-      old_user_id.to_string(),
-      guild_id.to_string(),
-      new_user_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    migration.update_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -938,20 +923,9 @@ impl DatabaseHandler {
 
   pub async fn migrate_meditation_entries(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    old_user_id: &serenity::UserId,
-    new_user_id: &serenity::UserId,
+    migration: &Migration,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE meditation SET user_id = $3 WHERE user_id = $1 AND guild_id = $2
-      ",
-      old_user_id.to_string(),
-      guild_id.to_string(),
-      new_user_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    migration.update_query().execute(&mut **transaction).await?;
 
     Ok(())
   }

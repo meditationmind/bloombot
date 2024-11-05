@@ -4,6 +4,7 @@ use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
+use crate::data::common::{Migration, MigrationType};
 use crate::database::DatabaseHandler;
 use crate::Context;
 use anyhow::{Context as AnyhowContext, Result};
@@ -676,22 +677,22 @@ async fn migrate(
 
   match data_type {
     DataType::CustomizationSettings => {
-      DatabaseHandler::migrate_tracking_profile(
-        &mut transaction,
-        &guild_id,
-        &old_user.id,
-        &new_user.id,
-      )
-      .await?;
+      let migration = Migration::new(
+        guild_id,
+        old_user.id,
+        new_user.id,
+        MigrationType::TrackingProfile,
+      );
+      DatabaseHandler::migrate_tracking_profile(&mut transaction, &migration).await?;
     }
     DataType::MeditationEntries => {
-      DatabaseHandler::migrate_meditation_entries(
-        &mut transaction,
-        &guild_id,
-        &old_user.id,
-        &new_user.id,
-      )
-      .await?;
+      let migration = Migration::new(
+        guild_id,
+        old_user.id,
+        new_user.id,
+        MigrationType::MeditationEntries,
+      );
+      DatabaseHandler::migrate_meditation_entries(&mut transaction, &migration).await?;
     }
   }
 

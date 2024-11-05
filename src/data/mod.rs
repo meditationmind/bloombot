@@ -1,4 +1,5 @@
 pub mod bookmark;
+pub mod common;
 pub mod course;
 pub mod erase;
 pub mod meditation;
