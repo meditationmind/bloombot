@@ -1,4 +1,7 @@
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{GuildId, UserId};
+use sqlx::postgres::PgArguments;
+use sqlx::query::Query;
+use sqlx::Postgres;
 
 use crate::handlers::database::UpdateQuery;
 
@@ -8,9 +11,9 @@ pub struct Exists {
 }
 
 pub struct Migration {
-  pub guild: serenity::GuildId,
-  pub old_user: serenity::UserId,
-  pub new_user: serenity::UserId,
+  pub guild: GuildId,
+  pub old_user: UserId,
+  pub new_user: UserId,
   pub kind: MigrationType,
 }
 
@@ -21,9 +24,9 @@ pub enum MigrationType {
 
 impl Migration {
   pub fn new(
-    guild_id: impl Into<serenity::GuildId>,
-    old_user_id: impl Into<serenity::UserId>,
-    new_user_id: impl Into<serenity::UserId>,
+    guild_id: impl Into<GuildId>,
+    old_user_id: impl Into<UserId>,
+    new_user_id: impl Into<UserId>,
     kind: MigrationType,
   ) -> Self {
     Self {
@@ -36,7 +39,7 @@ impl Migration {
 }
 
 impl UpdateQuery for Migration {
-  fn update_query(&self) -> sqlx::query::Query<sqlx::Postgres, sqlx::postgres::PgArguments> {
+  fn update_query(&self) -> Query<Postgres, PgArguments> {
     match self.kind {
       MigrationType::TrackingProfile => {
         sqlx::query!(
