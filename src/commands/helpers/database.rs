@@ -1,13 +1,16 @@
+use anyhow::{anyhow, Result};
+use poise::serenity_prelude::CreateEmbed;
+use poise::CreateReply;
+use sqlx::{Postgres, Transaction};
+
 use crate::commands::helpers::common::Visibility;
 use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::Result;
-use poise::{serenity_prelude as serenity, CreateReply};
 
 pub enum MessageType {
   TextOnly(String),
-  EmbedOnly(Box<serenity::CreateEmbed>),
+  EmbedOnly(Box<CreateEmbed>),
 }
 
 /// Takes a transaction and a response, committing the transaction if the message is sent successfully,
@@ -28,7 +31,7 @@ pub enum MessageType {
 /// channel, but are still logged.
 pub async fn commit_and_say(
   ctx: Context<'_>,
-  transaction: sqlx::Transaction<'_, sqlx::Postgres>,
+  transaction: Transaction<'_, Postgres>,
   message: MessageType,
   visibility: Visibility,
 ) -> Result<()> {
@@ -59,7 +62,7 @@ pub async fn commit_and_say(
             .content(format!("{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.", EMOJI.mminfo))
             .ephemeral(true)).await;
 
-          return Err(anyhow::anyhow!("Could not send message: {e}"));
+          return Err(anyhow!("Could not send message: {e}"));
         }
       };
     }
@@ -72,9 +75,7 @@ pub async fn commit_and_say(
       if e.to_string() == "Interaction has already been acknowledged."
         || e.to_string() == "Unknown interaction"
       {
-        return Err(anyhow::anyhow!(
-          "Multiple instances assumed. Ignoring error: {e}"
-        ));
+        return Err(anyhow!("Multiple instances assumed. Ignoring error: {e}"));
       }
 
       // Otherwise, it's likely the interaction has timed out for some reason.
@@ -84,7 +85,7 @@ pub async fn commit_and_say(
         .say(&ctx, format!("{} An error may have occurred. If your command failed, please contact staff for assistance.", EMOJI.mminfo))
         .await;
 
-      return Err(anyhow::anyhow!("Could not send message: {e}"));
+      return Err(anyhow!("Could not send message: {e}"));
     }
   };
 

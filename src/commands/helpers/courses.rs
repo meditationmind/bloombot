@@ -1,8 +1,11 @@
+use anyhow::Result;
+use poise::serenity_prelude::GuildId;
+use poise::CreateReply;
+use sqlx::{Postgres, Transaction};
+
 use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::Result;
-use poise::serenity_prelude as serenity;
 
 /// Checks the database for courses with names that meet a similarity threshold of 0.8
 /// (high similarity) and returns either the course with the highest similarity or `None`.
@@ -12,8 +15,8 @@ use poise::serenity_prelude as serenity;
 /// course, user is informed that the specified course does not exist.
 pub async fn course_not_found(
   ctx: Context<'_>,
-  transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-  guild_id: serenity::GuildId,
+  transaction: &mut Transaction<'_, Postgres>,
+  guild_id: GuildId,
   course_name: String,
 ) -> Result<()> {
   let possible_course =
@@ -29,7 +32,7 @@ pub async fn course_not_found(
       // Suggest possible_course if user is enrolled in the course
       ctx
         .send(
-          poise::CreateReply::default()
+          CreateReply::default()
             .content(format!(
               "{} Course does not exist. Did you mean `{}`?",
               EMOJI.mminfo, possible_course.name
@@ -45,7 +48,7 @@ pub async fn course_not_found(
   // If no possible_course is found or user is not enrolled in possible_course
   ctx
     .send(
-      poise::CreateReply::default()
+      CreateReply::default()
         .content(format!("{} Course does not exist.", EMOJI.mminfo))
         .ephemeral(true),
     )

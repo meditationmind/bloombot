@@ -1,8 +1,9 @@
-use crate::config::{self, CHANNELS, EMOTES, ROLES};
-use crate::database::DatabaseHandler;
-use crate::events::helpers::starboard;
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{builder::*, ChannelId, Context, Reaction, ReactionType};
+
+use crate::config::{BloomBotEmbed, CHANNELS, EMOTES, ROLES};
+use crate::database::DatabaseHandler;
+use crate::events::helpers::starboard;
 
 pub async fn reaction_add(
   ctx: &Context,
@@ -56,7 +57,7 @@ async fn check_report(ctx: &Context, reaction: &Reaction) -> Result<()> {
           CreateMessage::new()
             .content(format!("<@&{}> Message Reported", ROLES.staff))
             .embed(
-              config::BloomBotEmbed::new()
+              BloomBotEmbed::new()
                 .author(CreateEmbedAuthor::new(&message_user.name).icon_url(message_user.face()))
                 .description(message_content)
                 .field("Link", format!("[Go to message]({message_link})"), false)
@@ -73,7 +74,7 @@ async fn check_report(ctx: &Context, reaction: &Reaction) -> Result<()> {
         .dm(
           &ctx,
           CreateMessage::new().embed(
-            config::BloomBotEmbed::new()
+            BloomBotEmbed::new()
               .title("Report")
               .description("Your report has been sent to the moderation team."),
           ),

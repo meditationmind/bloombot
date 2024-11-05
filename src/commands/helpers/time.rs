@@ -1,4 +1,6 @@
-#[derive(poise::ChoiceParameter)]
+use poise::ChoiceParameter;
+
+#[derive(ChoiceParameter)]
 pub enum PlusOffsetChoice {
   #[name = "UTC+1 (BST, CET, IST, WAT, WEST)"]
   UTCPlus1,
@@ -50,7 +52,7 @@ pub enum PlusOffsetChoice {
   UTCPlus14,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 pub enum MinusOffsetChoice {
   #[name = "UTC-12 (BIT)"]
   UTCMinus12,
@@ -187,7 +189,7 @@ pub fn offset_from_choice(
   }
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 pub enum Timeframe {
   Yearly,
   Monthly,
@@ -195,7 +197,7 @@ pub enum Timeframe {
   Daily,
 }
 
-#[derive(poise::ChoiceParameter, PartialEq)]
+#[derive(ChoiceParameter, PartialEq)]
 pub enum ChallengeTimeframe {
   #[name = "Monthly Challenge"]
   Monthly,

@@ -1,16 +1,15 @@
 use std::fmt::Display;
+use std::time::Duration;
+
+use anyhow::Result;
+use poise::serenity_prelude::ComponentInteractionCollector;
+use poise::serenity_prelude::{CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter};
+use poise::serenity_prelude::{CreateInteractionResponse, CreateInteractionResponseMessage};
+use poise::CreateReply;
 
 use crate::commands::helpers::common::Visibility;
 use crate::config::BloomBotEmbed;
 use crate::Context;
-use anyhow::Result;
-use poise::{
-  serenity_prelude::{
-    self as serenity, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
-  },
-  CreateReply,
-};
 
 #[derive(Debug, Copy, Clone)]
 pub enum PageType {
@@ -185,12 +184,12 @@ impl<'a> Paginator<'a> {
       .await?;
 
     // Loop through incoming interactions with the navigation buttons
-    while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
+    while let Some(press) = ComponentInteractionCollector::new(ctx)
       // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
       // button was pressed
       .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
       // Timeout when no navigation button has been pressed for 24 hours
-      .timeout(std::time::Duration::from_secs(3600 * 24))
+      .timeout(Duration::from_secs(3600 * 24))
       .await
     {
       // Depending on which button was pressed, go to next or previous page
@@ -231,7 +230,7 @@ impl PaginationPage<'_> {
     self.entries.is_empty()
   }
 
-  fn to_embed(&self, title: &str, page_type: PageType) -> serenity::CreateEmbed {
+  fn to_embed(&self, title: &str, page_type: PageType) -> CreateEmbed {
     let mut embed = BloomBotEmbed::new().title(title).description(format!(
       "Showing entries {} to {}.",
       (self.page_number * self.entries_per_page) + 1,

@@ -1,6 +1,7 @@
-use crate::config::{self, EMOJI};
 use anyhow::Result;
-use poise::serenity_prelude::{self as serenity, Context, CreateMessage, Member};
+use poise::serenity_prelude::{ChannelId, Context, CreateMessage, Member, RoleId};
+
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 
 enum UpdateType {
   BecamePatreonDonator,
@@ -10,8 +11,8 @@ enum UpdateType {
 
 impl UpdateType {
   fn get_type(old: &Member, new: &Member) -> Option<Self> {
-    let patreon_role = serenity::RoleId::new(config::ROLES.patreon);
-    let kofi_role = serenity::RoleId::new(config::ROLES.kofi);
+    let patreon_role = RoleId::new(ROLES.patreon);
+    let kofi_role = RoleId::new(ROLES.kofi);
 
     if !old.roles.contains(&patreon_role) && new.roles.contains(&patreon_role) {
       Some(Self::BecamePatreonDonator)
@@ -38,11 +39,11 @@ pub async fn guild_member_update(
   if let Some(update_type) = UpdateType::get_type(old, new) {
     match update_type {
       UpdateType::BecamePatreonDonator => {
-        let donator_channel = serenity::ChannelId::new(config::CHANNELS.donators);
+        let donator_channel = ChannelId::new(CHANNELS.donators);
 
         donator_channel
           .send_message(&ctx, CreateMessage::new()
-            .embed(config::BloomBotEmbed::new()
+            .embed(BloomBotEmbed::new()
               .title(":tada: New Donator :tada:")
               .description(format!(
                 "Please welcome <@{}> as a new donator on Patreon.\n\nThank you for your generosity! It helps keep this community alive {}",
@@ -54,11 +55,11 @@ pub async fn guild_member_update(
           .await?;
       }
       UpdateType::BecameKofiDonator => {
-        let donator_channel = serenity::ChannelId::new(config::CHANNELS.donators);
+        let donator_channel = ChannelId::new(CHANNELS.donators);
 
         donator_channel
           .send_message(&ctx, CreateMessage::new()
-            .embed(config::BloomBotEmbed::new()
+            .embed(BloomBotEmbed::new()
               .title(":tada: New Donator :tada:")
               .description(format!(
                 "Please welcome <@{}> as a new donator on Ko-fi.\n\nThank you for your generosity! It helps keep this community alive {}",
@@ -70,12 +71,12 @@ pub async fn guild_member_update(
           .await?;
       }
       UpdateType::StoppedPending => {
-        let welcome_channel = serenity::ChannelId::new(config::CHANNELS.welcome);
+        let welcome_channel = ChannelId::new(CHANNELS.welcome);
 
         welcome_channel
           .send_message(&ctx, CreateMessage::new()
-            .content(format!("Please give <@{}> a warm welcome, <@&{}>!", new.user.id, config::ROLES.welcome_team))
-              .embed(config::BloomBotEmbed::new()
+            .content(format!("Please give <@{}> a warm welcome, <@&{}>!", new.user.id, ROLES.welcome_team))
+              .embed(BloomBotEmbed::new()
                   .title(":tada: A new member has arrived! :tada:")
                   .description(format!(
                     "Welcome to the Meditation Mind community, <@{}>!\n\nCheck out <id:customize> to grab some roles and [customize your community experience](<https://meditationmind.org/curating-your-experience/>).\n\nWe're glad you've joined us! {}",

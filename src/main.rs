@@ -1,21 +1,29 @@
 #![warn(clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
 #![allow(clippy::too_many_lines)]
 
-use anyhow::{Context as ErrorContext, Error, Result};
-use commands::{
+use std::env;
+use std::sync::Arc;
+use std::time::Instant;
+
+use anyhow::{anyhow, Context as ErrorContext, Error, Result};
+use dotenvy::dotenv;
+use log::{error, info};
+use poise::serenity_prelude::{self as serenity, FullEvent as Event};
+use poise::serenity_prelude::{ActivityData, Channel, Client, GatewayIntents, GuildId};
+use poise::{builtins, CreateReply, Framework, FrameworkError, FrameworkOptions};
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use tokio::sync::Mutex;
+
+use crate::commands::{
   add, add_bookmark, bookmark, challenge, coffee, community_sit, complete, course, courses,
   customize, erase, erase_message, glossary, hello, help, import, keys, manage, pick_winner, ping,
   quote, quotes, recent, remove_entry, report_message, stats, streak, suggest, terms, uptime,
   whatis,
 };
-use dotenvy::dotenv;
-use log::{error, info};
-use poise::serenity_prelude::{self as serenity, model::channel};
-use rand::rngs::SmallRng;
-use rand::SeedableRng;
-use serenity::FullEvent as Event;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use crate::database::DatabaseHandler;
+use crate::embeddings::OpenAIHandler;
+use crate::handlers::{database, embeddings};
 
 mod charts;
 mod commands;
@@ -24,13 +32,11 @@ mod data;
 mod events;
 mod handlers;
 
-use handlers::{database, embeddings};
-
 pub struct Data {
-  pub db: Arc<database::DatabaseHandler>,
+  pub db: Arc<DatabaseHandler>,
   pub rng: Arc<Mutex<SmallRng>>,
-  pub embeddings: Arc<embeddings::OpenAIHandler>,
-  pub bloom_start_time: std::time::Instant,
+  pub embeddings: Arc<OpenAIHandler>,
+  pub bloom_start_time: Instant,
 }
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -41,18 +47,18 @@ async fn main() -> Result<()> {
   pretty_env_logger::init();
 
   let token =
-    std::env::var("DISCORD_TOKEN").with_context(|| "Missing DISCORD_TOKEN environment variable")?;
-  let test_guild = std::env::var("TEST_GUILD_ID");
+    env::var("DISCORD_TOKEN").with_context(|| "Missing DISCORD_TOKEN environment variable")?;
+  let test_guild = env::var("TEST_GUILD_ID");
 
-  let intents = serenity::GatewayIntents::GUILDS
-    | serenity::GatewayIntents::GUILD_MODERATION
-    | serenity::GatewayIntents::GUILD_MESSAGES
-    | serenity::GatewayIntents::GUILD_MESSAGE_REACTIONS
-    | serenity::GatewayIntents::DIRECT_MESSAGES
-    | serenity::GatewayIntents::GUILD_MEMBERS;
+  let intents = GatewayIntents::GUILDS
+    | GatewayIntents::GUILD_MODERATION
+    | GatewayIntents::GUILD_MESSAGES
+    | GatewayIntents::GUILD_MESSAGE_REACTIONS
+    | GatewayIntents::DIRECT_MESSAGES
+    | GatewayIntents::GUILD_MEMBERS;
 
-  let framework = poise::Framework::builder()
-    .options(poise::FrameworkOptions {
+  let framework = Framework::builder()
+    .options(FrameworkOptions {
       commands: vec![
         keys(),
         courses(),
@@ -99,26 +105,26 @@ async fn main() -> Result<()> {
         if let Ok(test_guild) = test_guild {
           info!("Registering commands in test guild {test_guild}");
 
-          let guild_id = serenity::GuildId::new(test_guild.parse::<u64>()?);
-          poise::builtins::register_in_guild(ctx, &framework.options().commands, guild_id).await?;
+          let guild_id = GuildId::new(test_guild.parse::<u64>()?);
+          builtins::register_in_guild(ctx, &framework.options().commands, guild_id).await?;
         } else {
           info!("Registering commands globally");
-          poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+          builtins::register_globally(ctx, &framework.options().commands).await?;
         }
         Ok(Data {
-          db: Arc::new(database::DatabaseHandler::new().await?),
+          db: Arc::new(DatabaseHandler::new().await?),
           rng: Arc::new(Mutex::new(SmallRng::from_entropy())),
-          embeddings: Arc::new(embeddings::OpenAIHandler::new()?),
-          bloom_start_time: std::time::Instant::now(),
+          embeddings: Arc::new(OpenAIHandler::new()?),
+          bloom_start_time: Instant::now(),
         })
       })
     })
     .build();
 
-  let mut client = serenity::Client::builder(&token, intents)
+  let mut client = Client::builder(&token, intents)
     .framework(framework)
     .await
-    .map_err(|e| anyhow::anyhow!(e))?;
+    .map_err(|e| anyhow!(e))?;
 
   let shard_manager = client.shard_manager.clone();
 
@@ -132,12 +138,12 @@ async fn main() -> Result<()> {
   client
     .start()
     .await
-    .map_err(|e| anyhow::anyhow!("Error starting client: {e}"))
+    .map_err(|e| anyhow!("Error starting client: {e}"))
 }
 
-async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
+async fn error_handler(error: FrameworkError<'_, Data, Error>) {
   match error {
-    poise::FrameworkError::Command { ctx, error, .. } => {
+    FrameworkError::Command { ctx, error, .. } => {
       match ctx.say("An error occurred while running the command").await {
         Ok(_) => {}
         Err(e) => {
@@ -157,14 +163,14 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
       // Whether it's a guild or DM channel
       let source = match &channel {
         Some(channel) => match channel {
-          channel::Channel::Guild(_) => {
+          Channel::Guild(_) => {
             let guild_name = match ctx.guild() {
               Some(guild) => guild.name.clone(),
               None => "unknown".to_owned(),
             };
             format!("{} ({})", guild_name, channel.id())
           }
-          channel::Channel::Private(_) => "DM".to_owned(),
+          Channel::Private(_) => "DM".to_owned(),
           _ => "unknown".to_owned(),
         },
         None => "unknown".to_owned(),
@@ -183,7 +189,7 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
 
       error!("\tUser: {} ({})", user.name, user.id);
     }
-    poise::FrameworkError::ArgumentParse {
+    FrameworkError::ArgumentParse {
       error, input, ctx, ..
     } => {
       let response = if let Some(input) = input {
@@ -193,11 +199,7 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
       };
 
       match ctx
-        .send(
-          poise::CreateReply::default()
-            .content(response)
-            .ephemeral(true),
-        )
+        .send(CreateReply::default().content(response).ephemeral(true))
         .await
       {
         Ok(_) => {}
@@ -207,7 +209,7 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, Error>) {
       };
     }
     error => {
-      if let Err(e) = poise::builtins::on_error(error).await {
+      if let Err(e) = builtins::on_error(error).await {
         error!("Error while handling error: {e}");
       }
     }
@@ -250,7 +252,7 @@ async fn event_handler(ctx: &serenity::Context, event: &Event, data: &Data) -> R
         "Setting default activity text: \"{}\"",
         default_activity_text
       );
-      ctx.set_activity(Some(serenity::ActivityData::custom(default_activity_text)));
+      ctx.set_activity(Some(ActivityData::custom(default_activity_text)));
     }
     _ => {}
   }

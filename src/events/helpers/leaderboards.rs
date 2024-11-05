@@ -1,15 +1,16 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use crate::charts;
+use anyhow::Result;
+use log::{error, info};
+use poise::serenity_prelude::{GuildId, Http, UserId};
+use tokio::time;
+
+use crate::charts::Chart;
 use crate::commands::helpers::time::Timeframe;
 use crate::commands::stats::{LeaderboardType, SortBy};
 use crate::data::stats::LeaderboardUser;
 use crate::database::DatabaseHandler;
-use anyhow::Result;
-use log::{error, info};
-use poise::serenity_prelude::{GuildId, Http, UserId};
-use tokio::time::sleep;
 
 #[allow(dead_code)]
 pub struct Leaderboards<'a> {
@@ -206,7 +207,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(daily_minutes) = process_stats(http, guild_id, &daily_minutes).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_min_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top5_dark)
       .await?
       .leaderboard(
         daily_minutes.clone(),
@@ -217,10 +218,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_min_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top5_light)
       .await?
       .leaderboard(
         daily_minutes.clone(),
@@ -232,7 +233,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_min_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top10_dark)
       .await?
       .leaderboard(
         daily_minutes.clone(),
@@ -243,10 +244,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_min_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top10_light)
       .await?
       .leaderboard(
         daily_minutes,
@@ -269,7 +270,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(weekly_minutes) = process_stats(http, guild_id, &weekly_minutes).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_min_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top5_dark)
       .await?
       .leaderboard(
         weekly_minutes.clone(),
@@ -280,10 +281,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_min_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top5_light)
       .await?
       .leaderboard(
         weekly_minutes.clone(),
@@ -295,7 +296,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_min_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top10_dark)
       .await?
       .leaderboard(
         weekly_minutes.clone(),
@@ -306,10 +307,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_min_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top10_light)
       .await?
       .leaderboard(
         weekly_minutes,
@@ -332,7 +333,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(monthly_minutes) = process_stats(http, guild_id, &monthly_minutes).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_min_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top5_dark)
       .await?
       .leaderboard(
         monthly_minutes.clone(),
@@ -343,10 +344,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_min_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top5_light)
       .await?
       .leaderboard(
         monthly_minutes.clone(),
@@ -358,7 +359,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_min_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top10_dark)
       .await?
       .leaderboard(
         monthly_minutes.clone(),
@@ -369,10 +370,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_min_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top10_light)
       .await?
       .leaderboard(
         monthly_minutes,
@@ -395,7 +396,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(yearly_minutes) = process_stats(http, guild_id, &yearly_minutes).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_min_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top5_dark)
       .await?
       .leaderboard(
         yearly_minutes.clone(),
@@ -406,10 +407,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_min_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top5_light)
       .await?
       .leaderboard(
         yearly_minutes.clone(),
@@ -421,7 +422,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_min_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top10_dark)
       .await?
       .leaderboard(
         yearly_minutes.clone(),
@@ -432,10 +433,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_min_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top10_light)
       .await?
       .leaderboard(
         yearly_minutes,
@@ -458,7 +459,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(daily_sessions) = process_stats(http, guild_id, &daily_sessions).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_ses_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top5_dark)
       .await?
       .leaderboard(
         daily_sessions.clone(),
@@ -469,10 +470,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_ses_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top5_light)
       .await?
       .leaderboard(
         daily_sessions.clone(),
@@ -484,7 +485,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_ses_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top10_dark)
       .await?
       .leaderboard(
         daily_sessions.clone(),
@@ -495,10 +496,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_ses_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top10_light)
       .await?
       .leaderboard(
         daily_sessions,
@@ -521,7 +522,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(weekly_sessions) = process_stats(http, guild_id, &weekly_sessions).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_ses_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top5_dark)
       .await?
       .leaderboard(
         weekly_sessions.clone(),
@@ -532,10 +533,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_ses_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top5_light)
       .await?
       .leaderboard(
         weekly_sessions.clone(),
@@ -547,7 +548,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_ses_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top10_dark)
       .await?
       .leaderboard(
         weekly_sessions.clone(),
@@ -558,10 +559,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_ses_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top10_light)
       .await?
       .leaderboard(
         weekly_sessions,
@@ -584,7 +585,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(monthly_sessions) = process_stats(http, guild_id, &monthly_sessions).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_ses_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top5_dark)
       .await?
       .leaderboard(
         monthly_sessions.clone(),
@@ -595,10 +596,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_ses_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top5_light)
       .await?
       .leaderboard(
         monthly_sessions.clone(),
@@ -610,7 +611,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_ses_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top10_dark)
       .await?
       .leaderboard(
         monthly_sessions.clone(),
@@ -621,10 +622,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_ses_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top10_light)
       .await?
       .leaderboard(
         monthly_sessions,
@@ -647,7 +648,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(yearly_sessions) = process_stats(http, guild_id, &yearly_sessions).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_ses_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top5_dark)
       .await?
       .leaderboard(
         yearly_sessions.clone(),
@@ -658,10 +659,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_ses_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top5_light)
       .await?
       .leaderboard(
         yearly_sessions.clone(),
@@ -673,7 +674,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_ses_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top10_dark)
       .await?
       .leaderboard(
         yearly_sessions.clone(),
@@ -684,10 +685,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_ses_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top10_light)
       .await?
       .leaderboard(
         yearly_sessions,
@@ -710,7 +711,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(daily_streaks) = process_stats(http, guild_id, &daily_streaks).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_str_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top5_dark)
       .await?
       .leaderboard(
         daily_streaks.clone(),
@@ -721,10 +722,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_str_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top5_light)
       .await?
       .leaderboard(
         daily_streaks.clone(),
@@ -736,7 +737,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_str_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top10_dark)
       .await?
       .leaderboard(
         daily_streaks.clone(),
@@ -747,10 +748,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.day_str_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top10_light)
       .await?
       .leaderboard(
         daily_streaks,
@@ -773,7 +774,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(weekly_streaks) = process_stats(http, guild_id, &weekly_streaks).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_str_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top5_dark)
       .await?
       .leaderboard(
         weekly_streaks.clone(),
@@ -784,10 +785,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_str_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top5_light)
       .await?
       .leaderboard(
         weekly_streaks.clone(),
@@ -799,7 +800,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_str_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top10_dark)
       .await?
       .leaderboard(
         weekly_streaks.clone(),
@@ -810,10 +811,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.week_str_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top10_light)
       .await?
       .leaderboard(
         weekly_streaks,
@@ -836,7 +837,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(monthly_streaks) = process_stats(http, guild_id, &monthly_streaks).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_str_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top5_dark)
       .await?
       .leaderboard(
         monthly_streaks.clone(),
@@ -847,10 +848,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_str_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top5_light)
       .await?
       .leaderboard(
         monthly_streaks.clone(),
@@ -862,7 +863,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_str_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top10_dark)
       .await?
       .leaderboard(
         monthly_streaks.clone(),
@@ -873,10 +874,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.month_str_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top10_light)
       .await?
       .leaderboard(
         monthly_streaks,
@@ -899,7 +900,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(yearly_streaks) = process_stats(http, guild_id, &yearly_streaks).await? {
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_str_top5_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top5_dark)
       .await?
       .leaderboard(
         yearly_streaks.clone(),
@@ -910,10 +911,10 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       )
       .await?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time::sleep(Duration::from_secs(5)).await;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_str_top5_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top5_light)
       .await?
       .leaderboard(
         yearly_streaks.clone(),
@@ -925,7 +926,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
     */
 
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_str_top10_dark)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top10_dark)
       .await?
       .leaderboard(
         yearly_streaks.clone(),
@@ -937,7 +938,7 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
       .await?;
 
     /*
-    let _ = charts::Chart::new_with_name(LEADERBOARDS.year_str_top10_light)
+    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top10_light)
       .await?
       .leaderboard(
         yearly_streaks,
@@ -970,7 +971,7 @@ pub async fn update(
   guild_id: GuildId,
 ) {
   info!(target: source, "Leaderboard: Refreshing views");
-  let refresh_start = std::time::Instant::now();
+  let refresh_start = Instant::now();
   if let Err(err) = refresh(&task_conn).await {
     error!(target: source, "Leaderboard: Error refreshing views: {:?}", err);
   }
@@ -980,10 +981,10 @@ pub async fn update(
     refresh_start.elapsed()
   );
 
-  sleep(Duration::from_secs(10)).await;
+  time::sleep(Duration::from_secs(10)).await;
 
   info!(target: source, "Leaderboard: Generating images");
-  let generation_start = std::time::Instant::now();
+  let generation_start = Instant::now();
   if let Err(err) = generate(&task_http, &task_conn, &guild_id).await {
     error!(target: source, "Leaderboard: Error generating images: {:?}", err);
   }

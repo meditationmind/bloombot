@@ -4,19 +4,23 @@
   clippy::cast_sign_loss
 )]
 
+use std::env;
+use std::path::PathBuf;
+
+use anyhow::{anyhow, Result};
+use charts_rs::{self, Align, BarChart, Box, LegendCategory};
+use charts_rs::{Series, SeriesCategory, TableCellStyle, TableChart};
+use chrono::{Datelike, Duration, NaiveDate, Utc, Weekday};
+use tokio::fs::{self, File};
+use tokio::io::AsyncWriteExt;
+
 use crate::commands::helpers::time::Timeframe;
 use crate::commands::stats::{ChartStyle, LeaderboardType, SortBy, StatsType};
 use crate::data::stats::Timeframe as TimeframeStats;
-use anyhow::Result;
-use charts_rs::{
-  svg_to_webp, Align, BarChart, Box, LegendCategory, Series, TableCellStyle, TableChart,
-};
-use chrono::{Datelike, NaiveDate};
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Chart<'a> {
-  file: tokio::fs::File,
+  file: File,
   path: PathBuf,
   filename: &'a str,
 }
@@ -24,8 +28,8 @@ pub struct Chart<'a> {
 impl<'a> Chart<'a> {
   pub async fn new() -> Result<Self> {
     let filename = "attachment.webp";
-    let path = std::env::temp_dir().with_file_name(filename);
-    let file = tokio::fs::File::create(&path).await?;
+    let path = env::temp_dir().with_file_name(filename);
+    let file = File::create(&path).await?;
 
     Ok(Self {
       file,
@@ -35,8 +39,8 @@ impl<'a> Chart<'a> {
   }
 
   pub async fn new_with_name(filename: &'a str) -> Result<Self> {
-    let path = std::env::temp_dir().with_file_name(filename);
-    let file = tokio::fs::File::create(&path).await?;
+    let path = env::temp_dir().with_file_name(filename);
+    let file = File::create(&path).await?;
 
     Ok(Self {
       file,
@@ -46,8 +50,8 @@ impl<'a> Chart<'a> {
   }
 
   pub async fn open(filename: &'a str) -> Result<Self> {
-    let path = std::env::temp_dir().with_file_name(filename);
-    let file = tokio::fs::File::open(&path).await?;
+    let path = env::temp_dir().with_file_name(filename);
+    let file = File::open(&path).await?;
 
     Ok(Self {
       file,
@@ -68,7 +72,7 @@ impl<'a> Chart<'a> {
     light_mode: bool,
   ) -> Result<Self> {
     if stats.len() != 12 {
-      return Err(anyhow::anyhow!("Not enough stats to draw chart"));
+      return Err(anyhow!("Not enough stats to draw chart"));
     }
 
     let title = if let ChartStyle::BarCombined = chart_style {
@@ -113,18 +117,16 @@ impl<'a> Chart<'a> {
       vec![Series::new(series_name, stats)]
     };
 
-    let now = chrono::Utc::now();
+    let now = Utc::now();
     let mut x_labels: Vec<String> = vec![];
     for n in 1..13 {
       let label = match timeframe {
         Timeframe::Daily => {
-          let date =
-            (now + chrono::Duration::minutes(offset.into())) - chrono::Duration::days(12 - n);
+          let date = (now + Duration::minutes(offset.into())) - Duration::days(12 - n);
           date.format("%m/%d").to_string()
         }
         Timeframe::Weekly => {
-          let date = now.date_naive().week(chrono::Weekday::Mon).first_day()
-            - chrono::Duration::weeks(12 - n);
+          let date = now.date_naive().week(Weekday::Mon).first_day() - Duration::weeks(12 - n);
           date.format("%m/%d").to_string()
         }
         Timeframe::Monthly => {
@@ -135,7 +137,7 @@ impl<'a> Chart<'a> {
               .saturating_sub(12u32.saturating_sub(n.try_into()?)),
             1,
           )
-          .unwrap_or_else(|| now.date_naive() - chrono::Duration::days((12 * 30) - (n * 30)));
+          .unwrap_or_else(|| now.date_naive() - Duration::days((12 * 30) - (n * 30)));
           date.format("%y/%m").to_string()
         }
         Timeframe::Yearly => {
@@ -146,7 +148,7 @@ impl<'a> Chart<'a> {
             1,
             1,
           )
-          .unwrap_or_else(|| now.date_naive() - chrono::Duration::days((12 * 365) - (n * 365)));
+          .unwrap_or_else(|| now.date_naive() - Duration::days((12 * 365) - (n * 365)));
           date.format("%Y").to_string()
         }
       };
@@ -210,7 +212,7 @@ impl<'a> Chart<'a> {
     } else {
       bar_chart.series_fill = true;
       bar_chart.series_smooth = true;
-      bar_chart.series_list[0].category = Some(charts_rs::SeriesCategory::Line);
+      bar_chart.series_list[0].category = Some(SeriesCategory::Line);
       bar_chart.series_list[0].label_show = true;
       bar_chart.series_label_font_size = 16.0;
       bar_chart.series_label_font_weight = Some("bold".to_string());
@@ -227,8 +229,8 @@ impl<'a> Chart<'a> {
       if let ChartStyle::BarCombined = chart_style {
         bar_chart.y_axis_hidden = false;
         bar_chart.y_axis_configs[0].axis_width = Some(0.0);
-        bar_chart.series_list[0].category = Some(charts_rs::SeriesCategory::Bar);
-        bar_chart.series_list[1].category = Some(charts_rs::SeriesCategory::Bar);
+        bar_chart.series_list[0].category = Some(SeriesCategory::Bar);
+        bar_chart.series_list[1].category = Some(SeriesCategory::Bar);
         bar_chart.series_list[1].y_axis_index = 1;
         bar_chart.series_list[1].label_show = true;
         bar_chart.legend_show = Some(true);
@@ -245,10 +247,10 @@ impl<'a> Chart<'a> {
     }
 
     let svg = bar_chart.svg()?;
-    let webp = svg_to_webp(&svg)?;
+    let webp = charts_rs::svg_to_webp(&svg)?;
 
-    tokio::io::AsyncWriteExt::write_all(&mut self.file, &webp).await?;
-    tokio::io::AsyncWriteExt::flush(&mut self.file).await?;
+    AsyncWriteExt::write_all(&mut self.file, &webp).await?;
+    AsyncWriteExt::flush(&mut self.file).await?;
 
     Ok(Self {
       file: self.file,
@@ -274,17 +276,17 @@ impl<'a> Chart<'a> {
       LeaderboardType::Top10 => String::from("Leaderboard (Top 10)"),
     };
     let subtitle = match timeframe {
-      Timeframe::Daily => chrono::Utc::now().format("%B %-d, %Y").to_string(),
+      Timeframe::Daily => Utc::now().format("%B %-d, %Y").to_string(),
       Timeframe::Weekly => format!(
         "Week starting {}",
-        chrono::Utc::now()
+        Utc::now()
           .date_naive()
-          .week(chrono::Weekday::Sun)
+          .week(Weekday::Sun)
           .first_day()
           .format("%B %d"),
       ),
-      Timeframe::Monthly => chrono::Utc::now().format("%B %Y").to_string(),
-      Timeframe::Yearly => chrono::Utc::now().format("%Y").to_string(),
+      Timeframe::Monthly => Utc::now().format("%B %Y").to_string(),
+      Timeframe::Yearly => Utc::now().format("%Y").to_string(),
     };
 
     let mut cell_styles: Vec<TableCellStyle> = vec![];
@@ -370,10 +372,10 @@ impl<'a> Chart<'a> {
     }
 
     let svg = leaderboard.svg()?;
-    let webp = svg_to_webp(&svg)?;
+    let webp = charts_rs::svg_to_webp(&svg)?;
 
-    tokio::io::AsyncWriteExt::write_all(&mut self.file, &webp).await?;
-    tokio::io::AsyncWriteExt::flush(&mut self.file).await?;
+    AsyncWriteExt::write_all(&mut self.file, &webp).await?;
+    AsyncWriteExt::flush(&mut self.file).await?;
 
     Ok(Self {
       file: self.file,
@@ -391,7 +393,7 @@ impl<'a> Chart<'a> {
   }
 
   pub async fn remove(&self) -> Result<()> {
-    tokio::fs::remove_file(self.path()).await?;
+    fs::remove_file(self.path()).await?;
     Ok(())
   }
 }

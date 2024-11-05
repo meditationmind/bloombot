@@ -1,10 +1,11 @@
-use crate::database::DatabaseHandler;
 use anyhow::Result;
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::MessageId;
+
+use crate::database::DatabaseHandler;
 
 pub async fn message_delete(
   database: &DatabaseHandler,
-  deleted_message_id: &serenity::MessageId,
+  deleted_message_id: &MessageId,
 ) -> Result<()> {
   let mut transaction = database.start_transaction().await?;
 

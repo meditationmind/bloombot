@@ -1,17 +1,18 @@
-use crate::config::{self, CHANNELS, EMOTES};
-use crate::database::DatabaseHandler;
 use anyhow::Result;
-use poise::serenity_prelude::{
-  builder::*, ChannelId, Context, MessageFlags, Reaction, ReactionType,
-};
+use poise::serenity_prelude::{builder::*, ChannelId, Context};
+use poise::serenity_prelude::{MessageFlags, Reaction, ReactionType};
+use sqlx::{Postgres, Transaction};
+
+use crate::config::{BloomBotEmbed, CHANNELS, EMOTES, MIN_STARS};
+use crate::database::DatabaseHandler;
 
 async fn create_star_message(
   ctx: &Context,
-  transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+  transaction: &mut Transaction<'_, Postgres>,
   reaction: &Reaction,
   star_count: u64,
 ) -> Result<()> {
-  if star_count >= config::MIN_STARS {
+  if star_count >= MIN_STARS {
     let starred_message = reaction.message(&ctx).await?;
     let author_nick_or_name = match reaction.guild_id {
       Some(guild_id) => starred_message
@@ -43,12 +44,12 @@ async fn create_star_message(
     let mut embed = match starred_message.embeds.first() {
       Some(embed) => {
         if starred_message.content.is_empty() {
-          config::BloomBotEmbed::from(embed.clone())
+          BloomBotEmbed::from(embed.clone())
         } else {
-          config::BloomBotEmbed::new().description(starred_message.content.clone())
+          BloomBotEmbed::new().description(starred_message.content.clone())
         }
       }
-      None => config::BloomBotEmbed::new().description(starred_message.content.clone()),
+      None => BloomBotEmbed::new().description(starred_message.content.clone()),
     };
 
     embed = embed
@@ -162,7 +163,7 @@ pub async fn add_star(
 
       if let Some(star_message) = star_message {
         // Already exists, find the starboard channel
-        let starboard_channel = ChannelId::new(config::CHANNELS.starchannel);
+        let starboard_channel = ChannelId::new(CHANNELS.starchannel);
 
         // Get the starboard message
         let mut starboard_message = starboard_channel
@@ -224,9 +225,9 @@ pub async fn remove_star(
           .find(|r| r.reaction_type == ReactionType::Unicode(EMOTES.star.to_owned()))
           .map_or(0, |r| r.count);
 
-        let starboard_channel = ChannelId::new(config::CHANNELS.starchannel);
+        let starboard_channel = ChannelId::new(CHANNELS.starchannel);
 
-        if star_count >= config::MIN_STARS {
+        if star_count >= MIN_STARS {
           // Get the starboard message
           let mut starboard_message = starboard_channel
             .message(&ctx, star_message.board_message_id)

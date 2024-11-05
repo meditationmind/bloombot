@@ -1,10 +1,13 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use anyhow::Result;
+use chrono::{Duration as ChronoDuration, Utc};
+use log::{error, info};
+use tokio::time;
 
 use crate::commands::helpers::time::Timeframe;
 use crate::database::DatabaseHandler;
-use anyhow::Result;
-use log::{error, info};
-use tokio::time::sleep;
 
 /// Refreshes materialized views used to query stats for creating [`stats`][stats] charts.
 /// Since this is an intensive process, the function sleeps for two minutes between refreshing
@@ -14,9 +17,9 @@ use tokio::time::sleep;
 async fn refresh(db: &DatabaseHandler) -> Result<()> {
   let mut transaction = db.start_transaction().await?;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Weekly).await?;
-  tokio::time::sleep(std::time::Duration::from_secs(60 * 2)).await;
+  time::sleep(Duration::from_secs(60 * 2)).await;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Monthly).await?;
-  tokio::time::sleep(std::time::Duration::from_secs(60 * 2)).await;
+  time::sleep(Duration::from_secs(60 * 2)).await;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Yearly).await?;
   transaction.commit().await?;
 
@@ -32,15 +35,15 @@ async fn refresh(db: &DatabaseHandler) -> Result<()> {
 /// and upon completion with time elapsed. The source argument can be used to customize the
 /// target in the logs. For default behavior, use the [`module_path!`] macro.
 pub async fn update(source: &str, task_conn: Arc<DatabaseHandler>) {
-  let mut interval = tokio::time::interval(Duration::from_secs(60 * 60 * 12));
+  let mut interval = time::interval(Duration::from_secs(60 * 60 * 12));
   let wait = {
-    let now = chrono::Utc::now();
+    let now = Utc::now();
     let midnight = now
       .date_naive()
       .and_hms_opt(0, 0, 0)
       .unwrap_or_else(|| now.naive_utc())
       .and_utc()
-      + chrono::Duration::hours(24);
+      + ChronoDuration::hours(24);
     let noon = now
       .date_naive()
       .and_hms_opt(12, 0, 0)
@@ -58,17 +61,17 @@ pub async fn update(source: &str, task_conn: Arc<DatabaseHandler>) {
       target: source,
       "Chart stats: Next refresh in {}m ({})",
       wait / 60,
-      (chrono::Utc::now() + chrono::Duration::seconds(wait)).format("%H:%M %P")
+      (Utc::now() + ChronoDuration::seconds(wait)).format("%H:%M %P")
     );
   }
 
-  sleep(Duration::from_secs(wait.unsigned_abs())).await;
+  time::sleep(Duration::from_secs(wait.unsigned_abs())).await;
 
   loop {
     interval.tick().await;
 
     info!(target: source, "Chart stats: Refreshing views");
-    let refresh_start = std::time::Instant::now();
+    let refresh_start = Instant::now();
     if let Err(err) = refresh(&task_conn).await {
       error!(target: source, "Chart stats: Error refreshing views: {:?}", err);
     }

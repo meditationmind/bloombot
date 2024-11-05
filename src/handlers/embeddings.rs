@@ -1,7 +1,8 @@
-use anyhow::{Context, Result};
-use async_openai::{config::OpenAIConfig, types::CreateEmbeddingRequestArgs, Client};
-use poise::serenity_prelude as serenity;
 use std::env;
+
+use anyhow::{anyhow, Context, Result};
+use async_openai::{config::OpenAIConfig, types::CreateEmbeddingRequestArgs, Client};
+use poise::serenity_prelude::UserId;
 
 pub struct OpenAIHandler {
   client: Client<OpenAIConfig>,
@@ -28,7 +29,7 @@ impl OpenAIHandler {
   ///
   /// # Errors
   /// Returns an error if more than one embedding was generated.
-  pub async fn create_embedding(&self, input: String, user: serenity::UserId) -> Result<Vec<f32>> {
+  pub async fn create_embedding(&self, input: String, user: UserId) -> Result<Vec<f32>> {
     let request = CreateEmbeddingRequestArgs::default()
       .model("text-embedding-ada-002")
       .input(input)
@@ -40,7 +41,7 @@ impl OpenAIHandler {
     let embedding = match embeddings.data.len() {
       1 => embeddings.data[0].embedding.clone(),
       _ => {
-        return Err(anyhow::anyhow!(
+        return Err(anyhow!(
           "Expected 1 embedding, got {}",
           embeddings.data.len()
         ))

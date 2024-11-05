@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use crate::database::DatabaseHandler;
-use crate::events::helpers::{chart_stats, leaderboards};
 use anyhow::Result;
 use poise::serenity_prelude::{Context, GuildId};
+
+use crate::database::DatabaseHandler;
+use crate::events::helpers::{chart_stats, leaderboards};
 
 pub async fn guild_create(
   ctx: &Context,
