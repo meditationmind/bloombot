@@ -55,12 +55,14 @@ impl PageRow for Quote {
 }
 
 impl ExistsQuery for Quote {
+  type Item<'a> = &'a str;
+
   fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
     guild_id: GuildId,
-    quote_id: impl Into<String>,
+    quote_id: Self::Item<'a>,
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
     sqlx::query_as("SELECT EXISTS (SELECT 1 FROM quote WHERE record_id = $1 AND guild_id = $2)")
-      .bind(quote_id.into())
+      .bind(quote_id)
       .bind(guild_id.to_string())
   }
 }

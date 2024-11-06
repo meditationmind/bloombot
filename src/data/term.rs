@@ -165,14 +165,16 @@ impl PageRow for Term {
 }
 
 impl ExistsQuery for Term {
+  type Item<'a> = &'a str;
+
   fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
     guild_id: GuildId,
-    term_name: impl Into<String>,
+    term_name: Self::Item<'a>,
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
     sqlx::query_as(
       "SELECT EXISTS (SELECT 1 FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2)",
     )
-    .bind(term_name.into())
+    .bind(term_name)
     .bind(guild_id.to_string())
   }
 }

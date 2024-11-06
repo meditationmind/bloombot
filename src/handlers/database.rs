@@ -58,9 +58,11 @@ pub(crate) trait DeleteQuery {
 }
 
 pub(crate) trait ExistsQuery {
+  type Item<'a>;
+
   fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
     guild_id: serenity::GuildId,
-    unique_id: impl Into<String>,
+    item: Self::Item<'a>,
   ) -> QueryAs<'a, Postgres, T, PgArguments>;
 }
 
@@ -1364,7 +1366,7 @@ impl DatabaseHandler {
     key: &str,
   ) -> Result<bool> {
     Ok(
-      SteamKey::exists_query::<Exists>(*guild_id, key.to_string())
+      SteamKey::exists_query::<Exists>(*guild_id, Some(key))
         .fetch_one(&mut **transaction)
         .await?
         .exists,
@@ -1860,7 +1862,7 @@ impl DatabaseHandler {
     guild_id: &serenity::GuildId,
   ) -> Result<bool> {
     Ok(
-      SteamKey::exists_query::<Exists>(*guild_id, "none".to_string())
+      SteamKey::exists_query::<Exists>(*guild_id, None)
         .fetch_one(&mut **transaction)
         .await?
         .exists,
@@ -2043,7 +2045,7 @@ impl DatabaseHandler {
     term_name: &str,
   ) -> Result<bool> {
     Ok(
-      Term::exists_query::<Exists>(*guild_id, term_name.to_string())
+      Term::exists_query::<Exists>(*guild_id, term_name)
         .fetch_one(&mut **transaction)
         .await?
         .exists,
@@ -2480,7 +2482,7 @@ impl DatabaseHandler {
     quote_id: &str,
   ) -> Result<bool> {
     Ok(
-      Quote::exists_query::<Exists>(*guild_id, quote_id.to_string())
+      Quote::exists_query::<Exists>(*guild_id, quote_id)
         .fetch_one(&mut **transaction)
         .await?
         .exists,

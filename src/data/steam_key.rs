@@ -25,6 +25,8 @@ pub struct Recipient {
 }
 
 impl SteamKey {
+  /// Creates a new [`SteamKey`] with a specified [`GuildId`] and `key`,
+  /// setting all other fields to their defaults.
   pub fn new(guild_id: GuildId, key: impl Into<String>) -> Self {
     Self {
       guild_id,
@@ -33,13 +35,17 @@ impl SteamKey {
     }
   }
 
+  /// Marks a [`SteamKey`] as used when `true` or unused when `false`.
   pub fn set_used(mut self, used: bool) -> Self {
     self.used = used;
     self
   }
 
-  pub fn reserved_for(mut self, reserved: UserId) -> Self {
-    self.reserved = Some(reserved);
+  /// When [`Some<UserId>`] is provided, marks a [`SteamKey`] as reserved for
+  /// that user. When reserved is [`None`], the [`SteamKey`] will be marked unreserved,
+  /// or left unchanged if already unreserved.
+  pub fn reserved_for(mut self, reserved: Option<UserId>) -> Self {
+    self.reserved = reserved;
     self
   }
 }
@@ -62,6 +68,7 @@ impl PageRow for SteamKey {
 }
 
 impl InsertQuery for SteamKey {
+  /// Adds a [`SteamKey`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
       "INSERT INTO steamkey (record_id, steam_key, guild_id, used) VALUES ($1, $2, $3, $4)",
@@ -74,6 +81,7 @@ impl InsertQuery for SteamKey {
 }
 
 impl DeleteQuery for SteamKey {
+  /// Deletes a [`SteamKey`] from the database.
   fn delete_query<'a>(
     guild_id: GuildId,
     key: impl Into<String>,
@@ -87,22 +95,24 @@ impl DeleteQuery for SteamKey {
 }
 
 impl ExistsQuery for SteamKey {
+  type Item<'a> = Option<&'a str>;
+
+  /// If `key` is [`Some<&str>`], checks the database to see if the specified [`SteamKey`]
+  /// exists. If `key` is [`None`], checks to see if an unused [`SteamKey`] exists.
   fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
     guild_id: GuildId,
-    key: impl Into<String>,
+    key: Self::Item<'a>,
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
-    let key: String = key.into();
-    if key == "none" {
-      sqlx::query_as(
-        "SELECT EXISTS (SELECT 1 FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $1)",
-      )
-      .bind(guild_id.to_string())
-    } else {
-      sqlx::query_as(
+    match key {
+      Some(key) => sqlx::query_as(
         "SELECT EXISTS (SELECT 1 FROM steamkey WHERE steam_key = $1 AND guild_id = $2)",
       )
       .bind(key)
-      .bind(guild_id.to_string())
+      .bind(guild_id.to_string()),
+      None => sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $1)",
+      )
+      .bind(guild_id.to_string()),
     }
   }
 }
@@ -158,6 +168,7 @@ impl PageRow for Recipient {
 }
 
 impl InsertQuery for Recipient {
+  /// Adds a Steam key [`Recipient`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
       "
@@ -184,6 +195,7 @@ impl InsertQuery for Recipient {
 }
 
 impl UpdateQuery for Recipient {
+  /// Updates Steam key [`Recipient`] details in the database.
   fn update_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
       "
@@ -201,6 +213,7 @@ impl UpdateQuery for Recipient {
 }
 
 impl DeleteQuery for Recipient {
+  /// Deletes a Steam key [`Recipient`] from the database.
   fn delete_query<'a>(
     guild_id: GuildId,
     user_id: impl Into<String>,
@@ -214,14 +227,17 @@ impl DeleteQuery for Recipient {
 }
 
 impl ExistsQuery for Recipient {
+  type Item<'a> = String;
+
+  /// Checks the database to see if a Steam key [`Recipient`] exists.
   fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
     guild_id: GuildId,
-    user_id: impl Into<String>,
+    user_id: Self::Item<'_>,
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
     sqlx::query_as(
       "SELECT EXISTS (SELECT 1 FROM steamkey_recipients WHERE guild_id = $1 AND user_id = $2)",
     )
     .bind(guild_id.to_string())
-    .bind(user_id.into())
+    .bind(user_id)
   }
 }
