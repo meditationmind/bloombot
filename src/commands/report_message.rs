@@ -1,7 +1,9 @@
+use anyhow::Result;
+use poise::serenity_prelude::{builder::*, ChannelId, Message};
+use poise::CreateReply;
+
 use crate::config::{BloomBotEmbed, CHANNELS, ROLES};
 use crate::Context;
-use anyhow::Result;
-use poise::serenity_prelude::{self as serenity, builder::*};
 
 /// Report a message to server staff
 ///
@@ -16,10 +18,10 @@ use poise::serenity_prelude::{self as serenity, builder::*};
 )]
 pub async fn report_message(
   ctx: Context<'_>,
-  #[description = "Message to report"] message: serenity::Message,
+  #[description = "Message to report"] message: Message,
 ) -> Result<()> {
   let reporting_user = ctx.author();
-  let report_channel_id = serenity::ChannelId::new(CHANNELS.reportchannel);
+  let report_channel_id = ChannelId::new(CHANNELS.reportchannel);
   let message_link = message.link().clone();
   let message_user = message.author;
   let message_channel_name = message.channel_id.name(ctx).await?;
@@ -54,7 +56,7 @@ pub async fn report_message(
 
   ctx
     .send(
-      poise::CreateReply::default()
+      CreateReply::default()
         .content("Your report has been sent to the moderation team.")
         .ephemeral(true),
     )

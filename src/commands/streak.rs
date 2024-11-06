@@ -1,10 +1,11 @@
+use anyhow::{Context as AnyhowContext, Result};
+use poise::serenity_prelude::User;
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::data::tracking_profile::Privacy;
 use crate::database::DatabaseHandler;
-use crate::{config, Context};
-use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude as serenity;
+use crate::{config::ROLES, Context};
 
 /// See your current meditation streak
 ///
@@ -14,11 +15,9 @@ use poise::serenity_prelude as serenity;
 #[poise::command(slash_command, category = "Meditation Tracking", guild_only)]
 pub async fn streak(
   ctx: Context<'_>,
-  #[description = "The user to check the streak of"] user: Option<serenity::User>,
+  #[description = "The user to check the streak of"] user: Option<User>,
   #[description = "Set visibility of response (Defaults to public)"] privacy: Option<Privacy>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -27,7 +26,7 @@ pub async fn streak(
     None => ctx.author().id,
   };
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
 
   let tracking_profile =
@@ -46,11 +45,7 @@ pub async fn streak(
 
     if tracking_profile.streak.privacy == Privacy::Private {
       //Show for staff even when private
-      if ctx
-        .author()
-        .has_role(&ctx, guild_id, config::ROLES.staff)
-        .await?
-      {
+      if ctx.author().has_role(&ctx, guild_id, ROLES.staff).await? {
         let message = if streak.current == streak.longest {
           format!(
             "{user_nick_or_name}'s current **private** meditation streak is {} days. This is {user_nick_or_name}'s longest streak.",

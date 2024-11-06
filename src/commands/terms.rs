@@ -1,15 +1,16 @@
-use crate::{
-  commands::helpers::common::Visibility,
-  commands::helpers::database::{self, MessageType},
-  config::EMOJI,
-  data::term::{Term, TermModal},
-  database::DatabaseHandler,
-  Context, Data as AppData, Error as AppError,
-};
-use anyhow::{Context as AnyhowContext, Result};
+use anyhow::{anyhow, Context as AnyhowContext, Result};
 use log::info;
-use poise::serenity_prelude as serenity;
-use poise::Modal;
+use pgvector::Vector;
+use poise::serenity_prelude::GuildId;
+use poise::{ApplicationContext, Context as PoiseContext, CreateReply, Modal};
+use sqlx::{Postgres, Transaction};
+
+use crate::commands::helpers::common::Visibility;
+use crate::commands::helpers::database::{self, MessageType};
+use crate::config::EMOJI;
+use crate::data::term::{Term, TermModal};
+use crate::database::DatabaseHandler;
+use crate::{Context, Data as AppData, Error as AppError};
 
 /// Commands for managing glossary entries
 ///
@@ -26,7 +27,7 @@ use poise::Modal;
   guild_only
 )]
 #[allow(clippy::unused_async)]
-pub async fn terms(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
+pub async fn terms(_: PoiseContext<'_, AppData, AppError>) -> Result<()> {
   Ok(())
 }
 
@@ -35,7 +36,7 @@ pub async fn terms(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
 /// Adds a new term to the glossary.
 #[poise::command(slash_command)]
 async fn add(
-  ctx: poise::ApplicationContext<'_, AppData, AppError>,
+  ctx: ApplicationContext<'_, AppData, AppError>,
   #[description = "The term to add"]
   #[rename = "term"]
   term_name: String,
@@ -45,7 +46,7 @@ async fn add(
       .guild_id()
       .with_context(|| "Failed to retrieve guild ID from context")?;
 
-    let vector = pgvector::Vector::from(
+    let vector = Vector::from(
       ctx
         .data()
         .embeddings
@@ -67,7 +68,7 @@ async fn add(
     {
       ctx
         .send(
-          poise::CreateReply::default()
+          CreateReply::default()
             .content(format!(
               "{} Failed to add term. Please try again.",
               EMOJI.mmx
@@ -75,11 +76,11 @@ async fn add(
             .ephemeral(true),
         )
         .await?;
-      return Err(anyhow::anyhow!("Failed to add term: {e}"));
+      return Err(anyhow!("Failed to add term: {e}"));
     }
 
     database::commit_and_say(
-      poise::Context::Application(ctx),
+      PoiseContext::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Term has been added.", EMOJI.mmcheck)),
       Visibility::Ephemeral,
@@ -95,7 +96,7 @@ async fn add(
 /// Updates an existing term in the glossary.
 #[poise::command(slash_command)]
 async fn edit(
-  ctx: poise::ApplicationContext<'_, AppData, AppError>,
+  ctx: ApplicationContext<'_, AppData, AppError>,
   #[description = "The term to edit"]
   #[rename = "term"]
   term_name: String,
@@ -110,7 +111,7 @@ async fn edit(
     DatabaseHandler::get_term(&mut transaction, &guild_id, term_name.as_str()).await?
   else {
     term_not_found(
-      poise::Context::Application(ctx),
+      PoiseContext::Application(ctx),
       &mut transaction,
       guild_id,
       term_name,
@@ -126,7 +127,7 @@ async fn edit(
     let vector = if term_data.meaning == existing_meaning {
       None
     } else {
-      Some(pgvector::Vector::from(
+      Some(Vector::from(
         ctx
           .data()
           .embeddings
@@ -147,7 +148,7 @@ async fn edit(
     {
       ctx
         .send(
-          poise::CreateReply::default()
+          CreateReply::default()
             .content(format!(
               "{} Failed to edit term. Please try again.",
               EMOJI.mmx
@@ -155,11 +156,11 @@ async fn edit(
             .ephemeral(true),
         )
         .await?;
-      return Err(anyhow::anyhow!("Failed to edit term: {e}"));
+      return Err(anyhow!("Failed to edit term: {e}"));
     }
 
     database::commit_and_say(
-      poise::Context::Application(ctx),
+      PoiseContext::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Term has been edited.", EMOJI.mmcheck)),
       Visibility::Ephemeral,
@@ -188,7 +189,7 @@ async fn remove(
   if !DatabaseHandler::term_exists(&mut transaction, &guild_id, term_name.as_str()).await? {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!("{} Term does not exist.", EMOJI.mminfo))
           .ephemeral(true),
       )
@@ -201,7 +202,7 @@ async fn remove(
   {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!(
             "{} Failed to remove term. Please try again.",
             EMOJI.mmx
@@ -209,7 +210,7 @@ async fn remove(
           .ephemeral(true),
       )
       .await?;
-    return Err(anyhow::anyhow!("Failed to remove term: {e}"));
+    return Err(anyhow!("Failed to remove term: {e}"));
   }
 
   database::commit_and_say(
@@ -246,7 +247,7 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
       continue;
     };
 
-    let vector = Some(pgvector::Vector::from(
+    let vector = Some(Vector::from(
       ctx
         .data()
         .embeddings
@@ -285,8 +286,8 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
 /// Otherwise, informs the user that the term does not exist.
 async fn term_not_found(
   ctx: Context<'_>,
-  transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-  guild_id: serenity::GuildId,
+  transaction: &mut Transaction<'_, Postgres>,
+  guild_id: GuildId,
   term_name: String,
 ) -> Result<()> {
   let possible_terms =
@@ -295,7 +296,7 @@ async fn term_not_found(
   if possible_terms.len() > 1 {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!(
             "{} Term does not exist. Did you mean one of these?\n{}",
             EMOJI.mminfo,
@@ -311,7 +312,7 @@ async fn term_not_found(
   } else if let Some(possible_term) = possible_terms.first() {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!(
             "{} Term does not exist. Did you mean `{}`?",
             EMOJI.mminfo, possible_term.name
@@ -322,7 +323,7 @@ async fn term_not_found(
   } else {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!("{} Term does not exist.", EMOJI.mminfo))
           .ephemeral(true),
       )

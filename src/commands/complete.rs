@@ -1,8 +1,9 @@
+use anyhow::Result;
+use poise::serenity_prelude::{ChannelId, CreateMessage};
+
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::Result;
-use poise::serenity_prelude as serenity;
 
 /// Indicate that you have completed a course
 ///
@@ -20,9 +21,7 @@ pub async fn complete(
   ctx: Context<'_>,
   #[description = "The course you have completed"] course_name: String,
 ) -> Result<()> {
-  let data = ctx.data();
-
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let Some(course) =
     DatabaseHandler::get_course_in_dm(&mut transaction, course_name.as_str()).await?
@@ -49,7 +48,12 @@ pub async fn complete(
   }
 
   let Ok(member) = guild_id.member(ctx, ctx.author().id).await else {
-    ctx.say(format!("{} You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.", EMOJI.mminfo)).await?;
+    ctx
+      .say(format!(
+        "{} You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.",
+        EMOJI.mminfo
+      ))
+      .await?;
     return Ok(());
   };
 
@@ -99,10 +103,10 @@ pub async fn complete(
     ))
     .clone();
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::new(CHANNELS.logs);
 
   log_channel
-    .send_message(ctx, serenity::CreateMessage::new().embed(log_embed))
+    .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;
 
   Ok(())

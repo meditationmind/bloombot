@@ -1,3 +1,10 @@
+use std::time::Duration;
+
+use anyhow::{anyhow, Context as AnyhowContext, Result};
+use chrono::{Duration as ChronoDuration, Utc};
+use poise::serenity_prelude::{builder::*, ButtonStyle, ChannelId, ComponentInteractionCollector};
+use poise::CreateReply;
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
@@ -7,10 +14,6 @@ use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::events;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use chrono::Duration;
-use poise::serenity_prelude::{self as serenity, builder::*};
-use poise::CreateReply;
 
 /// Add a meditation entry
 ///
@@ -70,10 +73,10 @@ pub async fn add(
       ctx
           .send(
             CreateReply::default()
-                .content(format!(
-                  "A problem occurred while attempting to determine the UTC offset based on your choice: {e}"
-                ))
-                .ephemeral(true),
+              .content(format!(
+                "A problem occurred while attempting to determine the UTC offset based on your choice: {e}"
+              ))
+              .ephemeral(true),
           )
           .await?;
       return Ok(()); // Return early to avoid further processing
@@ -85,7 +88,7 @@ pub async fn add(
   if offset == 0 {
     DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes, seconds).await?;
   } else {
-    let adjusted_datetime = chrono::Utc::now() + Duration::minutes(i64::from(offset));
+    let adjusted_datetime = Utc::now() + ChronoDuration::minutes(i64::from(offset));
     DatabaseHandler::add_meditation_entry(
       &mut transaction,
       &guild_id,
@@ -127,21 +130,21 @@ pub async fn add(
           .components(vec![CreateActionRow::Buttons(vec![
             CreateButton::new(confirm_id.clone())
               .label("Yes")
-              .style(serenity::ButtonStyle::Success),
+              .style(ButtonStyle::Success),
             CreateButton::new(cancel_id.clone())
               .label("No")
-              .style(serenity::ButtonStyle::Danger),
+              .style(ButtonStyle::Danger),
           ])]),
       )
       .await?;
 
     // Loop through incoming interactions with the navigation buttons
-    while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
+    while let Some(press) = ComponentInteractionCollector::new(ctx)
       // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
       // button was pressed
       .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
       // Timeout when no navigation button has been pressed in one minute
-      .timeout(std::time::Duration::from_secs(60))
+      .timeout(Duration::from_secs(60))
       .await
     {
       // Depending on which button was pressed, go to next or previous page
@@ -154,24 +157,30 @@ pub async fn add(
 
       // Update the message to reflect the action
       match press
-        .create_response(ctx, CreateInteractionResponse::UpdateMessage(
-          {
-              if confirm {
-                if privacy {
-                  CreateInteractionResponseMessage::new().content(format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"))
-                    .ephemeral(privacy)
-                    .components(Vec::new())
-                } else {
-                  CreateInteractionResponseMessage::new().content(&response)
-                    .ephemeral(privacy)
-                    .components(Vec::new())
-                }
+        .create_response(
+          ctx,
+          CreateInteractionResponse::UpdateMessage({
+            if confirm {
+              if privacy {
+                CreateInteractionResponseMessage::new()
+                  .content(format!(
+                    "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+                  ))
+                  .ephemeral(privacy)
+                  .components(Vec::new())
               } else {
-                CreateInteractionResponseMessage::new().content("Cancelled.")
+                CreateInteractionResponseMessage::new()
+                  .content(&response)
                   .ephemeral(privacy)
                   .components(Vec::new())
               }
-            })
+            } else {
+              CreateInteractionResponseMessage::new()
+                .content("Cancelled.")
+                .ephemeral(privacy)
+                .components(Vec::new())
+            }
+          }),
         )
         .await
       {
@@ -183,7 +192,7 @@ pub async fn add(
                 check.edit(ctx, CreateReply::default()
                   .content(format!("{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.", EMOJI.mminfo))
                   .ephemeral(privacy)).await?;
-                return Err(anyhow::anyhow!("Could not send message: {e}"));
+                return Err(anyhow!("Could not send message: {e}"));
               }
             }
           }
@@ -195,7 +204,7 @@ pub async fn add(
                 .ephemeral(privacy)
             )
             .await?;
-          return Err(anyhow::anyhow!("Could not send message: {e}"));
+          return Err(anyhow!("Could not send message: {e}"));
         }
       }
 
@@ -231,7 +240,7 @@ pub async fn add(
           )
           .clone();
 
-        let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+        let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
         log_channel
           .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -254,7 +263,9 @@ pub async fn add(
   let guild_time_in_hours = tracking::get_guild_hours(&mut transaction, &guild_id).await?;
 
   if privacy {
-    let private_response = format!("Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:");
+    let private_response = format!(
+      "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+    );
     database::commit_and_say(
       ctx,
       transaction,

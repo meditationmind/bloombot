@@ -1,15 +1,17 @@
-use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
-use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use chrono::Duration;
-use poise::serenity_prelude::{
-  self as serenity, builder::*, FormattedTimestamp, FormattedTimestampStyle, Mentionable,
-  ScheduledEventStatus,
-};
+use std::time::Duration;
+
+use anyhow::{anyhow, Context as AnyhowContext, Result};
+use chrono::{Duration as ChronoDuration, Utc};
+use poise::serenity_prelude::{builder::*, ButtonStyle, ChannelId, ComponentInteractionCollector};
+use poise::serenity_prelude::{FormattedTimestamp, FormattedTimestampStyle};
+use poise::serenity_prelude::{Mentionable, RoleId, ScheduledEventStatus};
 use poise::CreateReply;
 
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
+use crate::Context;
+
 async fn is_helper(ctx: Context<'_>) -> Result<bool> {
-  let community_sit_helper = serenity::RoleId::from(ROLES.community_sit_helper);
+  let community_sit_helper = RoleId::from(ROLES.community_sit_helper);
   let has_role = match ctx.author_member().await {
     Some(member) => member.roles.contains(&community_sit_helper),
     None => false,
@@ -65,7 +67,7 @@ async fn start(ctx: Context<'_>) -> Result<()> {
   for event in events {
     if event.name.as_str().ends_with("Silent Sit")
       && event.status == ScheduledEventStatus::Scheduled
-      && (event.start_time.to_utc() - chrono::Utc::now()).abs() < Duration::minutes(15)
+      && (event.start_time.to_utc() - Utc::now()).abs() < ChronoDuration::minutes(15)
     {
       let mut embed = BloomBotEmbed::new().description(format!(
         "Starting Event:\n## {}\n{}\n-# Scheduled to begin {}.",
@@ -96,21 +98,21 @@ async fn start(ctx: Context<'_>) -> Result<()> {
             .components(vec![CreateActionRow::Buttons(vec![
               CreateButton::new(confirm_id.clone())
                 .label("Start Event")
-                .style(serenity::ButtonStyle::Success),
+                .style(ButtonStyle::Success),
               CreateButton::new(cancel_id.clone())
                 .label("Cancel")
-                .style(serenity::ButtonStyle::Danger),
+                .style(ButtonStyle::Danger),
             ])]),
         )
         .await?;
 
       // Loop through incoming interactions with the navigation buttons
-      while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
+      while let Some(press) = ComponentInteractionCollector::new(ctx)
         // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
         // button was pressed
         .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
         // Timeout when no navigation button has been pressed in one minute
-        .timeout(std::time::Duration::from_secs(60))
+        .timeout(Duration::from_secs(60))
         .await
       {
         if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
@@ -165,7 +167,7 @@ async fn start(ctx: Context<'_>) -> Result<()> {
                 )
                 .clone();
 
-              let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+              let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
               log_channel
                 .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -258,21 +260,21 @@ async fn end(ctx: Context<'_>) -> Result<()> {
             .components(vec![CreateActionRow::Buttons(vec![
               CreateButton::new(confirm_id.clone())
                 .label("End Event")
-                .style(serenity::ButtonStyle::Success),
+                .style(ButtonStyle::Success),
               CreateButton::new(cancel_id.clone())
                 .label("Cancel")
-                .style(serenity::ButtonStyle::Danger),
+                .style(ButtonStyle::Danger),
             ])]),
         )
         .await?;
 
       // Loop through incoming interactions with the navigation buttons
-      while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
+      while let Some(press) = ComponentInteractionCollector::new(ctx)
         // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
         // button was pressed
         .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
         // Timeout when no navigation button has been pressed in one minute
-        .timeout(std::time::Duration::from_secs(60))
+        .timeout(Duration::from_secs(60))
         .await
       {
         if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
@@ -330,7 +332,7 @@ async fn end(ctx: Context<'_>) -> Result<()> {
                 )
                 .clone();
 
-              let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+              let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
               log_channel
                 .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -339,7 +341,7 @@ async fn end(ctx: Context<'_>) -> Result<()> {
               return Ok(());
             }
             Err(e) => {
-              return Err(anyhow::anyhow!(
+              return Err(anyhow!(
                 "Failed to end \"{}\" due to error: {}",
                 event.name,
                 e

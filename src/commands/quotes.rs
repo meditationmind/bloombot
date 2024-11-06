@@ -1,3 +1,6 @@
+use anyhow::{Context as AnyhowContext, Result};
+use poise::{ApplicationContext, Context as PoiseContext, CreateReply, Modal};
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
@@ -5,8 +8,6 @@ use crate::config::{BloomBotEmbed, EMOJI, ENTRIES_PER_PAGE};
 use crate::data::quote::QuoteModal;
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
-use anyhow::{Context as AnyhowContext, Result};
-use poise::{CreateReply, Modal};
 
 /// Commands for managing quotes
 ///
@@ -25,7 +26,7 @@ use poise::{CreateReply, Modal};
   guild_only
 )]
 #[allow(clippy::unused_async)]
-pub async fn quotes(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
+pub async fn quotes(_: PoiseContext<'_, AppData, AppError>) -> Result<()> {
   Ok(())
 }
 
@@ -33,7 +34,7 @@ pub async fn quotes(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
 ///
 /// Adds a quote to the database.
 #[poise::command(slash_command)]
-async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Result<()> {
+async fn add(ctx: ApplicationContext<'_, AppData, AppError>) -> Result<()> {
   if let Some(quote_data) = QuoteModal::execute(ctx).await? {
     let guild_id = ctx
       .guild_id()
@@ -44,7 +45,7 @@ async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Result<()
     DatabaseHandler::add_quote(&mut transaction, &guild_id, quote_data).await?;
 
     database::commit_and_say(
-      poise::Context::Application(ctx),
+      PoiseContext::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Quote has been added.", EMOJI.mmcheck)),
       Visibility::Ephemeral,
@@ -60,7 +61,7 @@ async fn add(ctx: poise::ApplicationContext<'_, AppData, AppError>) -> Result<()
 /// Edits an existing quote.
 #[poise::command(slash_command)]
 async fn edit(
-  ctx: poise::ApplicationContext<'_, AppData, AppError>,
+  ctx: ApplicationContext<'_, AppData, AppError>,
   #[description = "ID of the quote to edit"]
   #[rename = "id"]
   quote_id: String,
@@ -82,7 +83,7 @@ async fn edit(
       DatabaseHandler::update_quote(&mut transaction, quote_data.into_quote(quote_id)).await?;
 
       database::commit_and_say(
-        poise::Context::Application(ctx),
+        PoiseContext::Application(ctx),
         transaction,
         MessageType::TextOnly(format!("{} Quote has been edited.", EMOJI.mmcheck)),
         Visibility::Ephemeral,
@@ -244,7 +245,7 @@ async fn show(
         quote.author.unwrap_or("Anonymous".to_string())
       ));
 
-      ctx.send(poise::CreateReply::default().embed(embed)).await?;
+      ctx.send(CreateReply::default().embed(embed)).await?;
     }
   }
 

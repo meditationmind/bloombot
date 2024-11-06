@@ -1,3 +1,8 @@
+use anyhow::{Context as AnyhowContext, Result};
+use poise::serenity_prelude::Message;
+use poise::Context as PoiseContext;
+use poise::{ApplicationContext, CreateReply, Modal};
+
 use crate::commands::helpers::common::{self, Visibility};
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
@@ -5,9 +10,6 @@ use crate::config::{EMOJI, ENTRIES_PER_PAGE};
 use crate::data::bookmark::Bookmark;
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
-use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude as serenity;
-use poise::{CreateReply, Modal};
 
 #[derive(Debug, Modal)]
 #[name = "Add to Bookmarks"]
@@ -30,15 +32,15 @@ struct AddBookmarkModal {
   guild_only
 )]
 pub async fn add_bookmark(
-  ctx: poise::ApplicationContext<'_, AppData, AppError>,
-  #[description = "Message to bookmark"] message: serenity::Message,
+  ctx: ApplicationContext<'_, AppData, AppError>,
+  #[description = "Message to bookmark"] message: Message,
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let supporter = common::is_supporter(poise::Context::Application(ctx)).await?;
+  let supporter = common::is_supporter(PoiseContext::Application(ctx)).await?;
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let bookmark_count =
@@ -48,7 +50,10 @@ pub async fn add_bookmark(
     ctx
       .send(
         CreateReply::default()
-          .content(format!("{} Sorry, you've reached the bookmark limit. Please remove one and try again.\n-# Subscription-based supporters can add unlimited bookmarks. [Learn more.](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>)", EMOJI.mminfo))
+          .content(format!(
+            "{} Sorry, you've reached the bookmark limit. Please remove one and try again.\n-# Subscription-based supporters can add unlimited bookmarks. [Learn more.](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>)",
+            EMOJI.mminfo
+          ))
           .ephemeral(true),
       )
       .await?;
@@ -61,7 +66,7 @@ pub async fn add_bookmark(
     DatabaseHandler::add_bookmark(&mut transaction, &new_bookmark).await?;
 
     database::commit_and_say(
-      poise::Context::Application(ctx),
+      PoiseContext::Application(ctx),
       transaction,
       MessageType::TextOnly(format!("{} Bookmark has been added.", EMOJI.mmcheck)),
       Visibility::Ephemeral,
@@ -83,7 +88,7 @@ pub async fn add_bookmark(
   guild_only
 )]
 #[allow(clippy::unused_async)]
-pub async fn bookmark(_: poise::Context<'_, AppData, AppError>) -> Result<()> {
+pub async fn bookmark(_: PoiseContext<'_, AppData, AppError>) -> Result<()> {
   Ok(())
 }
 
@@ -123,7 +128,7 @@ async fn list(
 #[poise::command(slash_command)]
 async fn add(
   ctx: Context<'_>,
-  #[description = "Message to bookmark (message link)"] message: serenity::Message,
+  #[description = "Message to bookmark (message link)"] message: Message,
   #[max_length = 100]
   #[description = "Include a short description (optional)"]
   description: Option<String>,
@@ -143,7 +148,10 @@ async fn add(
     ctx
       .send(
         CreateReply::default()
-          .content(format!("{} Sorry, you've reached the bookmark limit. Please remove one and try again.\n-# Subscription-based supporters can add unlimited bookmarks. [Learn more.](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>)", EMOJI.mminfo))
+          .content(format!(
+            "{} Sorry, you've reached the bookmark limit. Please remove one and try again.\n-# Subscription-based supporters can add unlimited bookmarks. [Learn more.](<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>)",
+            EMOJI.mminfo
+          ))
           .ephemeral(true),
       )
       .await?;

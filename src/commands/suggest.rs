@@ -1,7 +1,9 @@
+use anyhow::Result;
+use poise::serenity_prelude::{builder::*, AutoArchiveDuration, ChannelId, ChannelType};
+use poise::CreateReply;
+
 use crate::config::{BloomBotEmbed, CHANNELS};
 use crate::Context;
-use anyhow::Result;
-use poise::serenity_prelude::{self as serenity, builder::*};
 
 /// Submit an anonymous server suggestion
 ///
@@ -29,14 +31,14 @@ pub async fn suggest(
     )))
     .clone();
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::new(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;
 
   // Post suggestion and reactions
-  let channel_id = serenity::ChannelId::new(CHANNELS.suggestion);
+  let channel_id = ChannelId::new(CHANNELS.suggestion);
 
   let suggestion_message = channel_id
     .send_message(
@@ -63,14 +65,14 @@ pub async fn suggest(
           format!("Discussion: {suggestion}")
         }
       })
-      .kind(serenity::ChannelType::PublicThread)
-      .auto_archive_duration(serenity::AutoArchiveDuration::OneWeek),
+      .kind(ChannelType::PublicThread)
+      .auto_archive_duration(AutoArchiveDuration::OneWeek),
     )
     .await?;
 
   ctx
     .send(
-      poise::CreateReply::default()
+      CreateReply::default()
         .content(format!(
           "Your suggestion has been added to <#{channel_id}>."
         ))

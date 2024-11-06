@@ -1,16 +1,17 @@
 #![allow(clippy::cast_precision_loss)]
 
+use anyhow::{Context as AnyhowContext, Result};
+use chrono::{Datelike, Timelike, Utc};
+use poise::serenity_prelude::{builder::*, RoleId};
+use poise::{ChoiceParameter, CreateReply};
+
 use crate::commands::helpers::time::ChallengeTimeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::tracking_profile::{Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use chrono::{Datelike, Timelike, Utc};
-use poise::serenity_prelude::{self as serenity, builder::*};
-use poise::CreateReply;
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum ChallengeChoices {
   #[name = "Monthly Challenge"]
   Monthly,
@@ -68,11 +69,13 @@ async fn join(
 
         member.add_role(ctx, ROLES.meditation_challenger).await?;
 
-        ctx.say(format!(
-    "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
-    member.user.id,
-    chrono::Utc::now().format("%B"),
-    )).await?;
+        ctx
+          .say(format!(
+            "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
+            member.user.id,
+            Utc::now().format("%B"),
+          ))
+          .await?;
 
         return Ok(());
       }
@@ -128,11 +131,13 @@ async fn join(
 
   member.add_role(ctx, ROLES.meditation_challenger).await?;
 
-  ctx.say(format!(
-    "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
-    member.user.id,
-    chrono::Utc::now().format("%B"),
-    )).await?;
+  ctx
+    .say(format!(
+      "Challenge accepted! You're awesome, <@{}>! Now commit to practicing consistently throughout the month of {} and `/add` your times in this channel. You can use <#534702592245235733> and <#465656096929873942> for extra accountability. Let's do this!",
+      member.user.id,
+      Utc::now().format("%B"),
+    ))
+    .await?;
 
   Ok(())
 }
@@ -173,9 +178,12 @@ async fn leave(
         }
 
         ctx
-          .send(CreateReply::default()
-          .content("You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.")
-          .ephemeral(true)
+          .send(
+            CreateReply::default()
+              .content(
+                "You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.",
+              )
+              .ephemeral(true),
           )
           .await?;
 
@@ -202,9 +210,12 @@ async fn leave(
         }
 
         ctx
-          .send(CreateReply::default()
-          .content("You're not currently participating in the 365-day challenge. If you want to join, use `/challenge join`.")
-          .ephemeral(true)
+          .send(
+            CreateReply::default()
+              .content(
+                "You're not currently participating in the 365-day challenge. If you want to join, use `/challenge join`.",
+              )
+              .ephemeral(true),
           )
           .await?;
 
@@ -232,9 +243,12 @@ async fn leave(
   }
 
   ctx
-    .send(CreateReply::default()
-    .content("You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.")
-    .ephemeral(true)
+    .send(
+      CreateReply::default()
+        .content(
+          "You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.",
+        )
+        .ephemeral(true),
     )
     .await?;
 
@@ -264,7 +278,7 @@ async fn stats(
   if timeframe == ChallengeTimeframe::YearRound {
     if member
       .roles
-      .contains(&serenity::RoleId::from(ROLES.meditation_challenger_365))
+      .contains(&RoleId::from(ROLES.meditation_challenger_365))
     {
       let member_nick_or_name = match &member.nick {
         Some(nick) => nick.clone(),
@@ -362,7 +376,9 @@ async fn stats(
         .author(CreateEmbedAuthor::new(member_nick_or_name).icon_url(member.user.face()))
         .field(
           "Time",
-          format!("```yml\nChallenge Total: {total_h}{total_m}{total_s}\nAverage Per Day: {avg_h}{avg_m}{avg_s}```"),
+          format!(
+            "```yml\nChallenge Total: {total_h}{total_m}{total_s}\nAverage Per Day: {avg_h}{avg_m}{avg_s}```"
+          ),
           false,
         )
         .field(
@@ -370,7 +386,8 @@ async fn stats(
           format!(
             "```yml\nChallenge Total: {}\nAverage Per Day: {:.2}```",
             stats.timeframe_stats.count.unwrap_or(0),
-            ((stats.timeframe_stats.count.unwrap_or(0) as f64 / days as f64) * 100.0).round() / 100.0
+            ((stats.timeframe_stats.count.unwrap_or(0) as f64 / days as f64) * 100.0).round()
+              / 100.0
           ),
           false,
         );
@@ -400,11 +417,14 @@ async fn stats(
       return Ok(());
     }
     ctx
-          .send(CreateReply::default()
-          .content("You're not currently participating in the 365-day challenge. If you want to join, use `/challenge join`.")
-          .ephemeral(true)
+      .send(
+        CreateReply::default()
+          .content(
+            "You're not currently participating in the 365-day challenge. If you want to join, use `/challenge join`.",
           )
-          .await?;
+          .ephemeral(true),
+      )
+      .await?;
 
     return Ok(());
   }
@@ -412,7 +432,7 @@ async fn stats(
   // Defaults to monthly
   if member
     .roles
-    .contains(&serenity::RoleId::from(ROLES.meditation_challenger))
+    .contains(&RoleId::from(ROLES.meditation_challenger))
   {
     let member_nick_or_name = match &member.nick {
       Some(nick) => nick.clone(),
@@ -508,7 +528,9 @@ async fn stats(
       .author(CreateEmbedAuthor::new(member_nick_or_name).icon_url(member.user.face()))
       .field(
         "Time",
-        format!("```yml\nChallenge Total: {total_h}{total_m}{total_s}\nAverage Per Day: {avg_h}{avg_m}{avg_s}```"),
+        format!(
+          "```yml\nChallenge Total: {total_h}{total_m}{total_s}\nAverage Per Day: {avg_h}{avg_m}{avg_s}```"
+        ),
         false,
       )
       .field(
@@ -521,9 +543,9 @@ async fn stats(
         false,
       );
 
-    // Hide streaks if streaks disabled
+    // Hide streaks if streaks disabled.
     if tracking_profile.streak.status == Status::Enabled
-      // Hide streaks if streak set to private, unless own stats in ephemeral
+      // Hide streaks if streak set to private, unless own stats in ephemeral.
       && (tracking_profile.streak.privacy == Privacy::Public || tracking_profile.stats.privacy == Privacy::Private)
     {
       embed = embed.field(
@@ -547,9 +569,12 @@ async fn stats(
   }
 
   ctx
-    .send(CreateReply::default()
-    .content("You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.")
-    .ephemeral(true)
+    .send(
+      CreateReply::default()
+        .content(
+          "You're not currently participating in the monthly challenge. If you want to join, use `/challenge join`.",
+        )
+        .ephemeral(true),
     )
     .await?;
 

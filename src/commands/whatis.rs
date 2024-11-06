@@ -1,8 +1,10 @@
+use anyhow::{Context as AnyhowContext, Result};
+use poise::serenity_prelude::CreateEmbedFooter;
+use poise::CreateReply;
+
 use crate::config::BloomBotEmbed;
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::CreateEmbedFooter;
 
 /// See information about a term
 ///
@@ -61,14 +63,12 @@ pub async fn whatis(
         term, possible_term.name,
       )));
     } else if possible_terms.is_empty() {
-      embed = embed
-          .title("Term not found")
-          .description(format!(
-            "The term `{term}` was not found in the glossary. If you believe it should be included, use </glossary suggest:1135659962308243479> to suggest it for addition."
-          ));
+      embed = embed.title("Term not found").description(format!(
+        "The term `{term}` was not found in the glossary. If you believe it should be included, use </glossary suggest:1135659962308243479> to suggest it for addition."
+      ));
 
       ctx
-        .send(poise::CreateReply::default().embed(embed).ephemeral(true))
+        .send(CreateReply::default().embed(embed).ephemeral(true))
         .await?;
 
       return Ok(());
@@ -78,30 +78,32 @@ pub async fn whatis(
         .description(format!("The term `{term}` was not found in the glossary."));
 
       embed = embed.field(
-          "Did you mean one of these?",
-          {
-            let mut field = String::new();
+        "Did you mean one of these?",
+        {
+          let mut field = String::new();
 
-            for possible_term in possible_terms.iter().take(3) {
-              field.push_str(&format!("`{}`\n", possible_term.name));
-            }
+          for possible_term in possible_terms.iter().take(3) {
+            field.push_str(&format!("`{}`\n", possible_term.name));
+          }
 
-            field.push_str("\n\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search, or use </glossary suggest:1135659962308243479> to suggest the term for addition to the glossary.*");
+          field.push_str(
+            "\n\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search, or use </glossary suggest:1135659962308243479> to suggest the term for addition to the glossary.*",
+          );
 
-            field
-          },
-          false,
-        );
+          field
+        },
+        false,
+      );
 
       ctx
-        .send(poise::CreateReply::default().embed(embed).ephemeral(true))
+        .send(CreateReply::default().embed(embed).ephemeral(true))
         .await?;
 
       return Ok(());
     }
   }
 
-  ctx.send(poise::CreateReply::default().embed(embed)).await?;
+  ctx.send(CreateReply::default().embed(embed)).await?;
 
   Ok(())
 }

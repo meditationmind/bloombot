@@ -1,3 +1,15 @@
+use std::str::FromStr;
+
+use anyhow::{anyhow, Context as AnyhowContext, Result};
+use chrono::{DateTime, Duration, NaiveDateTime, TimeDelta, Utc};
+use csv::{Reader, ReaderBuilder, WriterBuilder};
+use log::info;
+use poise::serenity_prelude::{builder::*, ChannelId, Message, RoleId, User, UserId};
+use poise::{ChoiceParameter, CreateReply};
+use serde::{Deserialize, Serialize};
+use tokio::{fs, fs::File, io::AsyncWriteExt};
+use ulid::Ulid;
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::tracking;
@@ -6,14 +18,6 @@ use crate::data::meditation::Meditation;
 use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use chrono::{TimeDelta, Utc};
-use log::info;
-use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, RoleId, UserId};
-use poise::CreateReply;
-use serde::{Deserialize, Serialize};
-use tokio::io::AsyncWriteExt;
-use ulid::Ulid;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -54,7 +58,7 @@ struct AppleHealthRecord {
   #[serde(rename = "App Name")]
   app_name: String,
   #[serde(rename = "Start Time")]
-  occurred_at: chrono::DateTime<Utc>,
+  occurred_at: DateTime<Utc>,
   #[serde(rename = "Minutes")]
   meditation_minutes: i32,
   #[serde(rename = "Seconds")]
@@ -98,12 +102,12 @@ struct FinchBreathingSession {
 #[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct BloomRecord {
-  occurred_at: chrono::DateTime<Utc>,
+  occurred_at: DateTime<Utc>,
   meditation_minutes: i32,
   meditation_seconds: i32,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum ImportSource {
   #[name = "Apple Health"]
   AppleHealth,
@@ -120,7 +124,7 @@ enum ImportSource {
   Unknown,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum ImportType {
   #[name = "new entries"]
   NewEntries,
@@ -128,7 +132,7 @@ enum ImportType {
   AllEntries,
 }
 
-fn autodetect_source(rdr: &mut csv::Reader<&[u8]>) -> Result<ImportSource> {
+fn autodetect_source(rdr: &mut Reader<&[u8]>) -> Result<ImportSource> {
   let headers = rdr.headers()?;
   if headers == vec!["App Name", "Start Time", "Minutes", "Seconds"] {
     return Ok(ImportSource::AppleHealth);
@@ -165,7 +169,7 @@ fn process_finch_timer(content: &Vec<u8>) -> Result<Vec<u8>> {
   for record in records.data {
     entries.push(record);
   }
-  let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+  let mut wtr = WriterBuilder::new().from_writer(vec![]);
   for entry in entries {
     wtr.serialize(entry)?;
   }
@@ -180,7 +184,7 @@ fn process_finch_breathing(content: &Vec<u8>) -> Result<Vec<u8>> {
   for record in records.data {
     entries.push(record);
   }
-  let mut wtr = csv::WriterBuilder::new().from_writer(vec![]);
+  let mut wtr = WriterBuilder::new().from_writer(vec![]);
   for entry in entries {
     wtr.serialize(entry)?;
   }
@@ -197,11 +201,11 @@ fn process_finch_breathing(content: &Vec<u8>) -> Result<Vec<u8>> {
 #[poise::command(slash_command, category = "Meditation Tracking")]
 pub async fn import(
   ctx: Context<'_>,
-  #[description = "The message with the CSV/JSON file"] message: serenity::Message,
+  #[description = "The message with the CSV/JSON file"] message: Message,
   #[description = "The type of import (Defaults to new entries)"]
   #[rename = "type"]
   import_type: Option<ImportType>,
-  #[description = "The user to import for (staff only)"] user: Option<serenity::User>,
+  #[description = "The user to import for (staff only)"] user: Option<User>,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
@@ -217,7 +221,6 @@ pub async fn import(
     return Ok(());
   }
 
-  let data = ctx.data();
   let dm = ctx.guild_id().is_none();
   let guild_id = ctx.guild_id().unwrap_or(MEDITATION_MIND);
 
@@ -272,7 +275,7 @@ pub async fn import(
     return Ok(());
   }
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let tracking_profile =
     DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id)
@@ -326,7 +329,7 @@ pub async fn import(
   let mut import_source = String::new();
   let latest_meditation_time = match &latest_meditation {
     Some(entry) => entry.occurred_at,
-    None => chrono::DateTime::UNIX_EPOCH,
+    None => DateTime::UNIX_EPOCH,
   };
   let new_entries_only = match import_type {
     ImportType::AllEntries => false,
@@ -338,13 +341,13 @@ pub async fn import(
       user_id: UserId::default(),
       minutes: 0,
       seconds: 0,
-      occurred_at: chrono::DateTime::UNIX_EPOCH,
+      occurred_at: DateTime::UNIX_EPOCH,
     })]
   } else {
     DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &user_id).await?
   };
 
-  let mut rdr = csv::ReaderBuilder::new().from_reader(content.as_slice());
+  let mut rdr = ReaderBuilder::new().from_reader(content.as_slice());
 
   match autodetect_source(&mut rdr) {
     Ok(ImportSource::AppleHealth) => {
@@ -388,10 +391,10 @@ pub async fn import(
       'result: for result in rdr.deserialize::<FinchBreathingSessionRecord>().flatten() {
         if !result.completed_time.is_empty() {
           if let Ok(valid_starttime) =
-            chrono::NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
+            NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
           {
-            let datetime_utc = valid_starttime.and_utc()
-              - chrono::Duration::minutes(i64::from(tracking_profile.utc_offset));
+            let datetime_utc =
+              valid_starttime.and_utc() - Duration::minutes(i64::from(tracking_profile.utc_offset));
             if new_entries_only && datetime_utc.le(&latest_meditation_time) {
               continue;
             }
@@ -427,16 +430,16 @@ pub async fn import(
       'result: for result in rdr.deserialize::<FinchTimerSessionRecord>().flatten() {
         if result.timer_type == 0 {
           if let Ok(valid_starttime) =
-            chrono::NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
+            NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
           {
-            let datetime_utc = valid_starttime.and_utc()
-              - chrono::Duration::minutes(i64::from(tracking_profile.utc_offset));
+            let datetime_utc =
+              valid_starttime.and_utc() - Duration::minutes(i64::from(tracking_profile.utc_offset));
             if new_entries_only && datetime_utc.le(&latest_meditation_time) {
               continue;
             }
             #[allow(clippy::cast_possible_truncation)]
             let (minutes, seconds) = if let Ok(valid_endtime) =
-              chrono::NaiveDateTime::parse_from_str(&result.completed_time, "%a, %d %b %Y %H:%M:%S")
+              NaiveDateTime::parse_from_str(&result.completed_time, "%a, %d %b %Y %H:%M:%S")
             {
               let num_seconds = (valid_endtime - valid_starttime).num_seconds() as i32;
               (num_seconds / 60, num_seconds % 60)
@@ -477,7 +480,7 @@ pub async fn import(
           || result.activity == "瞑想"
         {
           if let Ok(valid_datetime) =
-            chrono::NaiveDateTime::parse_from_str(&result.start_time, "%m/%d/%Y %H:%M:%S")
+            NaiveDateTime::parse_from_str(&result.start_time, "%m/%d/%Y %H:%M:%S")
           {
             let datetime_utc = valid_datetime.and_utc();
             if new_entries_only && datetime_utc.le(&latest_meditation_time) {
@@ -485,9 +488,9 @@ pub async fn import(
             }
             let (minutes, seconds) = {
               let h_m_s: Vec<&str> = result.duration.split(':').collect();
-              let hours = <i32 as std::str::FromStr>::from_str(h_m_s[0])?;
-              let minutes = <i32 as std::str::FromStr>::from_str(h_m_s[1])?;
-              let seconds = <i32 as std::str::FromStr>::from_str(h_m_s[2])?;
+              let hours = <i32 as FromStr>::from_str(h_m_s[0])?;
+              let minutes = <i32 as FromStr>::from_str(h_m_s[1])?;
+              let seconds = <i32 as FromStr>::from_str(h_m_s[2])?;
               ((hours * 60) + minutes, seconds)
             };
             for entry in &current_data {
@@ -517,7 +520,7 @@ pub async fn import(
     Ok(ImportSource::MindfulnessCoach) => {
       for result in rdr.deserialize() {
         let row: MindfulnessCoachRecord = result?;
-        if let Ok(valid_datetime) = chrono::NaiveDateTime::parse_from_str(
+        if let Ok(valid_datetime) = NaiveDateTime::parse_from_str(
           format!("{} 00:00:00", &row.date).as_str(),
           "%Y-%m-%d %H:%M:%S",
         ) {
@@ -526,7 +529,7 @@ pub async fn import(
             continue;
           }
           if let Some(duration) = row.duration.split_whitespace().next() {
-            let minutes = <i32 as std::str::FromStr>::from_str(duration)?;
+            let minutes = <i32 as FromStr>::from_str(duration)?;
             total_minutes += minutes;
             user_data.push(BloomRecord {
               occurred_at: datetime_utc,
@@ -544,7 +547,7 @@ pub async fn import(
     Ok(ImportSource::WakingUp) => {
       for result in rdr.deserialize() {
         let row: WakingUpRecord = result?;
-        if let Ok(valid_datetime) = chrono::NaiveDateTime::parse_from_str(
+        if let Ok(valid_datetime) = NaiveDateTime::parse_from_str(
           format!("{} 00:00:00", &row.date).as_str(),
           "%m/%d/%Y %H:%M:%S",
         ) {
@@ -552,8 +555,8 @@ pub async fn import(
           if new_entries_only && datetime_utc.le(&latest_meditation_time) {
             continue;
           }
-          let minutes = <i32 as std::str::FromStr>::from_str(&row.duration)? / 60;
-          let seconds = <i32 as std::str::FromStr>::from_str(&row.duration)? % 60;
+          let minutes = <i32 as FromStr>::from_str(&row.duration)? / 60;
+          let seconds = <i32 as FromStr>::from_str(&row.duration)? % 60;
           total_minutes += minutes;
           total_seconds += seconds;
           user_data.push(BloomRecord {
@@ -572,7 +575,10 @@ pub async fn import(
       ctx
         .send(
           CreateReply::default()
-            .content(format!("{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser). If you would like support for another format, please contact staff.", EMOJI.mminfo))
+            .content(format!(
+              "{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires please contact staff.",
+              EMOJI.mminfo
+            ))
             .ephemeral(true),
         )
         .await?;
@@ -590,7 +596,10 @@ pub async fn import(
       ctx
         .send(
           CreateReply::default()
-            .content(format!("{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser). If you would like support for another format, please contact staff.", EMOJI.mminfo))
+            .content(format!(
+              "{} **Unrecognized file format.**\n-# Please use an unaltered data export. Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser). If you would like support for another format, please contact staff.",
+              EMOJI.mminfo
+            ))
             .ephemeral(true),
         )
         .await?;
@@ -729,10 +738,10 @@ pub async fn import(
   }
 
   let filename = format!("import_{}_{}.txt", user_id, Ulid::new().to_string());
-  let mut file = tokio::fs::File::create(&filename).await?;
+  let mut file = File::create(&filename).await?;
   file.write_all(reversal_query.as_bytes()).await?;
   file.flush().await?;
-  let f1 = tokio::fs::File::open(&filename).await?;
+  let f1 = File::open(&filename).await?;
   let return_file = [CreateAttachment::file(&f1, &filename).await?];
 
   let log_embed = BloomBotEmbed::new()
@@ -749,13 +758,13 @@ pub async fn import(
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     )
     .clone();
-  let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
   log_channel
     .send_files(&ctx, return_file, CreateMessage::new().embed(log_embed))
     .await?;
 
-  if let Err(e) = tokio::fs::remove_file(filename).await {
-    return Err(anyhow::anyhow!("Error removing file: {:?}", e));
+  if let Err(e) = fs::remove_file(filename).await {
+    return Err(anyhow!("Error removing file: {:?}", e));
   }
 
   Ok(())

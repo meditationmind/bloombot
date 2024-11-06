@@ -1,5 +1,6 @@
-use crate::Context;
 use anyhow::Result;
+
+use crate::Context;
 
 /// Say hello to Bloom!
 ///

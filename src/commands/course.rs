@@ -1,10 +1,11 @@
+use anyhow::{anyhow, Context as AnyhowContext, Result};
+use poise::serenity_prelude::{builder::*, ChannelId};
+use poise::CreateReply;
+
 use crate::commands::helpers::courses;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*};
-use poise::CreateReply;
 
 /// Manage your course enrollments
 ///
@@ -85,7 +86,7 @@ async fn join(
   if let Err(e) = member.add_role(ctx, course.participant_role).await {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!(
             "{} Failed to add the course role. Please try again or contact staff for assistance.",
             EMOJI.mminfo
@@ -93,7 +94,7 @@ async fn join(
           .ephemeral(true),
       )
       .await?;
-    return Err(anyhow::anyhow!("Failed to add course role: {e}"));
+    return Err(anyhow!("Failed to add course role: {e}"));
   }
 
   // Add course-specific embeds when more courses are added
@@ -102,14 +103,14 @@ async fn join(
       .title("Thank you for joining the Mindfulness Course!")
       .description(
         "You have two options for accessing the course materials.\
-      \n\n\
-      - If you prefer the Discord environment, you can access the full course directly from the \
-      Meditation Mind server: <#1257709248847155240>\n\
-      - If you prefer an online course platform, you may enroll and begin your journey on \
-      Thinkific: [Getting Started with Mindfulness](<https://meditation-mind.thinkific.com/courses/mindfulness>)\
-      \n\n\
-      If you decide you would like to opt out of the course-specific channels at a later time, \
-      just use the `/course leave` command.\n\nWe hope you find the course helpful!",
+        \n\n\
+        - If you prefer the Discord environment, you can access the full course directly from \
+        the Meditation Mind server: <#1257709248847155240>\n- If you prefer an online course \
+        platform, you may enroll and begin your journey on Thinkific: [Getting Started with \
+        Mindfulness](<https://meditation-mind.thinkific.com/courses/mindfulness>)\
+        \n\n\
+        If you decide you would like to opt out of the course-specific channels at a later time, \
+        just use the `/course leave` command.\n\nWe hope you find the course helpful!",
       )
       .image("https://meditationmind.org/wp-content/uploads/2022/01/Meditation_CHallenge_kopie.png")
   } else {
@@ -128,7 +129,7 @@ async fn join(
       ctx.author().id
     ));
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::new(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -187,7 +188,7 @@ async fn leave(
   if let Err(e) = member.remove_role(ctx, course.participant_role).await {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!(
             "{} Failed to remove the course role. Please try again or contact staff for assistance.",
             EMOJI.mminfo
@@ -195,7 +196,7 @@ async fn leave(
           .ephemeral(true),
       )
       .await?;
-    return Err(anyhow::anyhow!("Failed to remove course role: {e}"));
+    return Err(anyhow!("Failed to remove course role: {e}"));
   }
 
   // Adjust when new courses are added
@@ -223,7 +224,7 @@ async fn leave(
       ctx.author().id
     ));
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::new(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))

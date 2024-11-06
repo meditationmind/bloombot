@@ -1,8 +1,10 @@
+use anyhow::{Context as AnyhowContext, Result};
+use poise::CreateReply;
+
 use crate::commands::helpers::common;
 use crate::config::{BloomBotEmbed, EMOJI};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
 
 /// Get a meditation/mindfulness quote
 ///
@@ -36,13 +38,13 @@ pub async fn quote(
           quote.author.unwrap_or("Anonymous".to_string())
         ));
 
-        ctx.send(poise::CreateReply::default().embed(embed)).await?;
+        ctx.send(CreateReply::default().embed(embed)).await?;
 
         return Ok(());
       }
       ctx
         .send(
-          poise::CreateReply::default()
+          CreateReply::default()
             .content("No quotes found. Fetching random quote.")
             .ephemeral(true),
         )
@@ -51,7 +53,7 @@ pub async fn quote(
 
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!(
             "{} The keyword option is only available to [subscription-based donators]\
             (<https://discord.com/channels/244917432383176705/1030424719138246667/1031137243345211413>).",
@@ -73,7 +75,7 @@ pub async fn quote(
         quote.author.unwrap_or("Anonymous".to_string())
       ));
 
-      ctx.send(poise::CreateReply::default().embed(embed)).await?;
+      ctx.send(CreateReply::default().embed(embed)).await?;
     }
   }
 

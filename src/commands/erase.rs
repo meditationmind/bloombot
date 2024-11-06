@@ -1,3 +1,13 @@
+use std::time::Duration;
+
+use anyhow::{anyhow, Context as AnyhowContext, Result};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use poise::serenity_prelude::{builder::*, ChannelId, ChannelType, ComponentInteractionCollector};
+use poise::serenity_prelude::{ComponentInteractionDataKind, CreateQuickModal, InputTextStyle};
+use poise::serenity_prelude::{Message, User};
+use poise::{ApplicationContext, ChoiceParameter, Context as PoiseContext, CreateReply};
+use sqlx::{Postgres, Transaction};
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
@@ -5,11 +15,8 @@ use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::data::erase::Erase;
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
-use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{self as serenity, builder::*, ChannelId, CreateQuickModal};
-use poise::{ChoiceParameter, CreateReply};
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum DateFormat {
   #[name = "YYYY-MM-DD (ISO 8601)"]
   Ymd,
@@ -17,7 +24,7 @@ enum DateFormat {
   Dmy,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum DefaultReasons {
   #[name = "Rule 1: Be kind"]
   Rule1BeKind,
@@ -157,8 +164,8 @@ impl DefaultReasons {
   guild_only
 )]
 pub async fn erase_message(
-  ctx: poise::ApplicationContext<'_, AppData, AppError>,
-  #[description = "The message to delete"] message: serenity::Message,
+  ctx: ApplicationContext<'_, AppData, AppError>,
+  #[description = "The message to delete"] message: Message,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
   let ctx_id = ctx.id();
@@ -183,7 +190,7 @@ pub async fn erase_message(
       CreateSelectMenuOption::new(DefaultReasons::None.name(), "None"),
       CreateSelectMenuOption::new("Cancel erase", "cancel"),
     ];
-    let default_reason_dropdown = vec![serenity::CreateActionRow::SelectMenu(
+    let default_reason_dropdown = vec![CreateActionRow::SelectMenu(
       CreateSelectMenu::new(
         format!("{ctx_id}"),
         CreateSelectMenuKind::String { options },
@@ -198,16 +205,16 @@ pub async fn erase_message(
 
   let msg = ctx.send(reply).await?;
 
-  while let Some(mci) = serenity::ComponentInteractionCollector::new(ctx)
+  while let Some(mci) = ComponentInteractionCollector::new(ctx)
     .author_id(ctx.author().id)
     .channel_id(ctx.channel_id())
-    .timeout(std::time::Duration::from_secs(60))
+    .timeout(Duration::from_secs(60))
     .filter(move |mci| mci.data.custom_id == ctx_id.to_string())
     .await
   {
     let choice = match &mci.data.kind {
-      serenity::ComponentInteractionDataKind::StringSelect { values } => &values[0],
-      _ => return Err(anyhow::anyhow!("Unexpected interaction data kind")),
+      ComponentInteractionDataKind::StringSelect { values } => &values[0],
+      _ => return Err(anyhow!("Unexpected interaction data kind")),
     };
 
     if choice == "cancel" {
@@ -231,9 +238,9 @@ pub async fn erase_message(
         .quick_modal(
           ctx.serenity_context,
           CreateQuickModal::new("Erase Message")
-            .timeout(std::time::Duration::from_secs(600))
+            .timeout(Duration::from_secs(600))
             .field(
-              CreateInputText::new(serenity::InputTextStyle::Paragraph, "Reason", "")
+              CreateInputText::new(InputTextStyle::Paragraph, "Reason", "")
                 .max_length(512)
                 .placeholder("The reason for deleting the message"),
             ),
@@ -282,7 +289,7 @@ pub async fn erase_message(
     let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
     let dm_embed = erase_and_log(
-      poise::Context::Application(ctx),
+      PoiseContext::Application(ctx),
       &mut transaction,
       &message,
       reason,
@@ -307,12 +314,12 @@ pub async fn erase_message(
       mci.create_response(ctx, response).await?;
     }
 
-    notify_user(poise::Context::Application(ctx), &message, dm_embed).await?;
+    notify_user(PoiseContext::Application(ctx), &message, dm_embed).await?;
   }
 
   msg
     .edit(
-      poise::Context::Application(ctx),
+      PoiseContext::Application(ctx),
       CreateReply::default()
         .content(format!("{} Erase cancelled.", EMOJI.mminfo))
         .components(Vec::new())
@@ -347,7 +354,7 @@ pub async fn erase(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 async fn message(
   ctx: Context<'_>,
-  #[description = "The message to delete"] message: serenity::Message,
+  #[description = "The message to delete"] message: Message,
   #[max_length = 512] // Max length for audit log reason
   #[description = "The reason for deleting the message"]
   reason: Option<String>,
@@ -383,7 +390,7 @@ async fn message(
 #[poise::command(slash_command)]
 async fn list(
   ctx: Context<'_>,
-  #[description = "The user to show erase data for"] user: serenity::User,
+  #[description = "The user to show erase data for"] user: User,
   #[description = "The page to show"] page: Option<usize>,
   #[description = "Date format (Defaults to YYYY-MM-DD)"] date_format: Option<DateFormat>,
 ) -> Result<()> {
@@ -430,27 +437,27 @@ async fn list(
 #[poise::command(slash_command)]
 async fn populate(
   ctx: Context<'_>,
-  #[description = "The user to populate erase data for"] user: serenity::User,
+  #[description = "The user to populate erase data for"] user: User,
   #[description = "The link for the erase notification message"] message_link: String,
   #[description = "The reason for the erasure"] reason: Option<String>,
   #[description = "Choose a predefined default reason"] default_reason: Option<DefaultReasons>,
   #[description = "The date of the erasure (YYYY-MM-DD)"]
   #[rename = "date"]
-  erase_date: chrono::NaiveDate,
+  erase_date: NaiveDate,
   #[description = "The time of the erasure (HH:MM)"]
   #[rename = "time"]
-  erase_time: Option<chrono::NaiveTime>,
+  erase_time: Option<NaiveTime>,
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let erase_time = erase_time.unwrap_or(
-    chrono::NaiveTime::from_hms_opt(0, 0, 0)
+    NaiveTime::from_hms_opt(0, 0, 0)
       .with_context(|| "Failed to assign hardcoded 00:00:00 NaiveTime to erase_time")?,
   );
 
-  let datetime = chrono::NaiveDateTime::new(erase_date, erase_time).and_utc();
+  let datetime = NaiveDateTime::new(erase_date, erase_time).and_utc();
 
   let reason = reason.unwrap_or(default_reason.unwrap_or(DefaultReasons::None).response());
 
@@ -482,8 +489,8 @@ async fn populate(
 /// [logs]: crate::config::CHANNELS
 async fn erase_and_log(
   ctx: Context<'_>,
-  transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-  message: &serenity::Message,
+  transaction: &mut Transaction<'_, Postgres>,
+  message: &Message,
   reason: &String,
 ) -> Result<CreateEmbed> {
   let channel_id = message.channel_id;
@@ -495,7 +502,7 @@ async fn erase_and_log(
     .delete_message(channel_id, message_id, audit_log_reason)
     .await?;
 
-  let occurred_at = chrono::Utc::now();
+  let occurred_at = Utc::now();
 
   let guild_id = ctx
     .guild_id()
@@ -553,10 +560,10 @@ async fn erase_and_log(
   );
 
   dm_embed = dm_embed.footer(CreateEmbedFooter::new(
-    "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff."
-    ));
+    "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff.",
+  ));
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::new(CHANNELS.logs);
 
   let log_message = log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -577,11 +584,7 @@ async fn erase_and_log(
 /// When that fails, the [`CHANNELS.private_thread_default`][ptd] channel is used as a fallback.
 ///
 /// [ptd]: crate::config::CHANNELS
-async fn notify_user(
-  ctx: Context<'_>,
-  message: &serenity::Message,
-  dm_embed: CreateEmbed,
-) -> Result<()> {
+async fn notify_user(ctx: Context<'_>, message: &Message, dm_embed: CreateEmbed) -> Result<()> {
   // First, we try to send the notification via DM.
   if message
     .author
@@ -597,7 +600,7 @@ async fn notify_user(
       .is_ok_and(|channel| {
         channel
           .guild()
-          .is_some_and(|channel| channel.kind == serenity::ChannelType::Text)
+          .is_some_and(|channel| channel.kind == ChannelType::Text)
       }) {
       message.channel_id
     } else {
@@ -622,10 +625,9 @@ async fn notify_user(
 
     let mut thread_embed = dm_embed.clone();
 
-    thread_embed = thread_embed
-      .footer(CreateEmbedFooter::new(
-        "If you have any questions or concerns regarding this action, please contact staff via ModMail."
-        ));
+    thread_embed = thread_embed.footer(CreateEmbedFooter::new(
+      "If you have any questions or concerns regarding this action, please contact staff via ModMail.",
+    ));
 
     let thread_initial_message = format!("Private notification for <@{}>:", message.author.id);
 

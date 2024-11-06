@@ -1,11 +1,15 @@
+use std::time::{Duration, Instant};
+
+use anyhow::{Context as AnyhowContext, Result};
+use log::info;
+use pgvector::Vector;
+use poise::serenity_prelude::{builder::*, ChannelId, ComponentInteractionCollector};
+use poise::CreateReply;
+
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::database::DatabaseHandler;
 // use crate::pagination::{PageRowRef, Pagination};
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use log::info;
-use poise::serenity_prelude::{self as serenity, builder::*};
-use poise::CreateReply;
 
 /// Glossary commands
 ///
@@ -87,7 +91,9 @@ async fn list(
 
   for page in pages {
     letter = &page[0].0;
-    page_text = format!("-# Terms in parentheses are aliases for the preceding term. Use </glossary info:1135659962308243479> with any term or alias to read the full entry.\n\n-# {letter}\n");
+    page_text = format!(
+      "-# Terms in parentheses are aliases for the preceding term. Use </glossary info:1135659962308243479> with any term or alias to read the full entry.\n\n-# {letter}\n"
+    );
     for entry in &page {
       if entry.0 == letter {
         page_text.push_str(format!("- {}\n", entry.1).as_str());
@@ -109,9 +115,9 @@ async fn list(
 
   // Send the embed with the first page as content
   let reply = {
-    let components = serenity::CreateActionRow::Buttons(vec![
-      serenity::CreateButton::new(&prev_button_id).label("Previous"),
-      serenity::CreateButton::new(&next_button_id).label("Next"),
+    let components = CreateActionRow::Buttons(vec![
+      CreateButton::new(&prev_button_id).label("Previous"),
+      CreateButton::new(&next_button_id).label("Next"),
     ]);
 
     CreateReply::default()
@@ -136,12 +142,12 @@ async fn list(
   ctx.send(reply).await?;
 
   // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::collector::ComponentInteractionCollector::new(ctx)
+  while let Some(press) = ComponentInteractionCollector::new(ctx)
     // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
     // button was pressed
     .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
     // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
+    .timeout(Duration::from_secs(3600 * 24))
     .await
   {
     // Depending on which button was pressed, go to next or previous page
@@ -161,8 +167,8 @@ async fn list(
     press
       .create_response(
         ctx.serenity_context(),
-        serenity::CreateInteractionResponse::UpdateMessage(
-          serenity::CreateInteractionResponseMessage::new().embed(
+        CreateInteractionResponse::UpdateMessage(
+          CreateInteractionResponseMessage::new().embed(
             BloomBotEmbed::new()
               .title("List of Glossary Terms")
               .description(&all_pages[current_page])
@@ -326,24 +332,26 @@ async fn info(
         .description(format!("The term `{term}` was not found in the glossary."));
 
       embed = embed.field(
-          "Did you mean one of these?",
-          {
-            let mut field = String::new();
+        "Did you mean one of these?",
+        {
+          let mut field = String::new();
 
-            for possible_term in possible_terms.iter().take(3) {
-              field.push_str(&format!("`{}`\n", possible_term.name));
-            }
+          for possible_term in possible_terms.iter().take(3) {
+            field.push_str(&format!("`{}`\n", possible_term.name));
+          }
 
-            field.push_str("\n\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search.*");
+          field.push_str(
+            "\n\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search.*",
+          );
 
-            field
-          },
-          false,
-        );
+          field
+        },
+        false,
+      );
     }
   }
 
-  ctx.send(poise::CreateReply::default().embed(embed)).await?;
+  ctx.send(CreateReply::default().embed(embed)).await?;
 
   Ok(())
 }
@@ -364,9 +372,9 @@ async fn search(
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let start_time = std::time::Instant::now();
+  let start_time = Instant::now();
   let mut transaction = data.db.start_transaction_with_retry(5).await?;
-  let vector = pgvector::Vector::from(
+  let vector = Vector::from(
     data
       .embeddings
       .create_embedding(search.clone(), ctx.author().id)
@@ -448,7 +456,7 @@ async fn search(
       embed.description("No terms were found. Try browsing the glossary with `/glossary list`.");
   }
 
-  ctx.send(poise::CreateReply::default().embed(embed)).await?;
+  ctx.send(CreateReply::default().embed(embed)).await?;
 
   Ok(())
 }
@@ -474,7 +482,7 @@ async fn suggest(
     )
     .clone();
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))

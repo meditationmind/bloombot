@@ -1,4 +1,6 @@
-use anyhow::{Context as AnyhowContext, Result};
+use std::time::Duration;
+
+use anyhow::{anyhow, Context as AnyhowContext, Result};
 use poise::serenity_prelude::{builder::*, ButtonStyle, ChannelId};
 use poise::serenity_prelude::{ComponentInteractionCollector, Mentionable, User};
 use poise::CreateReply;
@@ -338,7 +340,7 @@ async fn update_recipient(
       // Only collect presses when button IDs start with ctx_id.
       .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
       // Timeout when no button has been pressed for one minute.
-      .timeout(std::time::Duration::from_secs(60))
+      .timeout(Duration::from_secs(60))
       .await
     {
       if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
@@ -367,7 +369,7 @@ async fn update_recipient(
           }
           Err(e) => {
             DatabaseHandler::rollback_transaction(transaction).await?;
-            return Err(anyhow::anyhow!(
+            return Err(anyhow!(
               "Failed to tell user that {} ({}) was removed from the recipient database: {}",
               recipient.name,
               recipient.id,

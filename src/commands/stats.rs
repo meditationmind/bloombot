@@ -1,19 +1,20 @@
 #![allow(clippy::unused_async)]
 
+use anyhow::{Context as AnyhowContext, Result};
+use log::info;
+use poise::serenity_prelude::{builder::*, CreateAllowedMentions, User};
+use poise::{ChoiceParameter, CreateReply};
+
+use crate::charts::Chart;
 use crate::commands::helpers::time::Timeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::events::leaderboards::{self, LEADERBOARDS};
 use crate::Context;
-use crate::{charts, config};
-use anyhow::{Context as AnyhowContext, Result};
-use log::info;
-use poise::serenity_prelude::{self as serenity, builder::*};
-use poise::ChoiceParameter;
 
 #[allow(clippy::module_name_repetitions)]
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 pub enum StatsType {
   #[name = "minutes"]
   MeditationMinutes,
@@ -21,7 +22,7 @@ pub enum StatsType {
   MeditationCount,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 pub enum ChartStyle {
   #[name = "bar chart"]
   Bar,
@@ -31,7 +32,7 @@ pub enum ChartStyle {
   BarCombined,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 pub enum SortBy {
   #[name = "minutes"]
   Minutes,
@@ -41,7 +42,7 @@ pub enum SortBy {
   Streak,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 pub enum LeaderboardType {
   #[name = "Top 5"]
   Top5,
@@ -49,7 +50,7 @@ pub enum LeaderboardType {
   Top10,
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum Theme {
   #[name = "light mode"]
   LightMode,
@@ -79,7 +80,7 @@ pub async fn stats(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 async fn user(
   ctx: Context<'_>,
-  #[description = "The user to get the stats of (Defaults to you)"] user: Option<serenity::User>,
+  #[description = "The user to get the stats of (Defaults to you)"] user: Option<User>,
   #[description = "The type of stats to get (Defaults to minutes)"]
   #[rename = "type"]
   stats_type: Option<StatsType>,
@@ -92,12 +93,11 @@ async fn user(
     Theme,
   >,
 ) -> Result<()> {
-  let data = ctx.data();
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
+
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let user = user.unwrap_or_else(|| ctx.author().clone());
   let user_nick_or_name = user
@@ -124,12 +124,12 @@ async fn user(
   {
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .content(format!(
             "Sorry, {user_nick_or_name}'s stats are set to private."
           ))
           .ephemeral(true)
-          .allowed_mentions(serenity::CreateAllowedMentions::new()),
+          .allowed_mentions(CreateAllowedMentions::new()),
       )
       .await?;
 
@@ -185,8 +185,8 @@ async fn user(
   }
 
   // Role-based bar color for donators; default otherwise
-  let bar_color = if user.has_role(&ctx, guild_id, config::ROLES.patreon).await?
-    || user.has_role(&ctx, guild_id, config::ROLES.kofi).await?
+  let bar_color = if user.has_role(&ctx, guild_id, ROLES.patreon).await?
+    || user.has_role(&ctx, guild_id, ROLES.kofi).await?
   {
     match guild_id.member(&ctx, user.id).await?.colour(ctx) {
       Some(color) => (color.r(), color.g(), color.b(), 255),
@@ -219,7 +219,7 @@ async fn user(
   )
   .await?;
 
-  let chart = charts::Chart::new()
+  let chart = Chart::new()
     .await?
     .stats(
       &chart_stats,
@@ -269,8 +269,7 @@ async fn user(
 
   ctx
     .send({
-      let mut f =
-        poise::CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
+      let mut f = CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
       f.embeds = vec![embed.clone()];
 
       f
@@ -303,8 +302,6 @@ async fn server(
 ) -> Result<()> {
   ctx.defer().await?;
 
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -331,7 +328,7 @@ async fn server(
     Timeframe::Daily => "Days",
   };
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let stats = DatabaseHandler::get_guild_stats(&mut transaction, &guild_id, &timeframe).await?;
 
@@ -381,7 +378,7 @@ async fn server(
   let chart_stats =
     DatabaseHandler::get_guild_chart_stats(&mut transaction, &guild_id, &timeframe).await?;
 
-  let chart = charts::Chart::new()
+  let chart = Chart::new()
     .await?
     .stats(
       &chart_stats,
@@ -400,8 +397,7 @@ async fn server(
 
   ctx
     .send({
-      let mut f =
-        poise::CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
+      let mut f = CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
       f.embeds = vec![embed.clone()];
 
       f
@@ -448,58 +444,58 @@ async fn leaderboard(
     let chart = match timeframe {
       Timeframe::Yearly => match sort_by {
         SortBy::Minutes => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.year_min_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.year_min_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.year_min_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.year_min_top10_dark).await?,
         },
         SortBy::Sessions => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.year_ses_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.year_ses_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.year_ses_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.year_ses_top10_dark).await?,
         },
         SortBy::Streak => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.year_str_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.year_str_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.year_str_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.year_str_top10_dark).await?,
         },
       },
       Timeframe::Monthly => match sort_by {
         SortBy::Minutes => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.month_min_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.month_min_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.month_min_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.month_min_top10_dark).await?,
         },
         SortBy::Sessions => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.month_ses_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.month_ses_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.month_ses_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.month_ses_top10_dark).await?,
         },
         SortBy::Streak => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.month_str_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.month_str_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.month_str_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.month_str_top10_dark).await?,
         },
       },
       Timeframe::Weekly => match sort_by {
         SortBy::Minutes => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.week_min_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.week_min_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.week_min_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.week_min_top10_dark).await?,
         },
         SortBy::Sessions => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.week_ses_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.week_ses_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.week_ses_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.week_ses_top10_dark).await?,
         },
         SortBy::Streak => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.week_str_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.week_str_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.week_str_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.week_str_top10_dark).await?,
         },
       },
       Timeframe::Daily => match sort_by {
         SortBy::Minutes => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.day_min_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.day_min_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.day_min_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.day_min_top10_dark).await?,
         },
         SortBy::Sessions => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.day_ses_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.day_ses_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.day_ses_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.day_ses_top10_dark).await?,
         },
         SortBy::Streak => match leaderboard_type {
-          LeaderboardType::Top5 => charts::Chart::open(LEADERBOARDS.day_str_top5_dark).await?,
-          LeaderboardType::Top10 => charts::Chart::open(LEADERBOARDS.day_str_top10_dark).await?,
+          LeaderboardType::Top5 => Chart::open(LEADERBOARDS.day_str_top5_dark).await?,
+          LeaderboardType::Top10 => Chart::open(LEADERBOARDS.day_str_top10_dark).await?,
         },
       },
     };
@@ -510,7 +506,7 @@ async fn leaderboard(
 
     if let Err(err) = ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .embed(embed)
           .ephemeral(false)
           .attachment(CreateAttachment::path(&file_path).await?),
@@ -520,13 +516,13 @@ async fn leaderboard(
       info!("Failed to send pre-generated leaderboard file: {:?}", err);
       ctx
         .send(
-          poise::CreateReply::default()
+          CreateReply::default()
             .content(format!(
               "{} Sorry, no leaderboard data available.",
               EMOJI.mminfo
             ))
             .ephemeral(true)
-            .allowed_mentions(serenity::CreateAllowedMentions::new()),
+            .allowed_mentions(CreateAllowedMentions::new()),
         )
         .await?;
     }
@@ -536,8 +532,8 @@ async fn leaderboard(
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
-  let data = ctx.data();
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let stats = DatabaseHandler::get_leaderboard_stats(
     &mut transaction,
@@ -551,7 +547,7 @@ async fn leaderboard(
   let leaderboard_data = leaderboards::process_stats(ctx.http(), &guild_id, &stats).await?;
 
   if let Some(leaderboard_data) = leaderboard_data {
-    let chart = charts::Chart::new()
+    let chart = Chart::new()
       .await?
       .leaderboard(
         leaderboard_data,
@@ -568,7 +564,7 @@ async fn leaderboard(
 
     ctx
       .send(
-        poise::CreateReply::default()
+        CreateReply::default()
           .embed(embed)
           .ephemeral(false)
           .attachment(CreateAttachment::path(&file_path).await?),
@@ -582,13 +578,13 @@ async fn leaderboard(
 
   ctx
     .send(
-      poise::CreateReply::default()
+      CreateReply::default()
         .content(format!(
           "{} Sorry, no leaderboard data available.",
           EMOJI.mminfo
         ))
         .ephemeral(true)
-        .allowed_mentions(serenity::CreateAllowedMentions::new()),
+        .allowed_mentions(CreateAllowedMentions::new()),
     )
     .await?;
 

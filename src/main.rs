@@ -8,8 +8,9 @@ use std::time::Instant;
 use anyhow::{anyhow, Context as ErrorContext, Error, Result};
 use dotenvy::dotenv;
 use log::{error, info};
-use poise::serenity_prelude::{self as serenity, FullEvent as Event};
 use poise::serenity_prelude::{ActivityData, Channel, Client, GatewayIntents, GuildId};
+use poise::serenity_prelude::{Context as SerenityContext, FullEvent as Event};
+use poise::Context as PoiseContext;
 use poise::{builtins, CreateReply, Framework, FrameworkError, FrameworkOptions};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -38,7 +39,7 @@ pub struct Data {
   pub embeddings: Arc<OpenAIHandler>,
   pub bloom_start_time: Instant,
 }
-pub type Context<'a> = poise::Context<'a, Data, Error>;
+pub type Context<'a> = PoiseContext<'a, Data, Error>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -216,7 +217,7 @@ async fn error_handler(error: FrameworkError<'_, Data, Error>) {
   }
 }
 
-async fn event_handler(ctx: &serenity::Context, event: &Event, data: &Data) -> Result<(), Error> {
+async fn event_handler(ctx: &SerenityContext, event: &Event, data: &Data) -> Result<(), Error> {
   let database = &data.db;
 
   match event {

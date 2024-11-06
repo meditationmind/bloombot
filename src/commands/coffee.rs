@@ -1,7 +1,9 @@
-use crate::Context;
+use std::sync::Arc;
+
 use anyhow::Result;
 use rand::Rng;
-use std::sync::Arc;
+
+use crate::Context;
 
 /// Are you feeling lucky?
 ///

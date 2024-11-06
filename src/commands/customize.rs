@@ -1,3 +1,8 @@
+use anyhow::{Context as AnyhowContext, Result};
+use log::error;
+use poise::serenity_prelude::{builder::*, CreateAllowedMentions};
+use poise::{ChoiceParameter, CreateReply};
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
@@ -5,12 +10,8 @@ use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
 use crate::data::tracking_profile::{Privacy, Status, TrackingProfile};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use log::error;
-use poise::serenity_prelude::{self as serenity, builder::*};
-use poise::{ChoiceParameter, CreateReply};
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum OnOff {
   #[name = "on"]
   On,
@@ -27,7 +28,6 @@ enum OnOff {
   slash_command,
   subcommands("show", "offset", "tracking", "streak", "stats"),
   category = "Meditation Tracking",
-  //hide_in_help,
   guild_only
 )]
 #[allow(clippy::unused_async)]
@@ -40,14 +40,13 @@ pub async fn customize(_: Context<'_>) -> Result<()> {
 /// Show your current settings for meditation tracking experience customization.
 #[poise::command(slash_command)]
 async fn show(ctx: Context<'_>) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+
   let tracking_profile =
     DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id)
       .await?
@@ -59,15 +58,15 @@ async fn show(ctx: Context<'_>) -> Result<()> {
     (None, None) => "UTC".to_string(),
     _ => {
       ctx
-          .send(
-            CreateReply::default()
-                .content(
-                  "Matched both plus and minus offsets from the given offset. This should never happen."
-                      .to_string(),
-                )
-                .ephemeral(true),
-          )
-          .await?;
+        .send(
+          CreateReply::default()
+            .content(
+              "Matched both plus and minus offsets from the given offset. This should never happen."
+                .to_string(),
+            )
+            .ephemeral(true),
+        )
+        .await?;
       return Ok(());
     }
   };
@@ -107,14 +106,12 @@ async fn offset(
   #[rename = "eastern_hemisphere_offset"]
   plus_offset: Option<PlusOffsetChoice>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let choice_offset = time::offset_from_choice(minus_offset, plus_offset, 0);
   let Ok(utc_offset) = choice_offset else {
@@ -183,14 +180,12 @@ async fn tracking(
   ctx: Context<'_>,
   #[description = "Turn anonymous tracking on or off (Default is off)"] anonymous: OnOff,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let tracking_privacy = match anonymous {
     OnOff::On => Privacy::Private,
@@ -256,14 +251,12 @@ async fn streak(
   #[description = "Set streak privacy (Defaults to public)"] privacy: Option<Privacy>,
   #[description = "Turn streak reporting on or off (Defaults to on)"] reporting: Option<Status>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   if let Some(existing_profile) =
     DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?
@@ -311,10 +304,17 @@ async fn streak(
           Err(err) => {
             error!("Error removing role: {err}");
 
-            ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(true)).await?;
+            ctx
+              .send(
+                CreateReply::default()
+                  .content(format!(
+                    "{} An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.",
+                    EMOJI.mminfo
+                  ))
+                  .allowed_mentions(CreateAllowedMentions::new())
+                  .ephemeral(true),
+              )
+              .await?;
           }
         }
       }
@@ -336,10 +336,17 @@ async fn streak(
             Err(err) => {
               error!("Error adding role: {err}");
 
-              ctx.send(CreateReply::default()
-                .content(format!("{} An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-                .allowed_mentions(serenity::CreateAllowedMentions::new())
-                .ephemeral(true)).await?;
+              ctx
+                .send(
+                  CreateReply::default()
+                    .content(format!(
+                      "{} An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.",
+                      EMOJI.mminfo
+                    ))
+                    .allowed_mentions(CreateAllowedMentions::new())
+                    .ephemeral(true),
+                )
+                .await?;
             }
           }
         }
@@ -368,10 +375,17 @@ async fn streak(
           Err(err) => {
             error!("Error removing role: {err}");
 
-            ctx.send(CreateReply::default()
-              .content(format!("{} An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.", EMOJI.mminfo))
-              .allowed_mentions(serenity::CreateAllowedMentions::new())
-              .ephemeral(true)).await?;
+            ctx
+              .send(
+                CreateReply::default()
+                  .content(format!(
+                    "{} An error occured while removing your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.",
+                    EMOJI.mminfo
+                  ))
+                  .allowed_mentions(CreateAllowedMentions::new())
+                  .ephemeral(true),
+              )
+              .await?;
           }
         }
       }

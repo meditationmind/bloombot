@@ -1,8 +1,12 @@
+use std::fmt::Write as _;
+
+use anyhow::{Context as AnyhowContext, Result};
+use indexmap::IndexMap;
+use poise::serenity_prelude::builder::*;
+use poise::{Command, Context as PoiseContext, ContextMenuCommandAction, CreateReply};
+
 use crate::config::ROLES;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use poise::{serenity_prelude::builder::*, CreateReply};
-use std::fmt::Write as _;
 
 struct HelpConfiguration<'a> {
   /// Extra text displayed at the bottom of your message. Can be used for help and tips specific to your bot.
@@ -27,7 +31,7 @@ impl Default for HelpConfiguration<'_> {
 }
 
 async fn help_single_command<U, E>(
-  ctx: poise::Context<'_, U, E>,
+  ctx: PoiseContext<'_, U, E>,
   command_name: &str,
   config: HelpConfiguration<'_>,
   elevated_permissions: bool,
@@ -97,7 +101,7 @@ async fn help_single_command<U, E>(
       .to_owned(),
   };
 
-  let mut subcommands = indexmap::IndexMap::<&String, String>::new();
+  let mut subcommands = IndexMap::<&String, String>::new();
 
   if !command.subcommands.is_empty() {
     help_text += "\n\nSubcommands:";
@@ -137,11 +141,11 @@ async fn help_single_command<U, E>(
 }
 
 async fn help_all_commands<U, E>(
-  ctx: poise::Context<'_, U, E>,
+  ctx: PoiseContext<'_, U, E>,
   config: HelpConfiguration<'_>,
   elevated_permissions: bool,
 ) -> Result<()> {
-  let mut categories = indexmap::IndexMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
+  let mut categories = IndexMap::<Option<&str>, Vec<&Command<U, E>>>::new();
   for cmd in &ctx.framework().options().commands {
     if !elevated_permissions && !cmd.required_permissions.is_empty() {
       continue;
@@ -193,8 +197,7 @@ async fn help_all_commands<U, E>(
     });
 
   if config.show_context_menu_commands {
-    let mut context_categories =
-      indexmap::IndexMap::<Option<&str>, Vec<&poise::Command<U, E>>>::new();
+    let mut context_categories = IndexMap::<Option<&str>, Vec<&Command<U, E>>>::new();
     for cmd in &ctx.framework().options().commands {
       if cmd.context_menu_action.is_none() || cmd.hide_in_help {
         continue;
@@ -213,8 +216,8 @@ async fn help_all_commands<U, E>(
     for (_, commands) in context_categories {
       for command in commands {
         let kind = match command.context_menu_action {
-          Some(poise::ContextMenuCommandAction::User(_)) => "user",
-          Some(poise::ContextMenuCommandAction::Message(_)) => "message",
+          Some(ContextMenuCommandAction::User(_)) => "user",
+          Some(ContextMenuCommandAction::Message(_)) => "message",
           _ => continue,
         };
         let name = command
@@ -283,7 +286,7 @@ async fn help_all_commands<U, E>(
 }
 
 async fn help_menu<U, E>(
-  ctx: poise::Context<'_, U, E>,
+  ctx: PoiseContext<'_, U, E>,
   command: Option<&str>,
   config: HelpConfiguration<'_>,
   elevated_permissions: bool,

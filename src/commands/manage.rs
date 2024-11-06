@@ -1,5 +1,13 @@
 #![allow(clippy::too_many_arguments)]
 
+use std::time::Duration;
+
+use anyhow::{anyhow, Context as AnyhowContext, Result};
+use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
+use poise::serenity_prelude::{builder::*, ButtonStyle};
+use poise::serenity_prelude::{ChannelId, Color, ComponentInteractionCollector, Mentionable, User};
+use poise::{ChoiceParameter, CreateReply};
+
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
@@ -7,12 +15,8 @@ use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::data::common::{Migration, MigrationType};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use chrono::{Datelike, Timelike};
-use poise::serenity_prelude::{self as serenity, builder::*, Mentionable};
-use poise::{ChoiceParameter, CreateReply};
 
-#[derive(poise::ChoiceParameter)]
+#[derive(ChoiceParameter)]
 enum DataType {
   #[name = "meditation entries"]
   MeditationEntries,
@@ -32,7 +36,6 @@ enum DataType {
   required_permissions = "BAN_MEMBERS",
   default_member_permissions = "BAN_MEMBERS",
   category = "Moderator Commands",
-  //hide_in_help,
   guild_only
 )]
 #[allow(clippy::unused_async)]
@@ -46,7 +49,7 @@ pub async fn manage(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 async fn create(
   ctx: Context<'_>,
-  #[description = "The user to create the entry for"] user: serenity::User,
+  #[description = "The user to create the entry for"] user: User,
   #[description = "The number of minutes for the entry"]
   #[min = 0]
   minutes: i32,
@@ -74,7 +77,7 @@ async fn create(
   #[max = 59]
   minute: Option<u32>,
 ) -> Result<()> {
-  let Some(entry_date) = chrono::NaiveDate::from_ymd_opt(year, month, day) else {
+  let Some(entry_date) = NaiveDate::from_ymd_opt(year, month, day) else {
     ctx
       .send(
         CreateReply::default()
@@ -82,7 +85,7 @@ async fn create(
             CreateEmbed::new()
               .title("Error")
               .description(format!("Invalid date provided: {year}-{month}-{day}"))
-              .color(serenity::Color::RED),
+              .color(Color::RED),
           )
           .ephemeral(true),
       )
@@ -90,8 +93,7 @@ async fn create(
     return Ok(());
   };
 
-  let Some(entry_time) = chrono::NaiveTime::from_hms_opt(hour.unwrap_or(0), minute.unwrap_or(0), 0)
-  else {
+  let Some(entry_time) = NaiveTime::from_hms_opt(hour.unwrap_or(0), minute.unwrap_or(0), 0) else {
     ctx
       .send(
         CreateReply::default()
@@ -103,7 +105,7 @@ async fn create(
                 hour.unwrap_or(0),
                 minute.unwrap_or(0)
               ))
-              .color(serenity::Color::RED),
+              .color(Color::RED),
           )
           .ephemeral(true),
       )
@@ -111,15 +113,14 @@ async fn create(
     return Ok(());
   };
 
-  let datetime = chrono::NaiveDateTime::new(entry_date, entry_time).and_utc();
+  let datetime = NaiveDateTime::new(entry_date, entry_time).and_utc();
   let seconds = seconds.unwrap_or(0);
 
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   DatabaseHandler::add_meditation_entry(
     &mut transaction,
@@ -174,7 +175,7 @@ async fn create(
     )
     .clone();
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -189,19 +190,18 @@ async fn create(
 #[poise::command(slash_command)]
 async fn list(
   ctx: Context<'_>,
-  #[description = "The user to list the entries for"] user: serenity::User,
+  #[description = "The user to list the entries for"] user: User,
   #[description = "The page to show"] page: Option<usize>,
 ) -> Result<()> {
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let entries =
     DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &user.id).await?;
-  let entries: Vec<PageRowRef> = entries.iter().map(|entry| entry as _).collect();
+  let entries: Vec<PageRowRef> = entries.iter().map(|entry| entry as PageRowRef).collect();
 
   drop(transaction);
 
@@ -244,12 +244,11 @@ async fn update(
   minute: Option<u32>,
 ) -> Result<()> {
   let existing_entry = {
-    let data = ctx.data();
     let guild_id = ctx
       .guild_id()
       .with_context(|| "Failed to retrieve guild ID from context")?;
 
-    let mut transaction = data.db.start_transaction_with_retry(5).await?;
+    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
     DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, &entry_id).await?
   };
@@ -269,7 +268,7 @@ async fn update(
             CreateEmbed::new()
               .title("Error")
               .description("You must provide at least one option to update the entry.")
-              .color(serenity::Color::RED),
+              .color(Color::RED),
           )
           .ephemeral(true),
       )
@@ -288,7 +287,7 @@ async fn update(
     let hour = hour.unwrap_or(existing_date.hour());
     let minute = minute.unwrap_or(existing_date.minute());
 
-    let Some(entry_date) = chrono::NaiveDate::from_ymd_opt(year, month, day) else {
+    let Some(entry_date) = NaiveDate::from_ymd_opt(year, month, day) else {
       ctx
         .send(
           CreateReply::default()
@@ -296,7 +295,7 @@ async fn update(
               CreateEmbed::new()
                 .title("Error")
                 .description(format!("Invalid date provided: {year}-{month}-{day}"))
-                .color(serenity::Color::RED),
+                .color(Color::RED),
             )
             .ephemeral(true),
         )
@@ -304,7 +303,7 @@ async fn update(
       return Ok(());
     };
 
-    let Some(entry_time) = chrono::NaiveTime::from_hms_opt(hour, minute, 0) else {
+    let Some(entry_time) = NaiveTime::from_hms_opt(hour, minute, 0) else {
       ctx
         .send(
           CreateReply::default()
@@ -312,7 +311,7 @@ async fn update(
               CreateEmbed::new()
                 .title("Error")
                 .description(format!("Invalid time provided: {hour}:{minute}"))
-                .color(serenity::Color::RED),
+                .color(Color::RED),
             )
             .ephemeral(true),
         )
@@ -320,11 +319,9 @@ async fn update(
       return Ok(());
     };
 
-    let datetime = chrono::NaiveDateTime::new(entry_date, entry_time).and_utc();
+    let datetime = NaiveDateTime::new(entry_date, entry_time).and_utc();
 
-    let data = ctx.data();
-
-    let mut transaction = data.db.start_transaction_with_retry(5).await?;
+    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
     DatabaseHandler::update_meditation_entry(
       &mut transaction,
@@ -356,7 +353,7 @@ async fn update(
         existing_entry.minutes,
         datetime.format("%B %d, %Y at %l:%M %P"),
         minutes,
-        )
+      )
     };
 
     let success_embed = BloomBotEmbed::new()
@@ -385,7 +382,7 @@ async fn update(
       )
       .clone();
 
-    let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+    let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
     log_channel
       .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -403,7 +400,7 @@ async fn update(
               .footer(CreateEmbedFooter::new(
                 "Use `/manage list` to see a user's entries.",
               ))
-              .color(serenity::Color::RED),
+              .color(Color::RED),
           )
           .ephemeral(true),
       )
@@ -421,12 +418,11 @@ async fn delete(
   ctx: Context<'_>,
   #[description = "The entry to delete"] entry_id: String,
 ) -> Result<()> {
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let Some(entry) =
     DatabaseHandler::get_meditation_entry(&mut transaction, &guild_id, &entry_id).await?
@@ -441,7 +437,7 @@ async fn delete(
               .footer(CreateEmbedFooter::new(
                 "Use `/manage list` to see a user's entries.",
               ))
-              .color(serenity::Color::RED),
+              .color(Color::RED),
           )
           .ephemeral(true),
       )
@@ -496,7 +492,7 @@ async fn delete(
     )
     .clone();
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -511,17 +507,16 @@ async fn delete(
 #[poise::command(slash_command)]
 async fn reset(
   ctx: Context<'_>,
-  #[description = "The user to reset the entries for"] user: serenity::User,
+  #[description = "The user to reset the entries for"] user: User,
   #[description = "The type of data to reset (Defaults to meditation entries)"]
   #[rename = "type"]
   data_type: Option<DataType>,
 ) -> Result<()> {
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   //Default to meditation entries
   let data_type = match data_type {
@@ -555,21 +550,21 @@ async fn reset(
         .components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(confirm_id.clone())
             .label("Yes")
-            .style(serenity::ButtonStyle::Success),
+            .style(ButtonStyle::Success),
           CreateButton::new(cancel_id.clone())
             .label("No")
-            .style(serenity::ButtonStyle::Danger),
+            .style(ButtonStyle::Danger),
         ])]),
     )
     .await?;
 
   // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
+  while let Some(press) = ComponentInteractionCollector::new(ctx)
     // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
     // button was pressed
     .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
     // Timeout when no navigation button has been pressed in one minute
-    .timeout(std::time::Duration::from_secs(60))
+    .timeout(Duration::from_secs(60))
     .await
   {
     // Depending on which button was pressed, go to next or previous page
@@ -615,7 +610,7 @@ async fn reset(
             )
             .clone();
 
-          let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+          let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
           log_channel
             .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -625,7 +620,7 @@ async fn reset(
         }
         Err(e) => {
           DatabaseHandler::rollback_transaction(transaction).await?;
-          return Err(anyhow::anyhow!(
+          return Err(anyhow!(
             "Failed to tell user that the {} were reset: {}",
             data_type.name(),
             e
@@ -656,18 +651,17 @@ async fn reset(
 #[poise::command(slash_command)]
 async fn migrate(
   ctx: Context<'_>,
-  #[description = "The user to migrate data from"] old_user: serenity::User,
-  #[description = "The user to migrate data to"] new_user: serenity::User,
+  #[description = "The user to migrate data from"] old_user: User,
+  #[description = "The user to migrate data to"] new_user: User,
   #[description = "The type of data to migrate (Defaults to meditation entries)"]
   #[rename = "type"]
   data_type: Option<DataType>,
 ) -> Result<()> {
-  let data = ctx.data();
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   //Default to meditation entries
   let data_type = match data_type {
@@ -714,21 +708,21 @@ async fn migrate(
         .components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(confirm_id.clone())
             .label("Yes")
-            .style(serenity::ButtonStyle::Success),
+            .style(ButtonStyle::Success),
           CreateButton::new(cancel_id.clone())
             .label("No")
-            .style(serenity::ButtonStyle::Danger),
+            .style(ButtonStyle::Danger),
         ])]),
     )
     .await?;
 
   // Loop through incoming interactions with the navigation buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
+  while let Some(press) = ComponentInteractionCollector::new(ctx)
     // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
     // button was pressed
     .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
     // Timeout when no navigation button has been pressed in one minute
-    .timeout(std::time::Duration::from_secs(60))
+    .timeout(Duration::from_secs(60))
     .await
   {
     // Depending on which button was pressed, go to next or previous page
@@ -777,7 +771,7 @@ async fn migrate(
             )
             .clone();
 
-          let log_channel = serenity::ChannelId::new(CHANNELS.bloomlogs);
+          let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
           log_channel
             .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -787,7 +781,7 @@ async fn migrate(
         }
         Err(e) => {
           DatabaseHandler::rollback_transaction(transaction).await?;
-          return Err(anyhow::anyhow!(
+          return Err(anyhow!(
             "Failed to tell user that the {} were migrated: {}",
             data_type.name(),
             e

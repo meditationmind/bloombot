@@ -1,13 +1,18 @@
+use std::time::Duration;
+
+use anyhow::{Context as AnyhowContext, Result};
+use chrono::Months as ChronoMonths;
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use futures::StreamExt;
+use poise::serenity_prelude::{builder::*, ButtonStyle};
+use poise::serenity_prelude::{ChannelId, ComponentInteractionCollector, Member, RoleId};
+use poise::{ChoiceParameter, CreateReply};
+
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 use crate::database::DatabaseHandler;
 use crate::Context;
-use anyhow::{Context as AnyhowContext, Result};
-use chrono::Datelike;
-use futures::StreamExt;
-use poise::serenity_prelude::{self as serenity, builder::*};
-use poise::CreateReply;
 
-#[derive(Debug, Clone, Copy, poise::ChoiceParameter)]
+#[derive(Debug, Clone, Copy, ChoiceParameter)]
 enum Months {
   January,
   February,
@@ -26,11 +31,11 @@ enum Months {
 async fn finalize_winner(
   reserved_key: String,
   ctx: Context<'_>,
-  winner: serenity::Member,
+  winner: Member,
   minutes: i64,
-  selected_date: chrono::DateTime<chrono::Utc>,
+  selected_date: DateTime<Utc>,
 ) -> Result<()> {
-  let now = chrono::Utc::now();
+  let now = Utc::now();
   let guild_name = {
     if let Some(guild) = ctx.guild() {
       guild.name.clone()
@@ -50,11 +55,10 @@ async fn finalize_winner(
     ))
     .thumbnail(winner.user.avatar_url().unwrap_or_default())
     .footer(CreateEmbedFooter::new(format!(
-        "Meditation Challenge for {} | Selected on {}",
-        selected_date.format("%B %Y"),
-        now.format("%B %d, %Y")
-      ))
-    ).clone();
+      "Meditation Challenge for {} | Selected on {}",
+      selected_date.format("%B %Y"),
+      now.format("%B %d, %Y")
+    )));
 
   let dm_embed = BloomBotEmbed::new()
     .title(":tada: You've won a key! :tada:")
@@ -65,11 +69,10 @@ async fn finalize_winner(
       false,
     )
     .footer(CreateEmbedFooter::new(format!(
-        "From {guild_name} | If you need any assistance, please contact server staff."
-      ))
-    ).clone();
+      "From {guild_name} | If you need any assistance, please contact server staff."
+    )));
 
-  let announcement_channel = serenity::ChannelId::new(CHANNELS.announcement);
+  let announcement_channel = ChannelId::new(CHANNELS.announcement);
   let dm_channel = winner.user.create_dm_channel(ctx).await?;
 
   announcement_channel
@@ -88,16 +91,19 @@ async fn finalize_winner(
         .components(vec![CreateActionRow::Buttons(vec![
           CreateButton::new(redeem_id.clone())
             .label("Redeem")
-            .style(serenity::ButtonStyle::Success),
+            .style(ButtonStyle::Success),
           CreateButton::new(cancel_id.clone())
             .label("Cancel")
-            .style(serenity::ButtonStyle::Danger),
+            .style(ButtonStyle::Danger),
         ])]),
     )
     .await
   else {
     ctx
-      .send(CreateReply::default().content(format!("{} Could not send DM to member. Please run `/usekey` and copy a key manually if they want one.\n\n**No key has been used.**", EMOJI.mminfo)))
+      .send(CreateReply::default().content(format!(
+        "{} Could not send DM to member. Please run `/usekey` and copy a key manually if they want one.\n\n**No key has been used.**",
+        EMOJI.mminfo
+      )))
       .await?;
     return Ok(());
   };
@@ -110,12 +116,12 @@ async fn finalize_winner(
     .await?;
 
   // Loop through incoming interactions with the buttons
-  while let Some(press) = serenity::ComponentInteractionCollector::new(ctx)
+  while let Some(press) = ComponentInteractionCollector::new(ctx)
     // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
     // button was pressed
     .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
     // Timeout when no navigation button has been pressed for 24 hours
-    .timeout(std::time::Duration::from_secs(3600 * 24))
+    .timeout(Duration::from_secs(3600 * 24))
     .await
   {
     // Depending on which button was pressed, confirm or cancel
@@ -152,10 +158,9 @@ async fn finalize_winner(
         .footer(
           CreateEmbedFooter::new(format!("{} ({})", winner.user.name, winner.user.id))
             .icon_url(winner.user.avatar_url().unwrap_or_default()),
-        )
-        .clone();
+        );
 
-      let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+      let log_channel = ChannelId::new(CHANNELS.logs);
 
       log_channel
         .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -186,10 +191,9 @@ async fn finalize_winner(
         .footer(
           CreateEmbedFooter::new(format!("{} ({})", winner.user.name, winner.user.id))
             .icon_url(winner.user.avatar_url().unwrap_or_default()),
-        )
-        .clone();
+        );
 
-      let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+      let log_channel = ChannelId::new(CHANNELS.logs);
 
       log_channel
         .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -204,8 +208,10 @@ async fn finalize_winner(
 
   let timeout_embed = BloomBotEmbed::new()
     .title("**Congratulations on winning the giveaway!** 🥳")
-    .description("You've won a key for [Playne: The Meditation Game](<https://store.steampowered.com/app/865540/PLAYNE__The_Meditation_Game/>) on Steam!\n\n**Would you like to redeem your key? Please contact server staff and we'll get one to you!**")
-    .footer(CreateEmbedFooter::new(format!("From {guild_name}"))).clone();
+    .description(
+      "You've won a key for [Playne: The Meditation Game](<https://store.steampowered.com/app/865540/PLAYNE__The_Meditation_Game/>) on Steam!\n\n**Would you like to redeem your key? Please contact server staff and we'll get one to you!**",
+    )
+    .footer(CreateEmbedFooter::new(format!("From {guild_name}")));
 
   dm_message
     .edit(
@@ -219,14 +225,15 @@ async fn finalize_winner(
   let log_embed = BloomBotEmbed::new()
     .title("**Key Offer Timed Out**")
     .description(format!(
-        "Sent Playne key offer to <@{}>, but user did not respond within 24 hours. Key has been returned to the pool and user has been asked to contact a moderator if they wish to claim their key.",
-        winner.user.id
-      ))
-    .footer(CreateEmbedFooter::new(format!("{} ({})", winner.user.name, winner.user.id))
-      .icon_url(winner.user.avatar_url().unwrap_or_default())
-    ).clone();
+      "Sent Playne key offer to <@{}>, but user did not respond within 24 hours. Key has been returned to the pool and user has been asked to contact a moderator if they wish to claim their key.",
+      winner.user.id
+    ))
+    .footer(
+      CreateEmbedFooter::new(format!("{} ({})", winner.user.name, winner.user.id))
+        .icon_url(winner.user.avatar_url().unwrap_or_default()),
+    );
 
-  let log_channel = serenity::ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::new(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -289,7 +296,7 @@ pub async fn pick_winner(
   }
 
   let year = year.unwrap_or_else(|| {
-    let now = chrono::Utc::now();
+    let now = Utc::now();
     now.year()
   });
 
@@ -309,11 +316,11 @@ pub async fn pick_winner(
       Months::December => 12,
     }
   } else {
-    let now = chrono::Utc::now();
+    let now = Utc::now();
     now.month()
   };
 
-  let Some(start_date) = chrono::NaiveDate::from_ymd_opt(year, month, 1) else {
+  let Some(start_date) = NaiveDate::from_ymd_opt(year, month, 1) else {
     ctx
       .send(
         CreateReply::default()
@@ -324,13 +331,13 @@ pub async fn pick_winner(
     return Ok(());
   };
 
-  let end_date = start_date + chrono::Months::new(1);
+  let end_date = start_date + ChronoMonths::new(1);
 
-  let time = chrono::NaiveTime::from_hms_opt(0, 0, 0)
+  let time = NaiveTime::from_hms_opt(0, 0, 0)
     .with_context(|| "Failed to assign hardcoded 00:00:00 NaiveTime to time")?;
 
-  let start_datetime = chrono::NaiveDateTime::new(start_date, time).and_utc();
-  let end_datetime = chrono::NaiveDateTime::new(end_date, time).and_utc();
+  let start_datetime = NaiveDateTime::new(start_date, time).and_utc();
+  let end_datetime = NaiveDateTime::new(end_date, time).and_utc();
 
   let mut conn = data.db.get_connection_with_retry(5).await?;
   // Since the stream is async, we can't use the same connection for the transaction
@@ -338,7 +345,7 @@ pub async fn pick_winner(
     DatabaseHandler::get_winner_candidates(&mut conn, start_datetime, end_datetime, &guild_id);
 
   // The database already randomizes the order... we can use the first one that has the role
-  let winner_role_id = serenity::RoleId::new(ROLES.meditation_challenger);
+  let winner_role_id = RoleId::new(ROLES.meditation_challenger);
 
   while let Some(winner) = database_winner_candidates.next().await {
     let Ok(winner) = winner else {
@@ -389,8 +396,11 @@ pub async fn pick_winner(
       DatabaseHandler::reserve_key(&mut transaction, &guild_id, &member.user.id).await?
     else {
       ctx
-      .send(CreateReply::default().content(format!("{} No unused keys found. Please add one and run `/usekey` to give them one if they want one.", EMOJI.mminfo)))
-      .await?;
+        .send(CreateReply::default().content(format!(
+          "{} No unused keys found. Please add one and run `/usekey` to give them one if they want one.",
+          EMOJI.mminfo
+        )))
+        .await?;
       return Ok(());
     };
 
