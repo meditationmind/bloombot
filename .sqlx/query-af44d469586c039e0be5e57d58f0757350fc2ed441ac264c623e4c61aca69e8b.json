@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        DELETE FROM star WHERE record_id = $1\n      ",
+  "query": "DELETE FROM star WHERE record_id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "75e0cadde2a3f1e8e06a18a1fddffa4db290bc88d0c2a6dcf1c0d62a8226bf90"
+  "hash": "af44d469586c039e0be5e57d58f0757350fc2ed441ac264c623e4c61aca69e8b"
 }

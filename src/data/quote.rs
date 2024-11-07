@@ -61,7 +61,7 @@ impl ExistsQuery for Quote {
     guild_id: GuildId,
     quote_id: Self::Item<'a>,
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
-    sqlx::query_as("SELECT EXISTS (SELECT 1 FROM quote WHERE record_id = $1 AND guild_id = $2)")
+    sqlx::query_as("SELECT EXISTS(SELECT 1 FROM quote WHERE record_id = $1 AND guild_id = $2)")
       .bind(quote_id)
       .bind(guild_id.to_string())
   }

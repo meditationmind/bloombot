@@ -105,12 +105,12 @@ impl ExistsQuery for SteamKey {
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
     match key {
       Some(key) => sqlx::query_as(
-        "SELECT EXISTS (SELECT 1 FROM steamkey WHERE steam_key = $1 AND guild_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM steamkey WHERE steam_key = $1 AND guild_id = $2)",
       )
       .bind(key)
       .bind(guild_id.to_string()),
       None => sqlx::query_as(
-        "SELECT EXISTS (SELECT 1 FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $1)",
+        "SELECT EXISTS(SELECT 1 FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $1)",
       )
       .bind(guild_id.to_string()),
     }
@@ -171,19 +171,7 @@ impl InsertQuery for Recipient {
   /// Adds a Steam key [`Recipient`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
-      "
-        INSERT INTO
-          steamkey_recipients (
-            record_id,
-            user_id,
-            guild_id,
-            challenge_prize,
-            donator_perk,
-            total_keys
-          )
-        VALUES
-          ($1, $2, $3, $4, $5, $6)
-      ",
+      "INSERT INTO steamkey_recipients( record_id, user_id, guild_id, challenge_prize, donator_perk, total_keys) VALUES ($1, $2, $3, $4, $5, $6)",
       Ulid::new().to_string(),
       self.user_id.to_string(),
       self.guild_id.to_string(),
@@ -198,11 +186,7 @@ impl UpdateQuery for Recipient {
   /// Updates Steam key [`Recipient`] details in the database.
   fn update_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
-      "
-        UPDATE steamkey_recipients
-        SET challenge_prize = $1, donator_perk = $2, total_keys = $3
-        WHERE user_id = $4 AND guild_id = $5
-      ",
+      "UPDATE steamkey_recipients SET challenge_prize = $1, donator_perk = $2, total_keys = $3 WHERE user_id = $4 AND guild_id = $5",
       self.challenge_prize,
       self.donator_perk,
       self.total_keys,
@@ -235,7 +219,7 @@ impl ExistsQuery for Recipient {
     user_id: Self::Item<'_>,
   ) -> QueryAs<'a, Postgres, T, PgArguments> {
     sqlx::query_as(
-      "SELECT EXISTS (SELECT 1 FROM steamkey_recipients WHERE guild_id = $1 AND user_id = $2)",
+      "SELECT EXISTS(SELECT 1 FROM steamkey_recipients WHERE guild_id = $1 AND user_id = $2)",
     )
     .bind(guild_id.to_string())
     .bind(user_id)

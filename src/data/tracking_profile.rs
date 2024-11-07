@@ -150,21 +150,7 @@ impl Default for TrackingProfile {
 impl InsertQuery for TrackingProfile {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
-      "
-        INSERT INTO
-          tracking_profile (
-            record_id,
-            user_id,
-            guild_id,
-            utc_offset,
-            anonymous_tracking,
-            streaks_active,
-            streaks_private,
-            stats_private
-          )
-        VALUES
-          ($1, $2, $3, $4, $5, $6, $7, $8)
-      ",
+      "INSERT INTO tracking_profile( record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
       Ulid::new().to_string(),
       self.user_id.to_string(),
       self.guild_id.to_string(),
@@ -180,16 +166,7 @@ impl InsertQuery for TrackingProfile {
 impl UpdateQuery for TrackingProfile {
   fn update_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
-      "
-        UPDATE tracking_profile
-        SET 
-          utc_offset = $1,
-          anonymous_tracking = $2,
-          streaks_active = $3,
-          streaks_private = $4,
-          stats_private = $5
-        WHERE user_id = $6 AND guild_id = $7
-      ",
+      "UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5 WHERE user_id = $6 AND guild_id = $7",
       self.utc_offset,
       privacy!(self.tracking.privacy),
       matches!(self.streak.status, Status::Enabled),
