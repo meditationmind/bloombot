@@ -19,7 +19,7 @@ use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
-use poise::serenity_prelude::{self as serenity};
+use poise::serenity_prelude::{self as serenity, GuildId};
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
 use sqlx::{FromRow, Postgres};
@@ -52,7 +52,7 @@ pub(crate) trait UpdateQuery {
 
 pub(crate) trait DeleteQuery {
   fn delete_query<'a>(
-    guild_id: serenity::GuildId,
+    guild_id: GuildId,
     unique_id: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments>;
 }
@@ -61,7 +61,7 @@ pub(crate) trait ExistsQuery {
   type Item<'a>;
 
   fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
-    guild_id: serenity::GuildId,
+    guild_id: GuildId,
     item: Self::Item<'a>,
   ) -> QueryAs<'a, Postgres, T, PgArguments>;
 }
@@ -3029,17 +3029,17 @@ mod tests {
     assert_eq!(bookmarks.len(), 4);
     assert_eq!(bookmarks[0].link, "https://foo.bar/1234");
     assert_eq!(bookmarks[0].description, Some("A bar of foo".to_string()));
-    assert_eq!(bookmarks[0].id, "01JBPTWBXJNAKK288S3D89JK7G".to_string());
+    assert_eq!(bookmarks[0].id(), "01JBPTWBXJNAKK288S3D89JK7G");
     assert_eq!(
-      bookmarks[0].added,
-      chrono::DateTime::from_timestamp(1_704_067_200, 0)
+      bookmarks[0].added(),
+      chrono::DateTime::from_timestamp(1_704_067_200, 0).as_ref()
     );
 
     assert_eq!(bookmarks[1].link, "https://foo.bar/1235");
-    assert_eq!(bookmarks[1].id, "01JBPTWBXJNAKK288S3D89JK7H".to_string());
+    assert_eq!(bookmarks[1].id(), "01JBPTWBXJNAKK288S3D89JK7H");
     assert_eq!(
-      bookmarks[1].added,
-      chrono::DateTime::from_timestamp(1_704_070_800, 0)
+      bookmarks[1].added(),
+      chrono::DateTime::from_timestamp(1_704_070_800, 0).as_ref()
     );
 
     assert_eq!(bookmarks[2].description, None);
