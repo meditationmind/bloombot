@@ -1,29 +1,34 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
-use crate::{
-  commands::helpers::time::{ChallengeTimeframe, Timeframe},
-  commands::stats::{LeaderboardType, SortBy},
-  data::bookmark::Bookmark,
-  data::common::{Exists, Migration},
-  data::course::{Course, ExtendedCourse},
-  data::erase::Erase,
-  data::meditation::Meditation,
-  data::quote::{Quote, QuoteModal},
-  data::star_message::StarMessage,
-  data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User},
-  data::steam_key::{Recipient, SteamKey},
-  data::term::{Names, SearchResult, Term},
-  data::tracking_profile::{self, TrackingProfile},
-};
+use std::env;
+use std::time::Duration;
+
 use anyhow::{Context, Result};
-use chrono::{Datelike, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration as ChronoDuration, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
-use poise::serenity_prelude::{self as serenity, GuildId};
+use pgvector::Vector;
+use poise::serenity_prelude::{GuildId, MessageId, Role, RoleId, UserId};
+use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
-use sqlx::{FromRow, Postgres};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
+use tokio::time;
 use ulid::Ulid;
+
+use crate::commands::helpers::time::{ChallengeTimeframe, Timeframe};
+use crate::commands::stats::{LeaderboardType, SortBy};
+use crate::data::bookmark::Bookmark;
+use crate::data::common::{Exists, Migration};
+use crate::data::course::{Course, ExtendedCourse};
+use crate::data::erase::Erase;
+use crate::data::meditation::Meditation;
+use crate::data::quote::{Quote, QuoteModal};
+use crate::data::star_message::StarMessage;
+use crate::data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User};
+use crate::data::steam_key::{Recipient, SteamKey};
+use crate::data::term::{Names, SearchResult, Term};
+use crate::data::tracking_profile::{self, TrackingProfile};
 
 #[derive(Debug)]
 struct Res {
@@ -67,19 +72,19 @@ pub(crate) trait ExistsQuery {
 }
 
 impl DatabaseHandler {
-  pub fn from_pool(pool: sqlx::PgPool) -> Self {
+  pub fn from_pool(pool: PgPool) -> Self {
     Self { pool }
   }
 
   pub async fn new() -> Result<Self> {
     let database_url =
-      std::env::var("DATABASE_URL").with_context(|| "Missing DATABASE_URL environment variable")?;
+      env::var("DATABASE_URL").with_context(|| "Missing DATABASE_URL environment variable")?;
     // let pool = sqlx::PgPool::connect(&database_url).await?;
     let max_retries = 5;
     let mut attempts = 0;
 
     loop {
-      let pool = match sqlx::PgPool::connect(&database_url).await {
+      let pool = match PgPool::connect(&database_url).await {
         Ok(pool) => pool,
         Err(e) => {
           if attempts >= max_retries {
@@ -97,7 +102,7 @@ impl DatabaseHandler {
               max_retries
             );
             // Wait before retrying
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            time::sleep(Duration::from_secs(60)).await;
             continue;
           }
 
@@ -114,14 +119,14 @@ impl DatabaseHandler {
     }
   }
 
-  pub async fn get_connection(&self) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>> {
+  pub async fn get_connection(&self) -> Result<PoolConnection<Postgres>> {
     Ok(self.pool.acquire().await?)
   }
 
   pub async fn get_connection_with_retry(
     &self,
     max_retries: usize,
-  ) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>> {
+  ) -> Result<PoolConnection<Postgres>> {
     let mut attempts = 0;
 
     loop {
@@ -138,7 +143,7 @@ impl DatabaseHandler {
             if io_error.kind() == std::io::ErrorKind::ConnectionReset {
               attempts += 1;
               // Wait for a moment before retrying
-              tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+              time::sleep(Duration::from_secs(1)).await;
               continue;
             }
           }
@@ -150,14 +155,14 @@ impl DatabaseHandler {
     }
   }
 
-  pub async fn start_transaction(&self) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
+  pub async fn start_transaction(&self) -> Result<Transaction<'_, Postgres>> {
     Ok(self.pool.begin().await?)
   }
 
   pub async fn start_transaction_with_retry(
     &self,
     max_retries: usize,
-  ) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
+  ) -> Result<Transaction<'_, Postgres>> {
     let mut attempts = 0;
 
     loop {
@@ -174,7 +179,7 @@ impl DatabaseHandler {
             if io_error.kind() == std::io::ErrorKind::ConnectionReset {
               attempts += 1;
               // Wait for a moment before retrying
-              tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+              time::sleep(Duration::from_secs(1)).await;
               continue;
             }
           }
@@ -186,24 +191,20 @@ impl DatabaseHandler {
     }
   }
 
-  pub async fn commit_transaction(
-    transaction: sqlx::Transaction<'_, sqlx::Postgres>,
-  ) -> Result<()> {
+  pub async fn commit_transaction(transaction: Transaction<'_, Postgres>) -> Result<()> {
     transaction.commit().await?;
     Ok(())
   }
 
   /// This function is not technically necessary, as the transaction will be rolled back when dropped.
   /// However, for readability, it is recommended to call this function when you want to rollback a transaction.
-  pub async fn rollback_transaction(
-    transaction: sqlx::Transaction<'_, sqlx::Postgres>,
-  ) -> Result<()> {
+  pub async fn rollback_transaction(transaction: Transaction<'_, Postgres>) -> Result<()> {
     transaction.rollback().await?;
     Ok(())
   }
 
   pub async fn add_tracking_profile(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     tracking_profile: &TrackingProfile,
   ) -> Result<()> {
     tracking_profile
@@ -215,7 +216,7 @@ impl DatabaseHandler {
   }
 
   pub async fn update_tracking_profile(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     tracking_profile: &TrackingProfile,
   ) -> Result<()> {
     tracking_profile
@@ -227,9 +228,9 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_tracking_profile(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<()> {
     TrackingProfile::delete_query(*guild_id, user_id.to_string())
       .execute(&mut **transaction)
@@ -239,7 +240,7 @@ impl DatabaseHandler {
   }
 
   pub async fn migrate_tracking_profile(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     migration: &Migration,
   ) -> Result<()> {
     migration.update_query().execute(&mut **transaction).await?;
@@ -248,9 +249,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_tracking_profile(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Option<TrackingProfile>> {
     let row = sqlx::query!(
       "
@@ -264,8 +265,8 @@ impl DatabaseHandler {
 
     let tracking_profile = match row {
       Some(row) => Some(TrackingProfile {
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
-        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>()?),
+        user_id: UserId::new(row.user_id.parse::<u64>()?),
+        guild_id: GuildId::new(row.guild_id.parse::<u64>()?),
         utc_offset: row.utc_offset,
         tracking: tracking_profile::Tracking {
           privacy: if row.anonymous_tracking {
@@ -301,7 +302,7 @@ impl DatabaseHandler {
   }
 
   pub async fn add_steamkey_recipient(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     recipient: &Recipient,
   ) -> Result<()> {
     recipient.insert_query().execute(&mut **transaction).await?;
@@ -310,7 +311,7 @@ impl DatabaseHandler {
   }
 
   pub async fn update_steamkey_recipient(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     recipient: &Recipient,
   ) -> Result<()> {
     recipient.update_query().execute(&mut **transaction).await?;
@@ -319,9 +320,9 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_steamkey_recipient(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<()> {
     Recipient::delete_query(*guild_id, user_id.to_string())
       .execute(&mut **transaction)
@@ -331,9 +332,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_steamkey_recipient(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Option<Recipient>> {
     let row = sqlx::query!(
       "
@@ -347,8 +348,8 @@ impl DatabaseHandler {
 
     let steamkey_recipient = match row {
       Some(row) => Some(Recipient {
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
-        guild_id: serenity::GuildId::new(row.guild_id.parse::<u64>()?),
+        user_id: UserId::new(row.user_id.parse::<u64>()?),
+        guild_id: GuildId::new(row.guild_id.parse::<u64>()?),
         challenge_prize: row.challenge_prize,
         donator_perk: row.donator_perk,
         total_keys: row.total_keys,
@@ -360,8 +361,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_steamkey_recipients(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Vec<Recipient>> {
     let rows = sqlx::query!(
       "
@@ -376,13 +377,13 @@ impl DatabaseHandler {
     let steamkey_recipients = rows
       .into_iter()
       .map(|row| Recipient {
-        user_id: serenity::UserId::new(
+        user_id: UserId::new(
           row
             .user_id
             .parse::<u64>()
             .expect("parse should not fail since user_id is UserId.to_string()"),
         ),
-        guild_id: serenity::GuildId::new(
+        guild_id: GuildId::new(
           row
             .guild_id
             .parse::<u64>()
@@ -398,9 +399,9 @@ impl DatabaseHandler {
   }
 
   pub async fn steamkey_recipient_exists(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<bool> {
     Ok(
       Recipient::exists_query::<Exists>(*guild_id, user_id.to_string())
@@ -411,9 +412,9 @@ impl DatabaseHandler {
   }
 
   pub async fn record_steamkey_receipt(
-    connection: &mut sqlx::pool::PoolConnection<sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    connection: &mut PoolConnection<Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<()> {
     let possible_record = sqlx::query!(
       "
@@ -457,7 +458,7 @@ impl DatabaseHandler {
   }
 
   pub async fn add_bookmark(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     bookmark: &Bookmark,
   ) -> Result<()> {
     bookmark.insert_query().execute(&mut **transaction).await?;
@@ -466,9 +467,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_bookmark_count(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<u64> {
     let row = sqlx::query!(
       "
@@ -488,9 +489,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_bookmarks(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Vec<Bookmark>> {
     let bookmarks: Vec<Bookmark> = sqlx::query_as(
       "
@@ -509,9 +510,9 @@ impl DatabaseHandler {
   }
 
   pub async fn search_bookmarks(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
     keyword: &str,
   ) -> Result<Vec<Bookmark>> {
     let bookmarks: Vec<Bookmark> = sqlx::query_as(
@@ -533,8 +534,8 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_bookmark(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     bookmark_id: &str,
   ) -> Result<u64> {
     Ok(
@@ -546,8 +547,8 @@ impl DatabaseHandler {
   }
 
   pub async fn add_erase(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     erase: Erase,
   ) -> Result<()> {
     sqlx::query!(
@@ -569,9 +570,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_erases(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Vec<Erase>> {
     let rows = sqlx::query!(
       "
@@ -588,7 +589,7 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| Erase {
         id: row.record_id,
-        user_id: serenity::UserId::new(
+        user_id: UserId::new(
           row
             .user_id
             .parse::<u64>()
@@ -604,9 +605,9 @@ impl DatabaseHandler {
   }
 
   pub async fn add_minutes(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
     minutes: i32,
     seconds: i32,
   ) -> Result<()> {
@@ -627,12 +628,12 @@ impl DatabaseHandler {
   }
 
   pub async fn add_meditation_entry(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
     minutes: i32,
     seconds: i32,
-    occurred_at: chrono::DateTime<Utc>,
+    occurred_at: DateTime<Utc>,
   ) -> Result<()> {
     sqlx::query!(
       "
@@ -652,7 +653,7 @@ impl DatabaseHandler {
   }
 
   pub async fn add_meditation_entry_batch(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     batch_query: &str,
   ) -> Result<u64> {
     Ok(
@@ -664,9 +665,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_user_meditation_entries(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Vec<Meditation>> {
     let rows = sqlx::query!(
       "
@@ -683,7 +684,7 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| Meditation {
         id: row.record_id,
-        user_id: serenity::UserId::new(
+        user_id: UserId::new(
           row
             .user_id
             .parse::<u64>()
@@ -699,11 +700,11 @@ impl DatabaseHandler {
   }
 
   /*pub async fn get_user_meditation_entries_between(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    start_time: chrono::DateTime<Utc>,
-    end_time: chrono::DateTime<Utc>,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+    start_time: DateTime<Utc>,
+    end_time: DateTime<Utc>,
   ) -> Result<Vec<MeditationData>> {
     let rows = sqlx::query!(
       "
@@ -726,7 +727,7 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| MeditationData {
         id: row.record_id,
-        user_id: serenity::UserId::new(
+        user_id: UserId::new(
           row
             .user_id
             .parse::<u64>()
@@ -741,8 +742,8 @@ impl DatabaseHandler {
   }*/
 
   pub async fn get_meditation_entry(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     meditation_id: &str,
   ) -> Result<Option<Meditation>> {
     let row = sqlx::query!(
@@ -758,7 +759,7 @@ impl DatabaseHandler {
     let meditation_entry = match row {
       Some(row) => Some(Meditation {
         id: row.record_id,
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
+        user_id: UserId::new(row.user_id.parse::<u64>()?),
         minutes: row.meditation_minutes,
         seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
@@ -770,9 +771,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_latest_meditation_entry(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Option<Meditation>> {
     let row = sqlx::query!(
       "
@@ -791,7 +792,7 @@ impl DatabaseHandler {
     let meditation_entry = match row {
       Some(row) => Some(Meditation {
         id: row.record_id,
-        user_id: serenity::UserId::new(row.user_id.parse::<u64>()?),
+        user_id: UserId::new(row.user_id.parse::<u64>()?),
         minutes: row.meditation_minutes,
         seconds: row.meditation_seconds,
         occurred_at: row.occurred_at,
@@ -803,11 +804,11 @@ impl DatabaseHandler {
   }
 
   pub async fn update_meditation_entry(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     meditation_id: &str,
     minutes: i32,
     seconds: i32,
-    occurred_at: chrono::DateTime<Utc>,
+    occurred_at: DateTime<Utc>,
   ) -> Result<()> {
     sqlx::query!(
       "
@@ -825,7 +826,7 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_meditation_entry(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     meditation_id: &str,
   ) -> Result<()> {
     sqlx::query!(
@@ -841,9 +842,9 @@ impl DatabaseHandler {
   }
 
   pub async fn reset_user_meditation_entries(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<()> {
     sqlx::query!(
       "
@@ -859,7 +860,7 @@ impl DatabaseHandler {
   }
 
   pub async fn migrate_meditation_entries(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     migration: &Migration,
   ) -> Result<()> {
     migration.update_query().execute(&mut **transaction).await?;
@@ -868,11 +869,11 @@ impl DatabaseHandler {
   }
 
   pub fn get_winner_candidates<'a>(
-    conn: &'a mut sqlx::pool::PoolConnection<sqlx::Postgres>,
-    start_date: chrono::DateTime<Utc>,
-    end_date: chrono::DateTime<Utc>,
-    guild_id: &'a serenity::GuildId,
-  ) -> impl Stream<Item = Result<serenity::UserId>> + 'a {
+    conn: &'a mut PoolConnection<Postgres>,
+    start_date: DateTime<Utc>,
+    end_date: DateTime<Utc>,
+    guild_id: &'a GuildId,
+  ) -> impl Stream<Item = Result<UserId>> + 'a {
     // All entries that are greater than 0 minutes and within the start and end date
     // We only want a user ID to show up once, so we group by user ID and sum the meditation minutes
     let rows_stream = sqlx::query!(
@@ -887,18 +888,18 @@ impl DatabaseHandler {
     rows_stream.map(|row| {
       let row = row?;
 
-      let user_id = serenity::UserId::new(row.user_id.parse::<u64>()?);
+      let user_id = UserId::new(row.user_id.parse::<u64>()?);
 
       Ok(user_id)
     })
   }
 
   pub async fn get_winner_candidate_meditation_sum(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    start_date: chrono::DateTime<Utc>,
-    end_date: chrono::DateTime<Utc>,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+    start_date: DateTime<Utc>,
+    end_date: DateTime<Utc>,
   ) -> Result<i64> {
     let row = sqlx::query!(
       "
@@ -920,11 +921,11 @@ impl DatabaseHandler {
   }
 
   pub async fn get_winner_candidate_meditation_count(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
-    start_date: chrono::DateTime<Utc>,
-    end_date: chrono::DateTime<Utc>,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+    start_date: DateTime<Utc>,
+    end_date: DateTime<Utc>,
   ) -> Result<u64> {
     let row = sqlx::query!(
       "
@@ -946,9 +947,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_user_meditation_sum(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<i64> {
     let row = sqlx::query!(
       "
@@ -968,9 +969,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_user_meditation_count(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<u64> {
     let row = sqlx::query!(
       "
@@ -990,8 +991,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_guild_meditation_sum(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<i64> {
     let row = sqlx::query!(
       "
@@ -1010,8 +1011,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_guild_meditation_count(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<u64> {
     let row = sqlx::query!(
       "
@@ -1030,8 +1031,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_all_quotes(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Vec<Quote>> {
     let rows = sqlx::query!(
       "
@@ -1055,8 +1056,8 @@ impl DatabaseHandler {
   }
 
   pub async fn search_quotes(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     keyword: &str,
   ) -> Result<Vec<Quote>> {
     let rows = sqlx::query!(
@@ -1084,8 +1085,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_quote(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     quote_id: &str,
   ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
@@ -1111,7 +1112,7 @@ impl DatabaseHandler {
   }
 
   pub async fn update_quote(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     quote: Quote,
   ) -> Result<()> {
     sqlx::query!(
@@ -1129,8 +1130,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_random_motivation(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Option<String>> {
     let row = sqlx::query!(
       "
@@ -1145,9 +1146,9 @@ impl DatabaseHandler {
   }
 
   pub async fn update_streak(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
     current: i32,
     longest: i32,
   ) -> Result<()> {
@@ -1169,9 +1170,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_streak(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Streak> {
     let mut streak_data = sqlx::query_as!(
       Streak,
@@ -1305,8 +1306,8 @@ impl DatabaseHandler {
   }
 
   pub async fn course_exists(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     course_name: &str,
   ) -> Result<bool> {
     Ok(
@@ -1318,11 +1319,11 @@ impl DatabaseHandler {
   }
 
   pub async fn add_course(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     course_name: &str,
-    participant_role: &serenity::Role,
-    graduate_role: &serenity::Role,
+    participant_role: &Role,
+    graduate_role: &Role,
   ) -> Result<()> {
     sqlx::query!(
       "
@@ -1341,7 +1342,7 @@ impl DatabaseHandler {
   }
 
   pub async fn update_course(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     course_name: &str,
     participant_role: String,
     graduate_role: String,
@@ -1361,8 +1362,8 @@ impl DatabaseHandler {
   }
 
   pub async fn steam_key_exists(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     key: &str,
   ) -> Result<bool> {
     Ok(
@@ -1374,7 +1375,7 @@ impl DatabaseHandler {
   }
 
   pub async fn add_steam_key(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     steam_key: &SteamKey,
   ) -> Result<()> {
     steam_key.insert_query().execute(&mut **transaction).await?;
@@ -1383,8 +1384,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_all_steam_keys(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Vec<SteamKey>> {
     let rows = sqlx::query!(
       "
@@ -1401,14 +1402,14 @@ impl DatabaseHandler {
       .map(|row| SteamKey {
         key: row.steam_key,
         reserved: row.reserved.map(|reserved| {
-          serenity::UserId::new(
+          UserId::new(
             reserved
               .parse::<u64>()
               .expect("parse should not fail since reserved is UserId.to_string()"),
           )
         }),
         used: row.used,
-        guild_id: serenity::GuildId::new(
+        guild_id: GuildId::new(
           row
             .guild_id
             .parse::<u64>()
@@ -1421,8 +1422,8 @@ impl DatabaseHandler {
   }
 
   pub async fn add_quote(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     quote: QuoteModal,
   ) -> Result<()> {
     sqlx::query!(
@@ -1441,9 +1442,9 @@ impl DatabaseHandler {
   }
 
   pub async fn add_term(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     term: Term,
-    vector: pgvector::Vector,
+    vector: Vector,
   ) -> Result<()> {
     sqlx::query(
       "
@@ -1465,9 +1466,9 @@ impl DatabaseHandler {
   }
 
   pub async fn search_terms_by_vector(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    search_vector: pgvector::Vector,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    search_vector: Vector,
     limit: usize,
   ) -> Result<Vec<SearchResult>> {
     // limit should be a small integer
@@ -1491,8 +1492,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_term(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     term_name: &str,
   ) -> Result<Option<Term>> {
     let row = sqlx::query!(
@@ -1525,8 +1526,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_term_meaning(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     term_name: &str,
   ) -> Result<Option<Term>> {
     let row = sqlx::query!(
@@ -1559,9 +1560,9 @@ impl DatabaseHandler {
   }
 
   pub async fn update_term(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     term: Term,
-    vector: Option<pgvector::Vector>,
+    vector: Option<Vector>,
   ) -> Result<()> {
     sqlx::query(
       "
@@ -1584,8 +1585,8 @@ impl DatabaseHandler {
   }
 
   pub async fn update_term_embedding(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     term_name: &str,
     vector: Option<pgvector::Vector>,
   ) -> Result<()> {
@@ -1607,8 +1608,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_all_courses(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Vec<Course>> {
     let rows = sqlx::query!(
       "
@@ -1627,13 +1628,13 @@ impl DatabaseHandler {
       .into_iter()
       .map(|row| Course {
         name: row.course_name,
-        participant_role: serenity::RoleId::new(
+        participant_role: RoleId::new(
           row
             .participant_role
             .parse::<u64>()
             .expect("parse should not fail since participant_role is RoleId.to_string()"),
         ),
-        graduate_role: serenity::RoleId::new(
+        graduate_role: RoleId::new(
           row
             .graduate_role
             .parse::<u64>()
@@ -1646,8 +1647,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_course(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     course_name: &str,
   ) -> Result<Option<Course>> {
     let row = sqlx::query!(
@@ -1665,8 +1666,8 @@ impl DatabaseHandler {
     let course_data = match row {
       Some(row) => Some(Course {
         name: row.course_name,
-        participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>()?),
-        graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>()?),
+        participant_role: RoleId::new(row.participant_role.parse::<u64>()?),
+        graduate_role: RoleId::new(row.graduate_role.parse::<u64>()?),
       }),
       None => None,
     };
@@ -1675,7 +1676,7 @@ impl DatabaseHandler {
   }
 
   pub async fn get_course_in_dm(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     course_name: &str,
   ) -> Result<Option<ExtendedCourse>> {
     let row = sqlx::query!(
@@ -1692,9 +1693,9 @@ impl DatabaseHandler {
     let extended_course_data = match row {
       Some(row) => Some(ExtendedCourse {
         name: row.course_name,
-        participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>()?),
-        graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>()?),
-        guild_id: serenity::GuildId::new(
+        participant_role: RoleId::new(row.participant_role.parse::<u64>()?),
+        graduate_role: RoleId::new(row.graduate_role.parse::<u64>()?),
+        guild_id: GuildId::new(
           row
             .guild_id
             .with_context(|| "Failed to retrieve guild_id from DB record")?
@@ -1708,8 +1709,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_possible_course(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     course_name: &str,
     similarity: f32,
   ) -> Result<Option<Course>> {
@@ -1731,8 +1732,8 @@ impl DatabaseHandler {
     let course_data = match row {
       Some(row) => Some(Course {
         name: row.course_name,
-        participant_role: serenity::RoleId::new(row.participant_role.parse::<u64>()?),
-        graduate_role: serenity::RoleId::new(row.graduate_role.parse::<u64>()?),
+        participant_role: RoleId::new(row.participant_role.parse::<u64>()?),
+        graduate_role: RoleId::new(row.graduate_role.parse::<u64>()?),
       }),
       None => None,
     };
@@ -1741,8 +1742,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_possible_terms(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     term_name: &str,
     similarity: f32,
   ) -> Result<Vec<Term>> {
@@ -1779,8 +1780,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_term_count(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<u64> {
     let row = sqlx::query!(
       "
@@ -1799,8 +1800,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_term_list(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Vec<Names>> {
     let rows = sqlx::query!(
       "
@@ -1826,8 +1827,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_all_glossary_terms(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Vec<Term>> {
     let rows = sqlx::query!(
       "
@@ -1858,8 +1859,8 @@ impl DatabaseHandler {
   }
 
   pub async fn unused_key_exists(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<bool> {
     Ok(
       SteamKey::exists_query::<Exists>(*guild_id, None)
@@ -1870,9 +1871,9 @@ impl DatabaseHandler {
   }
 
   pub async fn reserve_key(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
   ) -> Result<Option<String>> {
     let row = sqlx::query!(
       "
@@ -1887,10 +1888,7 @@ impl DatabaseHandler {
     Ok(row.map(|row| row.steam_key))
   }
 
-  pub async fn unreserve_key(
-    connection: &mut sqlx::pool::PoolConnection<sqlx::Postgres>,
-    key: &str,
-  ) -> Result<()> {
+  pub async fn unreserve_key(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
     sqlx::query!(
       "
         UPDATE steamkey SET reserved = NULL WHERE steam_key = $1
@@ -1903,10 +1901,7 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn mark_key_used(
-    connection: &mut sqlx::pool::PoolConnection<sqlx::Postgres>,
-    key: &str,
-  ) -> Result<()> {
+  pub async fn mark_key_used(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
     sqlx::query!(
       "
         UPDATE steamkey SET used = TRUE WHERE steam_key = $1
@@ -1920,8 +1915,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_key_and_mark_used(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Option<String>> {
     let row = sqlx::query!(
       "
@@ -1936,8 +1931,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_random_quote(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
   ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
       "
@@ -1961,8 +1956,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_random_quote_with_keyword(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     keyword: &str,
   ) -> Result<Option<Quote>> {
     let row = sqlx::query!(
@@ -1992,8 +1987,8 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_course(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     course_name: &str,
   ) -> Result<()> {
     sqlx::query!(
@@ -2010,8 +2005,8 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_steam_key(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     key: &str,
   ) -> Result<()> {
     SteamKey::delete_query(*guild_id, key)
@@ -2022,8 +2017,8 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_quote(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     quote: &str,
   ) -> Result<()> {
     sqlx::query!(
@@ -2040,8 +2035,8 @@ impl DatabaseHandler {
   }
 
   pub async fn term_exists(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     term_name: &str,
   ) -> Result<bool> {
     Ok(
@@ -2053,9 +2048,9 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_term(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     term_name: &str,
-    guild_id: &serenity::GuildId,
+    guild_id: &GuildId,
   ) -> Result<()> {
     sqlx::query!(
       "
@@ -2071,22 +2066,22 @@ impl DatabaseHandler {
   }
 
   pub async fn get_challenge_stats(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
     timeframe: &ChallengeTimeframe,
   ) -> Result<User> {
     // Get total count, total sum, and count/sum for timeframe
-    let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
+    let end_time = Utc::now() + ChronoDuration::minutes(840);
     let start_time = match timeframe {
-      ChallengeTimeframe::Monthly => chrono::Utc::now()
+      ChallengeTimeframe::Monthly => Utc::now()
         .with_day(1)
         .unwrap_or_default()
         .with_hour(0)
         .unwrap_or_default()
         .with_minute(0)
         .unwrap_or_default(),
-      ChallengeTimeframe::YearRound => chrono::Utc::now()
+      ChallengeTimeframe::YearRound => Utc::now()
         .with_month(1)
         .unwrap_or_default()
         .with_day(1)
@@ -2123,9 +2118,9 @@ impl DatabaseHandler {
   }
 
   pub async fn get_leaderboard_stats(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    //user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    //user_id: &UserId,
     timeframe: &Timeframe,
     sort_by: &SortBy,
     leaderboard_type: &LeaderboardType,
@@ -2331,7 +2326,7 @@ impl DatabaseHandler {
   }
 
   pub async fn refresh_leaderboard(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     timeframe: &Timeframe,
   ) -> Result<()> {
     match timeframe {
@@ -2377,18 +2372,18 @@ impl DatabaseHandler {
   }
 
   pub async fn get_user_stats(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
     timeframe: &Timeframe,
   ) -> Result<User> {
     // Get total count, total sum, and count/sum for timeframe
-    let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
+    let end_time = Utc::now() + ChronoDuration::minutes(840);
     let start_time = match timeframe {
-      Timeframe::Daily => end_time - chrono::Duration::days(12),
-      Timeframe::Weekly => end_time - chrono::Duration::weeks(12),
-      Timeframe::Monthly => end_time - chrono::Duration::days(30 * 12),
-      Timeframe::Yearly => end_time - chrono::Duration::days(365 * 12),
+      Timeframe::Daily => end_time - ChronoDuration::days(12),
+      Timeframe::Weekly => end_time - ChronoDuration::weeks(12),
+      Timeframe::Monthly => end_time - ChronoDuration::days(30 * 12),
+      Timeframe::Yearly => end_time - ChronoDuration::days(365 * 12),
     };
 
     let total_data = sqlx::query!(
@@ -2429,17 +2424,17 @@ impl DatabaseHandler {
   }
 
   pub async fn get_guild_stats(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     timeframe: &Timeframe,
   ) -> Result<Guild> {
     // Get total count, total sum, and count/sum for timeframe
-    let end_time = chrono::Utc::now() + chrono::Duration::minutes(840);
+    let end_time = Utc::now() + ChronoDuration::minutes(840);
     let start_time = match timeframe {
-      Timeframe::Daily => end_time - chrono::Duration::days(12),
-      Timeframe::Weekly => end_time - chrono::Duration::weeks(12),
-      Timeframe::Monthly => end_time - chrono::Duration::days(30 * 12),
-      Timeframe::Yearly => end_time - chrono::Duration::days(365 * 12),
+      Timeframe::Daily => end_time - ChronoDuration::days(12),
+      Timeframe::Weekly => end_time - ChronoDuration::weeks(12),
+      Timeframe::Monthly => end_time - ChronoDuration::days(30 * 12),
+      Timeframe::Yearly => end_time - ChronoDuration::days(365 * 12),
     };
 
     let total_data = sqlx::query!(
@@ -2477,8 +2472,8 @@ impl DatabaseHandler {
   }
 
   pub async fn quote_exists(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     quote_id: &str,
   ) -> Result<bool> {
     Ok(
@@ -2490,14 +2485,14 @@ impl DatabaseHandler {
   }
 
   pub async fn get_user_chart_stats(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
-    user_id: &serenity::UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
     timeframe: &Timeframe,
     offset: i16,
   ) -> Result<Vec<TimeframeStats>> {
     let mut fresh_data: Option<Res> = None;
-    let now_offset = chrono::Utc::now() + chrono::Duration::minutes(offset.into());
+    let now_offset = Utc::now() + ChronoDuration::minutes(offset.into());
 
     // Calculate data for last 12 days
     let rows: Vec<Res> = match timeframe {
@@ -2717,8 +2712,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_guild_chart_stats(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    guild_id: &serenity::GuildId,
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
     timeframe: &Timeframe,
   ) -> Result<Vec<TimeframeStats>> {
     let mut fresh_data: Option<Res> = None;
@@ -2933,7 +2928,7 @@ impl DatabaseHandler {
   }
 
   pub async fn refresh_chart_stats(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     timeframe: &Timeframe,
   ) -> Result<()> {
     match timeframe {
@@ -2971,8 +2966,8 @@ impl DatabaseHandler {
   }
 
   pub async fn get_star_message_by_message_id(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    message_id: &serenity::MessageId,
+    transaction: &mut Transaction<'_, Postgres>,
+    message_id: &MessageId,
   ) -> Result<Option<StarMessage>> {
     let star_message: Option<StarMessage> = sqlx::query_as(
       "SELECT record_id, starred_message_id, board_message_id, starred_channel_id FROM star WHERE starred_message_id = $1",
@@ -2985,7 +2980,7 @@ impl DatabaseHandler {
   }
 
   pub async fn remove_star_message(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     star_message: &str,
   ) -> Result<()> {
     StarMessage::delete_query(GuildId::default(), star_message)
@@ -2996,7 +2991,7 @@ impl DatabaseHandler {
   }
 
   pub async fn add_star_message(
-    transaction: &mut sqlx::Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     star_message: &StarMessage,
   ) -> Result<()> {
     star_message
@@ -3010,13 +3005,16 @@ impl DatabaseHandler {
 
 #[cfg(test)]
 mod tests {
-  use crate::data::bookmark::Bookmark;
-  use crate::handlers::database::DatabaseHandler;
+  use anyhow::{Error, Result};
+  use chrono::DateTime;
   use poise::serenity_prelude::{GuildId, UserId};
   use sqlx::PgPool;
 
+  use crate::data::bookmark::Bookmark;
+  use crate::handlers::database::DatabaseHandler;
+
   #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
-  async fn test_get_bookmarks(pool: PgPool) -> Result<(), anyhow::Error> {
+  async fn test_get_bookmarks(pool: PgPool) -> Result<(), Error> {
     let handler = DatabaseHandler { pool };
     let mut transaction = handler.start_transaction().await?;
     let bookmarks = DatabaseHandler::get_bookmarks(
@@ -3032,14 +3030,14 @@ mod tests {
     assert_eq!(bookmarks[0].id(), "01JBPTWBXJNAKK288S3D89JK7G");
     assert_eq!(
       bookmarks[0].added(),
-      chrono::DateTime::from_timestamp(1_704_067_200, 0).as_ref()
+      DateTime::from_timestamp(1_704_067_200, 0).as_ref()
     );
 
     assert_eq!(bookmarks[1].link, "https://foo.bar/1235");
     assert_eq!(bookmarks[1].id(), "01JBPTWBXJNAKK288S3D89JK7H");
     assert_eq!(
       bookmarks[1].added(),
-      chrono::DateTime::from_timestamp(1_704_070_800, 0).as_ref()
+      DateTime::from_timestamp(1_704_070_800, 0).as_ref()
     );
 
     assert_eq!(bookmarks[2].description, None);
@@ -3048,7 +3046,7 @@ mod tests {
   }
 
   #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
-  async fn test_bookmark_count(pool: PgPool) -> Result<(), anyhow::Error> {
+  async fn test_bookmark_count(pool: PgPool) -> Result<(), Error> {
     let handler = DatabaseHandler { pool };
     let mut transaction = handler.start_transaction().await?;
     let count = DatabaseHandler::get_bookmark_count(
@@ -3064,7 +3062,7 @@ mod tests {
   }
 
   #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
-  async fn test_remove_bookmark(pool: PgPool) -> Result<(), anyhow::Error> {
+  async fn test_remove_bookmark(pool: PgPool) -> Result<(), Error> {
     let handler = DatabaseHandler { pool };
     let mut transaction = handler.start_transaction().await?;
     let count = DatabaseHandler::remove_bookmark(
@@ -3089,7 +3087,7 @@ mod tests {
   }
 
   #[sqlx::test(fixtures(path = "fixtures", scripts("bookmarks")))]
-  async fn test_add_bookmark(pool: PgPool) -> Result<(), anyhow::Error> {
+  async fn test_add_bookmark(pool: PgPool) -> Result<(), Error> {
     let handler = DatabaseHandler { pool };
     let mut transaction = handler.start_transaction().await?;
     () = DatabaseHandler::add_bookmark(
@@ -3116,7 +3114,7 @@ mod tests {
   }
 
   #[sqlx::test(fixtures(path = "fixtures", scripts("quote")))]
-  async fn test_quote_exists(pool: PgPool) -> Result<(), anyhow::Error> {
+  async fn test_quote_exists(pool: PgPool) -> Result<(), Error> {
     let handler = DatabaseHandler { pool };
     let mut transaction = handler.start_transaction().await?;
 
