@@ -2974,64 +2974,35 @@ impl DatabaseHandler {
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     message_id: &serenity::MessageId,
   ) -> Result<Option<StarMessage>> {
-    let row = sqlx::query!(
-      "
-        SELECT record_id, starred_message_id, board_message_id, starred_channel_id
-        FROM star
-        WHERE starred_message_id = $1
-      ",
-      message_id.to_string(),
+    let star_message: Option<StarMessage> = sqlx::query_as(
+      "SELECT record_id, starred_message_id, board_message_id, starred_channel_id FROM star WHERE starred_message_id = $1",
     )
+    .bind(message_id.to_string())
     .fetch_optional(&mut **transaction)
     .await?;
-
-    let star_message = match row {
-      Some(row) => Some(StarMessage {
-        record_id: row.record_id,
-        starred_message_id: serenity::MessageId::new(row.starred_message_id.parse::<u64>()?),
-        board_message_id: serenity::MessageId::new(row.board_message_id.parse::<u64>()?),
-        starred_channel_id: serenity::ChannelId::new(row.starred_channel_id.parse::<u64>()?),
-      }),
-      None => None,
-    };
 
     Ok(star_message)
   }
 
   pub async fn remove_star_message(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    record_id: &str,
+    star_message: &str,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM star WHERE record_id = $1
-      ",
-      record_id,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    StarMessage::delete_query(GuildId::default(), star_message)
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
 
   pub async fn add_star_message(
     transaction: &mut sqlx::Transaction<'_, Postgres>,
-    starred_message_id: &serenity::MessageId,
-    board_message_id: &serenity::MessageId,
-    starred_channel_id: &serenity::ChannelId,
+    star_message: &StarMessage,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO star (record_id, starred_message_id, board_message_id, starred_channel_id) VALUES ($1, $2, $3, $4)
-        ON CONFLICT (starred_message_id) DO UPDATE SET board_message_id = $3
-      ",
-      Ulid::new().to_string(),
-      starred_message_id.to_string(),
-      board_message_id.to_string(),
-      starred_channel_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    star_message
+      .insert_query()
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
