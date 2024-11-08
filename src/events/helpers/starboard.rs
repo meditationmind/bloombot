@@ -188,8 +188,7 @@ pub async fn add_star(
     let mut transaction = database.start_transaction().await?;
 
     let Some(star_message) =
-      DatabaseHandler::get_star_message_by_message_id(&mut transaction, &reaction.message_id)
-        .await?
+      DatabaseHandler::get_star_message(&mut transaction, &reaction.message_id).await?
     else {
       // No message found in the database. Create a new starboard message and return.
       create_star_message(ctx, &mut transaction, reaction, star_count).await?;
@@ -201,7 +200,7 @@ pub async fn add_star(
 
     // Get the existing starboard message from the starboard channel.
     let mut starboard_message = starboard_channel
-      .message(&ctx, star_message.board_message()?)
+      .message(&ctx, star_message.board_message)
       .await?;
 
     // No processing needed for Tenor GIFs.
@@ -251,8 +250,7 @@ pub async fn remove_star(
   if emoji == EMOTES.star {
     let mut transaction = database.start_transaction().await?;
     let Some(star_message) =
-      DatabaseHandler::get_star_message_by_message_id(&mut transaction, &reaction.message_id)
-        .await?
+      DatabaseHandler::get_star_message(&mut transaction, &reaction.message_id).await?
     else {
       return Ok(());
     };
@@ -270,7 +268,7 @@ pub async fn remove_star(
 
     if star_count < MIN_STARS {
       starboard_channel
-        .delete_message(&ctx, star_message.board_message()?)
+        .delete_message(&ctx, star_message.board_message)
         .await?;
       DatabaseHandler::remove_star_message(&mut transaction, &star_message.id).await?;
       transaction.commit().await?;
@@ -280,7 +278,7 @@ pub async fn remove_star(
 
     // Get the existing starboard message from the starboard channel.
     let mut starboard_message = starboard_channel
-      .message(&ctx, star_message.board_message()?)
+      .message(&ctx, star_message.board_message)
       .await?;
 
     // No processing needed for Tenor GIFs.

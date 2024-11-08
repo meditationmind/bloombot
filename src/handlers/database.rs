@@ -2646,18 +2646,15 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn get_star_message_by_message_id(
+  pub async fn get_star_message(
     transaction: &mut Transaction<'_, Postgres>,
     message_id: &MessageId,
   ) -> Result<Option<StarMessage>> {
-    let star_message: Option<StarMessage> = sqlx::query_as(
-      "SELECT record_id, starred_message_id, board_message_id, starred_channel_id FROM star WHERE starred_message_id = $1",
+    Ok(
+      StarMessage::retrieve(*message_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .bind(message_id.to_string())
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    Ok(star_message)
   }
 
   pub async fn remove_star_message(
