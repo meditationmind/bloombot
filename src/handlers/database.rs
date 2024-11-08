@@ -336,66 +336,22 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Option<Recipient>> {
-    let row = sqlx::query!(
-      "
-        SELECT user_id, guild_id, challenge_prize, donator_perk, total_keys FROM steamkey_recipients WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
+    Ok(
+      Recipient::retrieve_one(*guild_id, *user_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let steamkey_recipient = match row {
-      Some(row) => Some(Recipient {
-        user_id: UserId::new(row.user_id.parse::<u64>()?),
-        guild_id: GuildId::new(row.guild_id.parse::<u64>()?),
-        challenge_prize: row.challenge_prize,
-        donator_perk: row.donator_perk,
-        total_keys: row.total_keys,
-      }),
-      None => None,
-    };
-
-    Ok(steamkey_recipient)
   }
 
   pub async fn get_steamkey_recipients(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
   ) -> Result<Vec<Recipient>> {
-    let rows = sqlx::query!(
-      "
-        SELECT user_id, guild_id, challenge_prize, donator_perk, total_keys FROM steamkey_recipients WHERE guild_id = $1
-      ",
-      guild_id.to_string(),
+    Ok(
+      Recipient::retrieve_all(*guild_id)
+        .fetch_all(&mut **transaction)
+        .await?,
     )
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    #[allow(clippy::expect_used)]
-    let steamkey_recipients = rows
-      .into_iter()
-      .map(|row| Recipient {
-        user_id: UserId::new(
-          row
-            .user_id
-            .parse::<u64>()
-            .expect("parse should not fail since user_id is UserId.to_string()"),
-        ),
-        guild_id: GuildId::new(
-          row
-            .guild_id
-            .parse::<u64>()
-            .expect("parse should not fail since guild_id is GuildId.to_string()"),
-        ),
-        challenge_prize: row.challenge_prize,
-        donator_perk: row.donator_perk,
-        total_keys: row.total_keys,
-      })
-      .collect();
-
-    Ok(steamkey_recipients)
   }
 
   pub async fn steamkey_recipient_exists(
@@ -404,7 +360,7 @@ impl DatabaseHandler {
     user_id: &UserId,
   ) -> Result<bool> {
     Ok(
-      Recipient::exists_query::<Exists>(*guild_id, user_id.to_string())
+      Recipient::exists_query::<Exists>(*guild_id, *user_id)
         .fetch_one(&mut **transaction)
         .await?
         .exists,
@@ -416,43 +372,14 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<()> {
-    let possible_record = sqlx::query!(
-      "
-        SELECT total_keys FROM steamkey_recipients WHERE guild_id = $1 AND user_id = $2
-      ",
-      guild_id.to_string(),
-      user_id.to_string(),
-    )
-    .fetch_optional(&mut **connection)
-    .await?;
+    let exists = Recipient::exists_query::<Exists>(*guild_id, *user_id)
+      .fetch_one(&mut **connection)
+      .await?
+      .exists;
 
-    match possible_record {
-      Some(existing_record) => {
-        let updated_keys = existing_record.total_keys + 1;
-        sqlx::query!(
-          "
-          UPDATE steamkey_recipients SET challenge_prize = TRUE, total_keys = $1 WHERE user_id = $2 AND guild_id = $3
-          ",
-          updated_keys,
-          user_id.to_string(),
-          guild_id.to_string(),
-        )
-        .execute(&mut **connection)
-        .await?;
-      }
-      None => {
-        sqlx::query!(
-          "
-            INSERT INTO steamkey_recipients (record_id, user_id, guild_id, challenge_prize, total_keys) VALUES ($1, $2, $3, TRUE, 1)
-          ",
-          Ulid::new().to_string(),
-          user_id.to_string(),
-          guild_id.to_string(),
-        )
-        .execute(&mut **connection)
-        .await?;
-      }
-    }
+    Recipient::record_win(*guild_id, *user_id, exists)
+      .execute(&mut **connection)
+      .await?;
 
     Ok(())
   }
@@ -1191,38 +1118,11 @@ impl DatabaseHandler {
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
   ) -> Result<Vec<SteamKey>> {
-    let rows = sqlx::query!(
-      "
-        SELECT steam_key, reserved, used, guild_id FROM steamkey WHERE guild_id = $1
-      ",
-      guild_id.to_string(),
+    Ok(
+      SteamKey::retrieve_all(*guild_id)
+        .fetch_all(&mut **transaction)
+        .await?,
     )
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    #[allow(clippy::expect_used)]
-    let steam_keys = rows
-      .into_iter()
-      .map(|row| SteamKey {
-        key: row.steam_key,
-        reserved: row.reserved.map(|reserved| {
-          UserId::new(
-            reserved
-              .parse::<u64>()
-              .expect("parse should not fail since reserved is UserId.to_string()"),
-          )
-        }),
-        used: row.used,
-        guild_id: GuildId::new(
-          row
-            .guild_id
-            .parse::<u64>()
-            .expect("parse should not fail since guild_id is GuildId.to_string()"),
-        ),
-      })
-      .collect();
-
-    Ok(steam_keys)
   }
 
   pub async fn add_quote(
@@ -1679,41 +1579,22 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Option<String>> {
-    let row = sqlx::query!(
-      "
-        UPDATE steamkey SET reserved = $1 WHERE steam_key = (SELECT steam_key FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $2 ORDER BY RANDOM() LIMIT 1) RETURNING steam_key
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
+    Ok(
+      SteamKey::reserve(*guild_id, *user_id)
+        .fetch_optional(&mut **transaction)
+        .await?
+        .map(|reserved| reserved.key),
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    Ok(row.map(|row| row.steam_key))
   }
 
   pub async fn unreserve_key(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE steamkey SET reserved = NULL WHERE steam_key = $1
-      ",
-      key,
-    )
-    .execute(&mut **connection)
-    .await?;
+    SteamKey::unreserve(key).execute(&mut **connection).await?;
 
     Ok(())
   }
 
   pub async fn mark_key_used(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE steamkey SET used = TRUE WHERE steam_key = $1
-      ",
-      key,
-    )
-    .execute(&mut **connection)
-    .await?;
+    SteamKey::mark_used(key).execute(&mut **connection).await?;
 
     Ok(())
   }
@@ -1722,16 +1603,12 @@ impl DatabaseHandler {
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
   ) -> Result<Option<String>> {
-    let row = sqlx::query!(
-      "
-        UPDATE steamkey SET used = TRUE WHERE steam_key = (SELECT steam_key FROM steamkey WHERE used = FALSE AND reserved IS NULL AND guild_id = $1 ORDER BY RANDOM() LIMIT 1) RETURNING steam_key
-      ",
-      guild_id.to_string(),
+    Ok(
+      SteamKey::consume(*guild_id)
+        .fetch_optional(&mut **transaction)
+        .await?
+        .map(|consumed| consumed.key),
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    Ok(row.map(|row| row.steam_key))
   }
 
   pub async fn get_random_quote(

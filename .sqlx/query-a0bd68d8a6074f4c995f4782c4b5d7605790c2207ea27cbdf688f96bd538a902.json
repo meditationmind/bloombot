@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE steamkey SET used = TRUE WHERE steam_key = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a0bd68d8a6074f4c995f4782c4b5d7605790c2207ea27cbdf688f96bd538a902"
+}

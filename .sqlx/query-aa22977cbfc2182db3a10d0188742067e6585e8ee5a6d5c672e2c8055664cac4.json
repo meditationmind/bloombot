@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE steamkey_recipients SET challenge_prize = TRUE, total_keys = total_keys + 1 WHERE user_id = $1 AND guild_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aa22977cbfc2182db3a10d0188742067e6585e8ee5a6d5c672e2c8055664cac4"
+}
