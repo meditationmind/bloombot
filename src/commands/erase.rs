@@ -463,12 +463,9 @@ async fn populate(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  let erase = Erase::new(user.id)
-    .link(message_link)
-    .reason(reason)
-    .datetime(datetime);
+  let erase = Erase::new(guild_id, user.id, message_link, reason, &datetime);
 
-  DatabaseHandler::add_erase(&mut transaction, &guild_id, erase).await?;
+  DatabaseHandler::add_erase(&mut transaction, &erase).await?;
 
   database::commit_and_say(
     ctx,
@@ -569,12 +566,9 @@ async fn erase_and_log(
     .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;
 
-  let erase = Erase::new(user_id)
-    .link(log_message.link())
-    .reason(reason)
-    .datetime(occurred_at);
+  let erase = Erase::new(guild_id, user_id, log_message.link(), reason, &occurred_at);
 
-  DatabaseHandler::add_erase(transaction, &guild_id, erase).await?;
+  DatabaseHandler::add_erase(transaction, &erase).await?;
 
   Ok(dm_embed)
 }

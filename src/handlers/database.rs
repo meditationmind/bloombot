@@ -546,25 +546,8 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn add_erase(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    erase: Erase,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO erases (record_id, user_id, guild_id, message_link, reason, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (message_link) DO UPDATE SET reason = $5
-      ",
-      Ulid::new().to_string(),
-      erase.user_id.to_string(),
-      guild_id.to_string(),
-      erase.message_link,
-      erase.reason,
-      erase.occurred_at,
-    )
-    .execute(&mut **transaction)
-    .await?;
+  pub async fn add_erase(transaction: &mut Transaction<'_, Postgres>, erase: &Erase) -> Result<()> {
+    erase.insert_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -574,34 +557,15 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Vec<Erase>> {
-    let rows = sqlx::query!(
-      "
-        SELECT record_id, user_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
+    let erases: Vec<Erase> = sqlx::query_as(
+      "SELECT record_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC",
     )
+    .bind(user_id.to_string())
+    .bind(guild_id.to_string())
     .fetch_all(&mut **transaction)
     .await?;
 
-    #[allow(clippy::expect_used)]
-    let erase_data = rows
-      .into_iter()
-      .map(|row| Erase {
-        id: row.record_id,
-        user_id: UserId::new(
-          row
-            .user_id
-            .parse::<u64>()
-            .expect("parse should not fail since user_id is UserId.to_string()"),
-        ),
-        message_link: row.message_link.unwrap_or(String::from("None")),
-        reason: row.reason.unwrap_or(String::from("No reason provided.")),
-        occurred_at: row.occurred_at.unwrap_or_default(),
-      })
-      .collect();
-
-    Ok(erase_data)
+    Ok(erases)
   }
 
   pub async fn add_minutes(
