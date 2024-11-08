@@ -182,7 +182,7 @@ impl FromRow<'_, PgRow> for Meditation {
   fn from_row(row: &'_ PgRow) -> sqlx::Result<Self, sqlx::Error> {
     let guild_id: String = row.try_get("guild_id").unwrap_or("1".to_string());
     let guild_id = match guild_id.parse::<u64>() {
-      Ok(id) => id,
+      Ok(id) => GuildId::new(id),
       Err(e) => {
         return Err(sqlx::Error::ColumnDecode {
           index: "guild_id".to_string(),
@@ -192,7 +192,7 @@ impl FromRow<'_, PgRow> for Meditation {
     };
     let user_id: String = row.try_get("user_id").unwrap_or("1".to_string());
     let user_id = match user_id.parse::<u64>() {
-      Ok(id) => id,
+      Ok(id) => UserId::new(id),
       Err(e) => {
         return Err(sqlx::Error::ColumnDecode {
           index: "user_id".to_string(),
@@ -203,8 +203,8 @@ impl FromRow<'_, PgRow> for Meditation {
 
     Ok(Self {
       id: row.try_get("record_id").unwrap_or_default(),
-      guild_id: GuildId::new(guild_id),
-      user_id: UserId::new(user_id),
+      guild_id,
+      user_id,
       minutes: row.try_get("meditation_minutes").unwrap_or_default(),
       seconds: row.try_get("meditation_seconds").unwrap_or_default(),
       occurred_at: row.try_get("occurred_at").unwrap_or_default(),
