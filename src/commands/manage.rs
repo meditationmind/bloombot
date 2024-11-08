@@ -13,6 +13,7 @@ use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, CHANNELS, ENTRIES_PER_PAGE};
 use crate::data::common::{Migration, MigrationType};
+use crate::data::meditation::Meditation;
 use crate::database::DatabaseHandler;
 use crate::Context;
 
@@ -122,15 +123,9 @@ async fn create(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  DatabaseHandler::add_meditation_entry(
-    &mut transaction,
-    &guild_id,
-    &user.id,
-    minutes,
-    seconds,
-    datetime,
-  )
-  .await?;
+  let meditation = Meditation::new(guild_id, user.id, minutes, seconds, &datetime);
+
+  DatabaseHandler::add_meditation_entry(&mut transaction, &meditation).await?;
 
   let description = if seconds > 0 {
     format!(
@@ -323,14 +318,9 @@ async fn update(
 
     let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-    DatabaseHandler::update_meditation_entry(
-      &mut transaction,
-      &entry_id,
-      minutes,
-      seconds,
-      datetime,
-    )
-    .await?;
+    let updated_entry = existing_entry.with_new(minutes, seconds, &datetime);
+
+    DatabaseHandler::update_meditation_entry(&mut transaction, &updated_entry).await?;
 
     let description = if existing_entry.seconds > 0 || seconds > 0 {
       format!(

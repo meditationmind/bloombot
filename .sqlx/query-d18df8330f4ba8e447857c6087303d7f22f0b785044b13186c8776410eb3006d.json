@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        DELETE FROM meditation WHERE record_id = $1\n      ",
+  "query": "DELETE FROM meditation WHERE record_id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "064a9fee699eb7abdd845744f16acf432c1c26184c1f510a6d7e4ef7a3bdb65c"
+  "hash": "d18df8330f4ba8e447857c6087303d7f22f0b785044b13186c8776410eb3006d"
 }

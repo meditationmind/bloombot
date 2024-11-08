@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9c3380da1f592fcaa13e4681472f215b474678af95b31fc1ca13e96b535b0166"
+}

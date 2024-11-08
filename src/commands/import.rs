@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context as AnyhowContext, Result};
 use chrono::{DateTime, Duration, NaiveDateTime, TimeDelta, Utc};
 use csv::{Reader, ReaderBuilder, WriterBuilder};
 use log::info;
-use poise::serenity_prelude::{builder::*, ChannelId, Message, RoleId, User, UserId};
+use poise::serenity_prelude::{builder::*, ChannelId, Message, RoleId, User};
 use poise::{ChoiceParameter, CreateReply};
 use serde::{Deserialize, Serialize};
 use tokio::{fs, fs::File, io::AsyncWriteExt};
@@ -14,7 +14,6 @@ use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, MEDITATION_MIND, ROLES};
-use crate::data::meditation::Meditation;
 use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::Context;
@@ -336,13 +335,7 @@ pub async fn import(
     ImportType::NewEntries => true,
   };
   let current_data = if new_entries_only {
-    vec![latest_meditation.unwrap_or(Meditation {
-      id: String::new(),
-      user_id: UserId::default(),
-      minutes: 0,
-      seconds: 0,
-      occurred_at: DateTime::UNIX_EPOCH,
-    })]
+    vec![latest_meditation.unwrap_or_default()]
   } else {
     DatabaseHandler::get_user_meditation_entries(&mut transaction, &guild_id, &user_id).await?
   };

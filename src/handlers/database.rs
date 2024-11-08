@@ -568,50 +568,14 @@ impl DatabaseHandler {
     Ok(erases)
   }
 
-  pub async fn add_minutes(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-    minutes: i32,
-    seconds: i32,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id) VALUES ($1, $2, $3, $4, $5)
-      ",
-      Ulid::new().to_string(),
-      user_id.to_string(),
-      minutes,
-      seconds,
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
-
-    Ok(())
-  }
-
   pub async fn add_meditation_entry(
     transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-    minutes: i32,
-    seconds: i32,
-    occurred_at: DateTime<Utc>,
+    meditation_entry: &Meditation,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)
-      ",
-      Ulid::new().to_string(),
-      user_id.to_string(),
-      minutes,
-      seconds,
-      guild_id.to_string(),
-      occurred_at,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    meditation_entry
+      .insert_query()
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
@@ -633,105 +597,23 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Vec<Meditation>> {
-    let rows = sqlx::query!(
-      "
-        SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
+    Ok(
+      Meditation::user_entries(*guild_id, *user_id)
+        .fetch_all(&mut **transaction)
+        .await?,
     )
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    #[allow(clippy::expect_used)]
-    let meditation_entries = rows
-      .into_iter()
-      .map(|row| Meditation {
-        id: row.record_id,
-        user_id: UserId::new(
-          row
-            .user_id
-            .parse::<u64>()
-            .expect("parse should not fail since user_id is UserId.to_string()"),
-        ),
-        minutes: row.meditation_minutes,
-        seconds: row.meditation_seconds,
-        occurred_at: row.occurred_at,
-      })
-      .collect();
-
-    Ok(meditation_entries)
   }
-
-  /*pub async fn get_user_meditation_entries_between(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-    start_time: DateTime<Utc>,
-    end_time: DateTime<Utc>,
-  ) -> Result<Vec<MeditationData>> {
-    let rows = sqlx::query!(
-      "
-        SELECT record_id, user_id, meditation_minutes, occurred_at
-        FROM meditation
-        WHERE user_id = $1 AND guild_id = $2
-        AND occurred_at >= $3 AND occurred_at <= $4
-        ORDER BY occurred_at DESC
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-      start_time,
-      end_time,
-    )
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    #[allow(clippy::expect_used)]
-    let meditation_entries = rows
-      .into_iter()
-      .map(|row| MeditationData {
-        id: row.record_id,
-        user_id: UserId::new(
-          row
-            .user_id
-            .parse::<u64>()
-            .expect("parse should not fail since user_id is UserId.to_string()"),
-        ),
-        meditation_minutes: row.meditation_minutes,
-        occurred_at: row.occurred_at,
-      })
-      .collect();
-
-    Ok(meditation_entries)
-  }*/
 
   pub async fn get_meditation_entry(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     meditation_id: &str,
   ) -> Result<Option<Meditation>> {
-    let row = sqlx::query!(
-      "
-        SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at FROM meditation WHERE record_id = $1 AND guild_id = $2
-      ",
-      meditation_id,
-      guild_id.to_string(),
+    Ok(
+      Meditation::full_entry(*guild_id, meditation_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let meditation_entry = match row {
-      Some(row) => Some(Meditation {
-        id: row.record_id,
-        user_id: UserId::new(row.user_id.parse::<u64>()?),
-        minutes: row.meditation_minutes,
-        seconds: row.meditation_seconds,
-        occurred_at: row.occurred_at,
-      }),
-      None => None,
-    };
-
-    Ok(meditation_entry)
   }
 
   pub async fn get_latest_meditation_entry(
@@ -739,52 +621,21 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Option<Meditation>> {
-    let row = sqlx::query!(
-      "
-        SELECT record_id, user_id, meditation_minutes, meditation_seconds, occurred_at
-        FROM meditation
-        WHERE user_id = $1 AND guild_id = $2
-        ORDER BY occurred_at DESC
-        LIMIT 1
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
+    Ok(
+      Meditation::latest_entry(*guild_id, *user_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let meditation_entry = match row {
-      Some(row) => Some(Meditation {
-        id: row.record_id,
-        user_id: UserId::new(row.user_id.parse::<u64>()?),
-        minutes: row.meditation_minutes,
-        seconds: row.meditation_seconds,
-        occurred_at: row.occurred_at,
-      }),
-      None => None,
-    };
-
-    Ok(meditation_entry)
   }
 
   pub async fn update_meditation_entry(
     transaction: &mut Transaction<'_, Postgres>,
-    meditation_id: &str,
-    minutes: i32,
-    seconds: i32,
-    occurred_at: DateTime<Utc>,
+    meditation_entry: &Meditation,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4
-      ",
-      minutes,
-      seconds,
-      occurred_at,
-      meditation_id,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    meditation_entry
+      .update_query()
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
@@ -793,14 +644,9 @@ impl DatabaseHandler {
     transaction: &mut Transaction<'_, Postgres>,
     meditation_id: &str,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM meditation WHERE record_id = $1
-      ",
-      meditation_id,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    Meditation::delete_query(GuildId::default(), meditation_id)
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
@@ -810,15 +656,9 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM meditation WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
+    Meditation::remove_all(*guild_id, *user_id)
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }

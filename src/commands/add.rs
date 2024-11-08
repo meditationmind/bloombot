@@ -10,6 +10,7 @@ use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
+use crate::data::meditation::Meditation;
 use crate::data::tracking_profile::{privacy, Privacy, Status};
 use crate::database::DatabaseHandler;
 use crate::events;
@@ -85,20 +86,14 @@ pub async fn add(
 
   let seconds = seconds.unwrap_or(0);
 
-  if offset == 0 {
-    DatabaseHandler::add_minutes(&mut transaction, &guild_id, &user_id, minutes, seconds).await?;
-  } else {
-    let adjusted_datetime = Utc::now() + ChronoDuration::minutes(i64::from(offset));
-    DatabaseHandler::add_meditation_entry(
-      &mut transaction,
-      &guild_id,
-      &user_id,
-      minutes,
-      seconds,
-      adjusted_datetime,
-    )
-    .await?;
-  }
+  let datetime = match offset {
+    0 => Utc::now(),
+    _ => Utc::now() + ChronoDuration::minutes(i64::from(offset)),
+  };
+
+  let meditation = Meditation::new(guild_id, user_id, minutes, seconds, &datetime);
+
+  DatabaseHandler::add_meditation_entry(&mut transaction, &meditation).await?;
 
   let user_sum =
     DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, &user_id).await?;

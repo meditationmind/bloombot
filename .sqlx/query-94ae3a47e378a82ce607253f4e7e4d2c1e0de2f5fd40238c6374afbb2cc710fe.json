@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        DELETE FROM meditation WHERE user_id = $1 AND guild_id = $2\n      ",
+  "query": "DELETE FROM meditation WHERE user_id = $1 AND guild_id = $2",
   "describe": {
     "columns": [],
     "parameters": {
@@ -11,5 +11,5 @@
     },
     "nullable": []
   },
-  "hash": "fdf0996777e84a16d442c3507ec9ef845aa6353649672569b302e7ac35e1d4e0"
+  "hash": "94ae3a47e378a82ce607253f4e7e4d2c1e0de2f5fd40238c6374afbb2cc710fe"
 }
