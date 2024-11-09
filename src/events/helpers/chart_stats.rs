@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use chrono::{Duration as ChronoDuration, Utc};
 use log::{error, info};
+use sqlx::{Connection, PgConnection};
 use tokio::time;
 
 use crate::commands::helpers::time::Timeframe;
@@ -18,8 +19,24 @@ async fn refresh(db: &DatabaseHandler) -> Result<()> {
   let mut transaction = db.start_transaction().await?;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Weekly).await?;
   time::sleep(Duration::from_secs(60 * 2)).await;
+
+  let mut transaction = if PgConnection::ping(&mut *transaction).await.is_ok() {
+    transaction
+  } else {
+    info!(target: "bloombot::database","Connection closed. Reconnecting.");
+    db.start_transaction().await?
+  };
+
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Monthly).await?;
   time::sleep(Duration::from_secs(60 * 2)).await;
+
+  let mut transaction = if PgConnection::ping(&mut *transaction).await.is_ok() {
+    transaction
+  } else {
+    info!(target: "bloombot::database","Connection closed. Reconnecting.");
+    db.start_transaction().await?
+  };
+
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Yearly).await?;
   transaction.commit().await?;
 
