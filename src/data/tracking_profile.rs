@@ -1,11 +1,12 @@
 use poise::serenity_prelude::{GuildId, UserId};
 use poise::ChoiceParameter;
-use sqlx::postgres::PgArguments;
-use sqlx::query::Query;
-use sqlx::Postgres;
+use sqlx::postgres::{PgArguments, PgRow};
+use sqlx::query::{Query, QueryAs};
+use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};
 use ulid::Ulid;
 
 use crate::commands::helpers::time;
+use crate::data::common;
 use crate::handlers::database::{DeleteQuery, InsertQuery, UpdateQuery};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, ChoiceParameter)]
@@ -124,6 +125,18 @@ impl TrackingProfile {
     self.stats.privacy = privacy;
     self
   }
+
+  /// Retrieves a [`TrackingProfile`] for a specified `user_id`.
+  pub fn retrieve<'a>(
+    guild_id: GuildId,
+    user_id: UserId,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    sqlx::query_as(
+      "SELECT user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private FROM tracking_profile WHERE user_id = $1 AND guild_id = $2",
+    )
+    .bind(user_id.to_string())
+    .bind(guild_id.to_string())
+  }
 }
 
 //Default values for tracking customization
@@ -150,7 +163,7 @@ impl Default for TrackingProfile {
 impl InsertQuery for TrackingProfile {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
-      "INSERT INTO tracking_profile( record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+      "INSERT INTO tracking_profile (record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
       Ulid::new().to_string(),
       self.user_id.to_string(),
       self.guild_id.to_string(),
@@ -188,6 +201,49 @@ impl DeleteQuery for TrackingProfile {
       user_id.into(),
       guild_id.to_string(),
     )
+  }
+}
+
+impl FromRow<'_, PgRow> for TrackingProfile {
+  fn from_row(row: &'_ PgRow) -> SqlxResult<Self, SqlxError> {
+    let user_id = UserId::new(common::decode_id_row(row, "user_id")?);
+    let guild_id = GuildId::new(common::decode_id_row(row, "guild_id")?);
+    let tracking_privacy = if row.try_get::<bool, &str>("anonymous_tracking")? {
+      Privacy::Private
+    } else {
+      Privacy::Public
+    };
+    let streak_status = if row.try_get::<bool, &str>("streaks_active")? {
+      Status::Enabled
+    } else {
+      Status::Disabled
+    };
+    let streak_privacy = if row.try_get::<bool, &str>("streaks_private")? {
+      Privacy::Private
+    } else {
+      Privacy::Public
+    };
+    let stats_privacy = if row.try_get::<bool, &str>("stats_private")? {
+      Privacy::Private
+    } else {
+      Privacy::Public
+    };
+
+    Ok(Self {
+      user_id,
+      guild_id,
+      utc_offset: row.try_get("utc_offset").unwrap_or_default(),
+      tracking: Tracking {
+        privacy: tracking_privacy,
+      },
+      streak: Streak {
+        status: streak_status,
+        privacy: streak_privacy,
+      },
+      stats: Stats {
+        privacy: stats_privacy,
+      },
+    })
   }
 }
 

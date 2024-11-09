@@ -28,7 +28,7 @@ use crate::data::star_message::StarMessage;
 use crate::data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User};
 use crate::data::steam_key::{Recipient, SteamKey};
 use crate::data::term::{Names, SearchResult, Term};
-use crate::data::tracking_profile::{self, TrackingProfile};
+use crate::data::tracking_profile::TrackingProfile;
 
 #[derive(Debug)]
 struct Res {
@@ -253,52 +253,11 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Option<TrackingProfile>> {
-    let row = sqlx::query!(
-      "
-        SELECT user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private FROM tracking_profile WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
+    Ok(
+      TrackingProfile::retrieve(*guild_id, *user_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let tracking_profile = match row {
-      Some(row) => Some(TrackingProfile {
-        user_id: UserId::new(row.user_id.parse::<u64>()?),
-        guild_id: GuildId::new(row.guild_id.parse::<u64>()?),
-        utc_offset: row.utc_offset,
-        tracking: tracking_profile::Tracking {
-          privacy: if row.anonymous_tracking {
-            tracking_profile::Privacy::Private
-          } else {
-            tracking_profile::Privacy::Public
-          },
-        },
-        streak: tracking_profile::Streak {
-          status: if row.streaks_active {
-            tracking_profile::Status::Enabled
-          } else {
-            tracking_profile::Status::Disabled
-          },
-          privacy: if row.streaks_private {
-            tracking_profile::Privacy::Private
-          } else {
-            tracking_profile::Privacy::Public
-          },
-        },
-        stats: tracking_profile::Stats {
-          privacy: if row.stats_private {
-            tracking_profile::Privacy::Private
-          } else {
-            tracking_profile::Privacy::Public
-          },
-        },
-      }),
-      None => None,
-    };
-
-    Ok(tracking_profile)
   }
 
   pub async fn add_steamkey_recipient(
