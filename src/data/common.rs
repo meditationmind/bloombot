@@ -5,9 +5,18 @@ use sqlx::{Error as SqlxError, Postgres, Row};
 
 use crate::handlers::database::UpdateQuery;
 
-#[derive(sqlx::FromRow)]
+#[derive(Default, sqlx::FromRow)]
+#[sqlx(default)]
 pub struct Exists {
   pub exists: bool,
+}
+
+#[derive(Default, sqlx::FromRow)]
+#[sqlx(default)]
+pub struct Aggregate {
+  #[sqlx(try_from = "i64")]
+  pub count: u64,
+  pub sum: i64,
 }
 
 pub struct Migration {

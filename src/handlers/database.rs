@@ -19,7 +19,7 @@ use ulid::Ulid;
 use crate::commands::helpers::time::{ChallengeTimeframe, Timeframe};
 use crate::commands::stats::{LeaderboardType, SortBy};
 use crate::data::bookmark::Bookmark;
-use crate::data::common::{Exists, Migration};
+use crate::data::common::{Aggregate, Exists, Migration};
 use crate::data::course::{Course, ExtendedCourse};
 use crate::data::erase::Erase;
 use crate::data::meditation::Meditation;
@@ -398,21 +398,12 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<u64> {
-    let row = sqlx::query!(
-      "
-        SELECT COUNT(record_id) AS bookmark_count FROM bookmarks WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
+    Ok(
+      Bookmark::user_total::<Aggregate>(*guild_id, *user_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .count,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let bookmark_count = row
-      .bookmark_count
-      .with_context(|| "Failed to assign bookmark_count computed by DB query")?;
-
-    Ok(bookmark_count.try_into()?)
   }
 
   pub async fn get_bookmarks(
@@ -420,20 +411,11 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Vec<Bookmark>> {
-    let bookmarks: Vec<Bookmark> = sqlx::query_as(
-      "
-        SELECT record_id, message_link, user_desc, occurred_at
-        FROM bookmarks
-        WHERE guild_id = $1 AND user_id = $2
-        ORDER BY occurred_at ASC
-      ",
+    Ok(
+      Bookmark::retrieve_all(*guild_id, *user_id)
+        .fetch_all(&mut **transaction)
+        .await?,
     )
-    .bind(guild_id.to_string())
-    .bind(user_id.to_string())
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    Ok(bookmarks)
   }
 
   pub async fn search_bookmarks(
@@ -442,22 +424,11 @@ impl DatabaseHandler {
     user_id: &UserId,
     keyword: &str,
   ) -> Result<Vec<Bookmark>> {
-    let bookmarks: Vec<Bookmark> = sqlx::query_as(
-      "
-        SELECT record_id, message_link, user_desc, occurred_at
-        FROM bookmarks
-        WHERE user_id = $1 AND guild_id = $2
-        AND (desc_tsv @@ websearch_to_tsquery('english', $3))
-        ORDER BY ts_rank(desc_tsv, websearch_to_tsquery('english', $3)) DESC
-      ",
+    Ok(
+      Bookmark::search(*guild_id, *user_id, keyword)
+        .fetch_all(&mut **transaction)
+        .await?,
     )
-    .bind(user_id.to_string())
-    .bind(guild_id.to_string())
-    .bind(keyword.to_string())
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    Ok(bookmarks)
   }
 
   pub async fn remove_bookmark(
