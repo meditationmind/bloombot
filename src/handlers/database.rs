@@ -1,6 +1,7 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
 use std::env;
+use std::pin::Pin;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -12,7 +13,7 @@ use poise::serenity_prelude::{GuildId, MessageId, Role, RoleId, UserId};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
-use sqlx::{FromRow, PgPool, Postgres, Transaction};
+use sqlx::{Error as SqlxError, FromRow, PgPool, Postgres, Transaction};
 use tokio::time;
 use ulid::Ulid;
 
@@ -23,6 +24,7 @@ use crate::data::common::{Aggregate, Exists, Migration};
 use crate::data::course::{Course, ExtendedCourse};
 use crate::data::erase::Erase;
 use crate::data::meditation::Meditation;
+use crate::data::pick_winner;
 use crate::data::quote::Quote;
 use crate::data::star_message::StarMessage;
 use crate::data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User};
@@ -531,24 +533,10 @@ impl DatabaseHandler {
     end_date: DateTime<Utc>,
     guild_id: &'a GuildId,
   ) -> impl Stream<Item = Result<UserId>> + 'a {
-    // All entries that are greater than 0 minutes and within the start and end date
-    // We only want a user ID to show up once, so we group by user ID and sum the meditation minutes
-    let rows_stream = sqlx::query!(
-      "
-        SELECT user_id FROM meditation WHERE meditation_minutes > 0 AND occurred_at >= $1 AND occurred_at <= $2 AND guild_id = $3 GROUP BY user_id ORDER BY RANDOM()
-      ",
-      start_date,
-      end_date,
-      guild_id.to_string(),
-    ).fetch(&mut **conn);
+    let stream: Pin<Box<dyn Stream<Item = Result<Meditation, SqlxError>> + Send>> =
+      pick_winner::retrieve_candidate(*guild_id, start_date, end_date).fetch(&mut **conn);
 
-    rows_stream.map(|row| {
-      let row = row?;
-
-      let user_id = UserId::new(row.user_id.parse::<u64>()?);
-
-      Ok(user_id)
-    })
+    stream.map(|row| Ok(row?.user_id))
   }
 
   pub async fn get_winner_candidate_meditation_sum(
@@ -558,23 +546,12 @@ impl DatabaseHandler {
     start_date: DateTime<Utc>,
     end_date: DateTime<Utc>,
   ) -> Result<i64> {
-    let row = sqlx::query!(
-      "
-        SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS winner_candidate_total FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-      start_date,
-      end_date,
+    Ok(
+      pick_winner::candidate_sum::<Aggregate>(*guild_id, *user_id, start_date, end_date)
+        .fetch_one(&mut **transaction)
+        .await?
+        .sum,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let winner_candidate_total = row
-      .winner_candidate_total
-      .with_context(|| "Failed to assign winner_candidate_total computed by DB query")?;
-
-    Ok(winner_candidate_total)
   }
 
   pub async fn get_winner_candidate_meditation_count(
@@ -584,23 +561,12 @@ impl DatabaseHandler {
     start_date: DateTime<Utc>,
     end_date: DateTime<Utc>,
   ) -> Result<u64> {
-    let row = sqlx::query!(
-      "
-        SELECT COUNT(record_id) AS winner_candidate_total FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-      start_date,
-      end_date,
+    Ok(
+      pick_winner::candidate_count::<Aggregate>(*guild_id, *user_id, start_date, end_date)
+        .fetch_one(&mut **transaction)
+        .await?
+        .count,
     )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let winner_candidate_total = row
-      .winner_candidate_total
-      .with_context(|| "Failed to assign winner_candidate_total computed by DB query")?;
-
-    Ok(winner_candidate_total.try_into()?)
   }
 
   pub async fn get_user_meditation_sum(

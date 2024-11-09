@@ -3,6 +3,7 @@ pub mod common;
 pub mod course;
 pub mod erase;
 pub mod meditation;
+pub mod pick_winner;
 pub mod quote;
 pub mod star_message;
 pub mod stats;
