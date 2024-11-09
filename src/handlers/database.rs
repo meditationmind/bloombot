@@ -9,7 +9,7 @@ use chrono::{DateTime, Datelike, Duration as ChronoDuration, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use pgvector::Vector;
-use poise::serenity_prelude::{GuildId, MessageId, Role, RoleId, UserId};
+use poise::serenity_prelude::{GuildId, MessageId, UserId};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
@@ -21,7 +21,7 @@ use crate::commands::helpers::time::{ChallengeTimeframe, Timeframe};
 use crate::commands::stats::{LeaderboardType, SortBy};
 use crate::data::bookmark::Bookmark;
 use crate::data::common::{Aggregate, Exists, Migration};
-use crate::data::course::{Course, ExtendedCourse};
+use crate::data::course::Course;
 use crate::data::erase::Erase;
 use crate::data::meditation::Meditation;
 use crate::data::pick_winner;
@@ -911,6 +911,36 @@ impl DatabaseHandler {
     Ok(streak_data)
   }
 
+  pub async fn add_course(
+    transaction: &mut Transaction<'_, Postgres>,
+    course: &Course,
+  ) -> Result<()> {
+    course.insert_query().execute(&mut **transaction).await?;
+
+    Ok(())
+  }
+
+  pub async fn update_course(
+    transaction: &mut Transaction<'_, Postgres>,
+    course: &Course,
+  ) -> Result<()> {
+    course.update_query().execute(&mut **transaction).await?;
+
+    Ok(())
+  }
+
+  pub async fn remove_course(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    course_name: &str,
+  ) -> Result<()> {
+    Course::delete_query(*guild_id, course_name)
+      .execute(&mut **transaction)
+      .await?;
+
+    Ok(())
+  }
+
   pub async fn course_exists(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -924,47 +954,51 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn add_course(
+  pub async fn get_course(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     course_name: &str,
-    participant_role: &Role,
-    graduate_role: &Role,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO course (record_id, course_name, participant_role, graduate_role, guild_id) VALUES ($1, $2, $3, $4, $5)
-      ",
-      Ulid::new().to_string(),
-      course_name,
-      participant_role.id.to_string(),
-      graduate_role.id.to_string(),
-      guild_id.to_string(),
+  ) -> Result<Option<Course>> {
+    Ok(
+      Course::retrieve(*guild_id, course_name)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .execute(&mut **transaction)
-    .await?;
-
-    Ok(())
   }
 
-  pub async fn update_course(
+  pub async fn get_course_in_dm(
     transaction: &mut Transaction<'_, Postgres>,
     course_name: &str,
-    participant_role: String,
-    graduate_role: String,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE course SET participant_role = $1, graduate_role = $2 WHERE LOWER(course_name) = LOWER($3)
-      ",
-      participant_role,
-      graduate_role,
-      course_name,
+  ) -> Result<Option<Course>> {
+    Ok(
+      Course::retrieve_in_dm(course_name)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .execute(&mut **transaction)
-    .await?;
+  }
 
-    Ok(())
+  pub async fn get_possible_course(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    course_name: &str,
+    similarity: f32,
+  ) -> Result<Option<Course>> {
+    Ok(
+      Course::retrieve_similar(*guild_id, course_name, similarity)
+        .fetch_optional(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn get_all_courses(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<Vec<Course>> {
+    Ok(
+      Course::retrieve_all(*guild_id)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
   }
 
   pub async fn steam_key_exists(
@@ -1227,140 +1261,6 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn get_all_courses(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<Vec<Course>> {
-    let rows = sqlx::query!(
-      "
-        SELECT course_name, participant_role, graduate_role
-        FROM course
-        WHERE guild_id = $1
-        ORDER BY course_name ASC
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    #[allow(clippy::expect_used)]
-    let courses = rows
-      .into_iter()
-      .map(|row| Course {
-        name: row.course_name,
-        participant_role: RoleId::new(
-          row
-            .participant_role
-            .parse::<u64>()
-            .expect("parse should not fail since participant_role is RoleId.to_string()"),
-        ),
-        graduate_role: RoleId::new(
-          row
-            .graduate_role
-            .parse::<u64>()
-            .expect("parse should not fail since graduate_role is RoleId.to_string()"),
-        ),
-      })
-      .collect();
-
-    Ok(courses)
-  }
-
-  pub async fn get_course(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    course_name: &str,
-  ) -> Result<Option<Course>> {
-    let row = sqlx::query!(
-      "
-        SELECT course_name, participant_role, graduate_role
-        FROM course
-        WHERE LOWER(course_name) = LOWER($1) AND guild_id = $2
-      ",
-      course_name,
-      guild_id.to_string(),
-    )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let course_data = match row {
-      Some(row) => Some(Course {
-        name: row.course_name,
-        participant_role: RoleId::new(row.participant_role.parse::<u64>()?),
-        graduate_role: RoleId::new(row.graduate_role.parse::<u64>()?),
-      }),
-      None => None,
-    };
-
-    Ok(course_data)
-  }
-
-  pub async fn get_course_in_dm(
-    transaction: &mut Transaction<'_, Postgres>,
-    course_name: &str,
-  ) -> Result<Option<ExtendedCourse>> {
-    let row = sqlx::query!(
-      "
-        SELECT course_name, participant_role, graduate_role, guild_id
-        FROM course
-        WHERE LOWER(course_name) = LOWER($1)
-      ",
-      course_name,
-    )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let extended_course_data = match row {
-      Some(row) => Some(ExtendedCourse {
-        name: row.course_name,
-        participant_role: RoleId::new(row.participant_role.parse::<u64>()?),
-        graduate_role: RoleId::new(row.graduate_role.parse::<u64>()?),
-        guild_id: GuildId::new(
-          row
-            .guild_id
-            .with_context(|| "Failed to retrieve guild_id from DB record")?
-            .parse::<u64>()?,
-        ),
-      }),
-      None => None,
-    };
-
-    Ok(extended_course_data)
-  }
-
-  pub async fn get_possible_course(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    course_name: &str,
-    similarity: f32,
-  ) -> Result<Option<Course>> {
-    let row = sqlx::query!(
-      "
-        SELECT course_name, participant_role, graduate_role, SET_LIMIT($2), SIMILARITY(LOWER(course_name), LOWER($1)) AS similarity_score
-        FROM course
-        WHERE LOWER(course_name) % LOWER($1) AND guild_id = $3
-        ORDER BY similarity_score DESC
-        LIMIT 1
-      ",
-      course_name,
-      similarity,
-      guild_id.to_string(),
-    )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let course_data = match row {
-      Some(row) => Some(Course {
-        name: row.course_name,
-        participant_role: RoleId::new(row.participant_role.parse::<u64>()?),
-        graduate_role: RoleId::new(row.graduate_role.parse::<u64>()?),
-      }),
-      None => None,
-    };
-
-    Ok(course_data)
-  }
-
   pub async fn get_possible_terms(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -1476,24 +1376,6 @@ impl DatabaseHandler {
       .collect();
 
     Ok(glossary)
-  }
-
-  pub async fn remove_course(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    course_name: &str,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM course WHERE course_name = $1 AND guild_id = $2
-      ",
-      course_name,
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
-
-    Ok(())
   }
 
   pub async fn term_exists(

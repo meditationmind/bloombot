@@ -7,6 +7,7 @@ use crate::commands::helpers::courses;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{EMOJI, ENTRIES_PER_PAGE};
+use crate::data::course::Course;
 use crate::database::DatabaseHandler;
 use crate::Context;
 
@@ -123,14 +124,9 @@ async fn add(
     return Ok(());
   }
 
-  DatabaseHandler::add_course(
-    &mut transaction,
-    &guild_id,
-    course_name.as_str(),
-    &participant_role,
-    &graduate_role,
-  )
-  .await?;
+  let course = Course::new(course_name, participant_role.id, graduate_role.id, guild_id);
+
+  DatabaseHandler::add_course(&mut transaction, &course).await?;
 
   database::commit_and_say(
     ctx,
@@ -211,9 +207,9 @@ async fn edit(
           .await?;
         return Ok(());
       }
-      participant_role.id.to_string()
+      participant_role.id
     }
-    None => course.participant_role.to_string(),
+    None => course.participant_role,
   };
 
   let graduate_role = match graduate_role {
@@ -245,9 +241,9 @@ async fn edit(
           .await?;
         return Ok(());
       }
-      graduate_role.id.to_string()
+      graduate_role.id
     }
-    None => course.graduate_role.to_string(),
+    None => course.graduate_role,
   };
 
   // Verify that the roles are not the same
@@ -261,13 +257,9 @@ async fn edit(
     return Ok(());
   }
 
-  DatabaseHandler::update_course(
-    &mut transaction,
-    course_name.as_str(),
-    participant_role,
-    graduate_role,
-  )
-  .await?;
+  let course = Course::new(course_name, participant_role, graduate_role, guild_id);
+
+  DatabaseHandler::update_course(&mut transaction, &course).await?;
 
   database::commit_and_say(
     ctx,

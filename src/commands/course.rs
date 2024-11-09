@@ -114,7 +114,7 @@ async fn join(
       )
       .image("https://meditationmind.org/wp-content/uploads/2022/01/Meditation_CHallenge_kopie.png")
   } else {
-    BloomBotEmbed::new()
+    BloomBotEmbed::new().description("How did you get here?")
   };
 
   ctx
