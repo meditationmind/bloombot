@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO quote (record_id, quote, author, guild_id) VALUES ($1, $2, $3, $4)\n      ",
+  "query": "INSERT INTO quote (record_id, quote, author, guild_id) VALUES ($1, $2, $3, $4)",
   "describe": {
     "columns": [],
     "parameters": {
@@ -13,5 +13,5 @@
     },
     "nullable": []
   },
-  "hash": "e8820488ffee5bb2cd33f51c65837f6ad45e21d16830ed8e68c8a90cd4913431"
+  "hash": "15b645eb74e723162e69be7e66ad1466b6e9326e91032513805dabb4aad59280"
 }

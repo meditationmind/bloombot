@@ -23,7 +23,7 @@ use crate::data::common::{Aggregate, Exists, Migration};
 use crate::data::course::{Course, ExtendedCourse};
 use crate::data::erase::Erase;
 use crate::data::meditation::Meditation;
-use crate::data::quote::{Quote, QuoteModal};
+use crate::data::quote::Quote;
 use crate::data::star_message::StarMessage;
 use crate::data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User};
 use crate::data::steam_key::{Recipient, SteamKey};
@@ -687,58 +687,31 @@ impl DatabaseHandler {
     Ok(guild_total.try_into()?)
   }
 
-  pub async fn get_all_quotes(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<Vec<Quote>> {
-    let rows = sqlx::query!(
-      "
-        SELECT record_id, quote, author FROM quote WHERE guild_id = $1
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_all(&mut **transaction)
-    .await?;
+  pub async fn add_quote(transaction: &mut Transaction<'_, Postgres>, quote: &Quote) -> Result<()> {
+    quote.insert_query().execute(&mut **transaction).await?;
 
-    let quotes = rows
-      .into_iter()
-      .map(|row| Quote {
-        id: row.record_id,
-        quote: row.quote,
-        author: row.author,
-      })
-      .collect();
-
-    Ok(quotes)
+    Ok(())
   }
 
-  pub async fn search_quotes(
+  pub async fn update_quote(
+    transaction: &mut Transaction<'_, Postgres>,
+    quote: &Quote,
+  ) -> Result<()> {
+    quote.update_query().execute(&mut **transaction).await?;
+
+    Ok(())
+  }
+
+  pub async fn remove_quote(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
-    keyword: &str,
-  ) -> Result<Vec<Quote>> {
-    let rows = sqlx::query!(
-      "
-        SELECT record_id, quote, author
-        FROM quote
-        WHERE guild_id = $1 AND (quote_tsv @@ websearch_to_tsquery('english', $2))
-      ",
-      guild_id.to_string(),
-      keyword.to_string(),
-    )
-    .fetch_all(&mut **transaction)
-    .await?;
+    quote_id: &str,
+  ) -> Result<()> {
+    Quote::delete_query(*guild_id, quote_id)
+      .execute(&mut **transaction)
+      .await?;
 
-    let quotes = rows
-      .into_iter()
-      .map(|row| Quote {
-        id: row.record_id,
-        quote: row.quote,
-        author: row.author,
-      })
-      .collect();
-
-    Ok(quotes)
+    Ok(())
   }
 
   pub async fn get_quote(
@@ -746,60 +719,57 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     quote_id: &str,
   ) -> Result<Option<Quote>> {
-    let row = sqlx::query!(
-      "
-        SELECT record_id, quote, author FROM quote WHERE record_id = $1 AND guild_id = $2
-      ",
-      quote_id,
-      guild_id.to_string(),
+    Ok(
+      Quote::retrieve(*guild_id, quote_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let quote = match row {
-      Some(row) => Some(Quote {
-        id: row.record_id,
-        quote: row.quote,
-        author: row.author,
-      }),
-      None => None,
-    };
-
-    Ok(quote)
   }
 
-  pub async fn update_quote(
-    transaction: &mut Transaction<'_, Postgres>,
-    quote: Quote,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        UPDATE quote SET quote = $1, author = $2 WHERE record_id = $3
-      ",
-      quote.quote,
-      quote.author,
-      quote.id,
-    )
-    .execute(&mut **transaction)
-    .await?;
-
-    Ok(())
-  }
-
-  pub async fn get_random_motivation(
+  pub async fn get_random_quote(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
-  ) -> Result<Option<String>> {
-    let row = sqlx::query!(
-      "
-        SELECT quote FROM quote WHERE guild_id = $1 ORDER BY RANDOM() LIMIT 1
-      ",
-      guild_id.to_string(),
+  ) -> Result<Option<Quote>> {
+    Ok(
+      Quote::retrieve_random(*guild_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .fetch_optional(&mut **transaction)
-    .await?;
+  }
 
-    Ok(row.map(|row| row.quote))
+  pub async fn get_random_quote_with_keyword(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    keyword: &str,
+  ) -> Result<Option<Quote>> {
+    Ok(
+      Quote::retrieve_random_with_keyword(*guild_id, keyword)
+        .fetch_optional(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn get_all_quotes(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<Vec<Quote>> {
+    Ok(
+      Quote::retrieve_all(*guild_id)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn search_quotes(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    keyword: &str,
+  ) -> Result<Vec<Quote>> {
+    Ok(
+      Quote::search(*guild_id, keyword)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
   }
 
   pub async fn update_streak(
@@ -1049,26 +1019,6 @@ impl DatabaseHandler {
         .fetch_all(&mut **transaction)
         .await?,
     )
-  }
-
-  pub async fn add_quote(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    quote: QuoteModal,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO quote (record_id, quote, author, guild_id) VALUES ($1, $2, $3, $4)
-      ",
-      Ulid::new().to_string(),
-      quote.quote,
-      quote.author,
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
-
-    Ok(())
   }
 
   pub async fn add_term(
@@ -1537,62 +1487,6 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn get_random_quote(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<Option<Quote>> {
-    let row = sqlx::query!(
-      "
-        SELECT record_id, quote, author FROM quote WHERE guild_id = $1 ORDER BY RANDOM() LIMIT 1
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let quote = match row {
-      Some(row) => Some(Quote {
-        id: row.record_id,
-        quote: row.quote,
-        author: row.author,
-      }),
-      None => None,
-    };
-
-    Ok(quote)
-  }
-
-  pub async fn get_random_quote_with_keyword(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    keyword: &str,
-  ) -> Result<Option<Quote>> {
-    let row = sqlx::query!(
-      "
-        SELECT record_id, quote, author
-        FROM quote
-        WHERE guild_id = $1 AND (quote_tsv @@ websearch_to_tsquery('english', $2))
-        ORDER BY RANDOM()
-        LIMIT 1
-      ",
-      guild_id.to_string(),
-      keyword.to_string(),
-    )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let quote = match row {
-      Some(row) => Some(Quote {
-        id: row.record_id,
-        quote: row.quote,
-        author: row.author,
-      }),
-      None => None,
-    };
-
-    Ok(quote)
-  }
-
   pub async fn remove_course(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -1619,24 +1513,6 @@ impl DatabaseHandler {
     SteamKey::delete_query(*guild_id, key)
       .execute(&mut **transaction)
       .await?;
-
-    Ok(())
-  }
-
-  pub async fn remove_quote(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    quote: &str,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM quote WHERE record_id = $1 AND guild_id = $2
-      ",
-      quote,
-      guild_id.to_string(),
-    )
-    .execute(&mut **transaction)
-    .await?;
 
     Ok(())
   }

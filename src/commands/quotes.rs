@@ -5,7 +5,7 @@ use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
 use crate::config::{BloomBotEmbed, EMOJI, ENTRIES_PER_PAGE};
-use crate::data::quote::QuoteModal;
+use crate::data::quote::{Quote, QuoteModal};
 use crate::database::DatabaseHandler;
 use crate::{Context, Data as AppData, Error as AppError};
 
@@ -13,7 +13,7 @@ use crate::{Context, Data as AppData, Error as AppError};
 ///
 /// Commands to list, add, edit, or remove quotes.
 ///
-/// These quotes are used both for the `/quote` command and for motivational messages when a user runs `/add`.
+/// These quotes are used both for the `/quote` command and for quotes returned when a user runs `/add`.
 ///
 /// Requires `Manage Roles` permissions.
 #[poise::command(
@@ -42,7 +42,9 @@ async fn add(ctx: ApplicationContext<'_, AppData, AppError>) -> Result<()> {
 
     let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-    DatabaseHandler::add_quote(&mut transaction, &guild_id, quote_data).await?;
+    let quote = Quote::new_from_modal(guild_id, quote_data);
+
+    DatabaseHandler::add_quote(&mut transaction, &quote).await?;
 
     database::commit_and_say(
       PoiseContext::Application(ctx),
@@ -80,7 +82,9 @@ async fn edit(
     if let Some(quote_data) = QuoteModal::execute_with_defaults(ctx, defaults).await? {
       let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-      DatabaseHandler::update_quote(&mut transaction, quote_data.into_quote(quote_id)).await?;
+      let quote = quote_data.into_quote(guild_id, quote_id)?;
+
+      DatabaseHandler::update_quote(&mut transaction, &quote).await?;
 
       database::commit_and_say(
         PoiseContext::Application(ctx),
