@@ -139,27 +139,6 @@ impl TrackingProfile {
   }
 }
 
-//Default values for tracking customization
-impl Default for TrackingProfile {
-  fn default() -> Self {
-    Self {
-      user_id: UserId::default(),
-      guild_id: GuildId::default(),
-      utc_offset: 0,
-      tracking: Tracking {
-        privacy: Privacy::Public,
-      },
-      streak: Streak {
-        status: Status::Enabled,
-        privacy: Privacy::Public,
-      },
-      stats: Stats {
-        privacy: Privacy::Public,
-      },
-    }
-  }
-}
-
 impl InsertQuery for TrackingProfile {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
@@ -201,6 +180,27 @@ impl DeleteQuery for TrackingProfile {
       user_id.into(),
       guild_id.to_string(),
     )
+  }
+}
+
+//Default values for tracking customization
+impl Default for TrackingProfile {
+  fn default() -> Self {
+    Self {
+      user_id: UserId::default(),
+      guild_id: GuildId::default(),
+      utc_offset: 0,
+      tracking: Tracking {
+        privacy: Privacy::Public,
+      },
+      streak: Streak {
+        status: Status::Enabled,
+        privacy: Privacy::Public,
+      },
+      stats: Stats {
+        privacy: Privacy::Public,
+      },
+    }
   }
 }
 

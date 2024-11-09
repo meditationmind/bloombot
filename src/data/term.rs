@@ -154,16 +154,6 @@ impl Term {
   }
 }
 
-impl PageRow for Term {
-  fn title(&self, _page_type: PageType) -> String {
-    format!("__{}__", self.name.clone())
-  }
-
-  fn body(&self) -> String {
-    self.meaning.clone()
-  }
-}
-
 impl ExistsQuery for Term {
   type Item<'a> = &'a str;
 
@@ -176,6 +166,16 @@ impl ExistsQuery for Term {
     )
     .bind(term_name)
     .bind(guild_id.to_string())
+  }
+}
+
+impl PageRow for Term {
+  fn title(&self, _page_type: PageType) -> String {
+    format!("__{}__", self.name.clone())
+  }
+
+  fn body(&self) -> String {
+    self.meaning.clone()
   }
 }
 

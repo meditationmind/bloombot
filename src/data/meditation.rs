@@ -101,6 +101,44 @@ impl Meditation {
   }
 }
 
+impl InsertQuery for Meditation {
+  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+    sqlx::query!(
+      "INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)",
+      self.id,
+      self.user_id.to_string(),
+      self.minutes,
+      self.seconds,
+      self.guild_id.to_string(),
+      self.occurred_at,
+    )
+  }
+}
+
+impl UpdateQuery for Meditation {
+  fn update_query(&self) -> Query<Postgres, PgArguments> {
+    sqlx::query!(
+      "UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4",
+      self.minutes,
+      self.seconds,
+      self.occurred_at,
+      self.id,
+    )
+  }
+}
+
+impl DeleteQuery for Meditation {
+  fn delete_query<'a>(
+    _guild_id: GuildId,
+    meditation_id: impl Into<String>,
+  ) -> Query<'a, Postgres, PgArguments> {
+    sqlx::query!(
+      "DELETE FROM meditation WHERE record_id = $1",
+      meditation_id.into(),
+    )
+  }
+}
+
 impl PageRow for Meditation {
   fn title(&self, _page_type: PageType) -> String {
     if self.seconds > 0 {
@@ -137,44 +175,6 @@ impl PageRow for Meditation {
       "Date: `{}`\nID: `{}`",
       self.occurred_at.format("%Y-%m-%d %H:%M"),
       self.id
-    )
-  }
-}
-
-impl InsertQuery for Meditation {
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
-      "INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)",
-      self.id,
-      self.user_id.to_string(),
-      self.minutes,
-      self.seconds,
-      self.guild_id.to_string(),
-      self.occurred_at,
-    )
-  }
-}
-
-impl UpdateQuery for Meditation {
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
-      "UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4",
-      self.minutes,
-      self.seconds,
-      self.occurred_at,
-      self.id,
-    )
-  }
-}
-
-impl DeleteQuery for Meditation {
-  fn delete_query<'a>(
-    _guild_id: GuildId,
-    meditation_id: impl Into<String>,
-  ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
-      "DELETE FROM meditation WHERE record_id = $1",
-      meditation_id.into(),
     )
   }
 }

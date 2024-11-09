@@ -76,23 +76,6 @@ impl SteamKey {
   }
 }
 
-impl PageRow for SteamKey {
-  fn title(&self, _page_type: PageType) -> String {
-    self.key.clone()
-  }
-
-  fn body(&self) -> String {
-    format!(
-      "Used: {}\nReserved for: {}",
-      if self.used { "Yes" } else { "No" },
-      match self.reserved {
-        Some(reserved) => reserved.mention().to_string(),
-        None => "Nobody".to_owned(),
-      },
-    )
-  }
-}
-
 impl InsertQuery for SteamKey {
   /// Adds a [`SteamKey`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
@@ -140,6 +123,23 @@ impl ExistsQuery for SteamKey {
       )
       .bind(guild_id.to_string()),
     }
+  }
+}
+
+impl PageRow for SteamKey {
+  fn title(&self, _page_type: PageType) -> String {
+    self.key.clone()
+  }
+
+  fn body(&self) -> String {
+    format!(
+      "Used: {}\nReserved for: {}",
+      if self.used { "Yes" } else { "No" },
+      match self.reserved {
+        Some(reserved) => reserved.mention().to_string(),
+        None => "Nobody".to_owned(),
+      },
+    )
   }
 }
 
@@ -219,38 +219,6 @@ impl Recipient {
   }
 }
 
-impl PageRow for Recipient {
-  fn title(&self, _page_type: PageType) -> String {
-    "__Recipient__".to_owned()
-  }
-
-  fn body(&self) -> String {
-    format!(
-      "Name: {}\nDonator Perk: {}\nChallenge Prize: {}\nTotal Keys: {}",
-      self.user_id.mention(),
-      match self.donator_perk {
-        Some(value) =>
-          if value {
-            "Yes"
-          } else {
-            "No"
-          },
-        None => "No",
-      },
-      match self.challenge_prize {
-        Some(value) =>
-          if value {
-            "Yes"
-          } else {
-            "No"
-          },
-        None => "No",
-      },
-      self.total_keys,
-    )
-  }
-}
-
 impl InsertQuery for Recipient {
   /// Adds a Steam key [`Recipient`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
@@ -307,6 +275,38 @@ impl ExistsQuery for Recipient {
     )
     .bind(guild_id.to_string())
     .bind(user_id.to_string())
+  }
+}
+
+impl PageRow for Recipient {
+  fn title(&self, _page_type: PageType) -> String {
+    "__Recipient__".to_owned()
+  }
+
+  fn body(&self) -> String {
+    format!(
+      "Name: {}\nDonator Perk: {}\nChallenge Prize: {}\nTotal Keys: {}",
+      self.user_id.mention(),
+      match self.donator_perk {
+        Some(value) =>
+          if value {
+            "Yes"
+          } else {
+            "No"
+          },
+        None => "No",
+      },
+      match self.challenge_prize {
+        Some(value) =>
+          if value {
+            "Yes"
+          } else {
+            "No"
+          },
+        None => "No",
+      },
+      self.total_keys,
+    )
   }
 }
 

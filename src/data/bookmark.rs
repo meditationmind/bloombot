@@ -85,6 +85,28 @@ impl Bookmark {
   }
 }
 
+impl InsertQuery for Bookmark {
+  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+    sqlx::query!(
+      "INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)",
+      self.id,
+      self.user_id.to_string(),
+      self.guild_id.to_string(),
+      self.link,
+      self.description,
+    )
+  }
+}
+
+impl DeleteQuery for Bookmark {
+  fn delete_query<'a>(
+    _guild_id: GuildId,
+    id: impl Into<String>,
+  ) -> Query<'a, Postgres, PgArguments> {
+    sqlx::query!("DELETE FROM bookmarks WHERE record_id = $1", id.into())
+  }
+}
+
 impl PageRow for Bookmark {
   fn title(&self, _page_type: PageType) -> String {
     self.link.clone()
@@ -105,28 +127,6 @@ impl PageRow for Bookmark {
       self.id,
       self.id,
     )
-  }
-}
-
-impl InsertQuery for Bookmark {
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
-      "INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)",
-      self.id,
-      self.user_id.to_string(),
-      self.guild_id.to_string(),
-      self.link,
-      self.description,
-    )
-  }
-}
-
-impl DeleteQuery for Bookmark {
-  fn delete_query<'a>(
-    _guild_id: GuildId,
-    id: impl Into<String>,
-  ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!("DELETE FROM bookmarks WHERE record_id = $1", id.into())
   }
 }
 

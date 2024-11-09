@@ -20,6 +20,19 @@ pub struct ExtendedCourse {
   pub guild_id: GuildId,
 }
 
+impl ExistsQuery for Course {
+  type Item<'a> = &'a str;
+
+  fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
+    course_name: Self::Item<'a>,
+  ) -> QueryAs<'a, Postgres, T, PgArguments> {
+    sqlx::query_as("SELECT EXISTS(SELECT 1 FROM course WHERE course_name = $1 AND guild_id = $2)")
+      .bind(course_name)
+      .bind(guild_id.to_string())
+  }
+}
+
 impl PageRow for Course {
   fn title(&self, _page_type: PageType) -> String {
     self.name.clone()
@@ -31,18 +44,5 @@ impl PageRow for Course {
       self.participant_role.mention(),
       self.graduate_role.mention()
     )
-  }
-}
-
-impl ExistsQuery for Course {
-  type Item<'a> = &'a str;
-
-  fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
-    guild_id: GuildId,
-    course_name: Self::Item<'a>,
-  ) -> QueryAs<'a, Postgres, T, PgArguments> {
-    sqlx::query_as("SELECT EXISTS(SELECT 1 FROM course WHERE course_name = $1 AND guild_id = $2)")
-      .bind(course_name)
-      .bind(guild_id.to_string())
   }
 }
