@@ -290,6 +290,19 @@ impl DatabaseHandler {
     Ok(())
   }
 
+  pub async fn steamkey_recipient_exists(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+  ) -> Result<bool> {
+    Ok(
+      Recipient::exists_query::<Exists>(*guild_id, *user_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
+    )
+  }
+
   pub async fn get_steamkey_recipient(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -310,19 +323,6 @@ impl DatabaseHandler {
       Recipient::retrieve_all(*guild_id)
         .fetch_all(&mut **transaction)
         .await?,
-    )
-  }
-
-  pub async fn steamkey_recipient_exists(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-  ) -> Result<bool> {
-    Ok(
-      Recipient::exists_query::<Exists>(*guild_id, *user_id)
-        .fetch_one(&mut **transaction)
-        .await?
-        .exists,
     )
   }
 
@@ -352,16 +352,16 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn get_bookmark_count(
+  pub async fn remove_bookmark(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
-    user_id: &UserId,
+    bookmark_id: &str,
   ) -> Result<u64> {
     Ok(
-      Bookmark::user_total::<Aggregate>(*guild_id, *user_id)
-        .fetch_one(&mut **transaction)
+      Bookmark::delete_query(*guild_id, bookmark_id)
+        .execute(&mut **transaction)
         .await?
-        .count,
+        .rows_affected(),
     )
   }
 
@@ -390,16 +390,16 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn remove_bookmark(
+  pub async fn get_bookmark_count(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
-    bookmark_id: &str,
+    user_id: &UserId,
   ) -> Result<u64> {
     Ok(
-      Bookmark::delete_query(*guild_id, bookmark_id)
-        .execute(&mut **transaction)
+      Bookmark::user_total::<Aggregate>(*guild_id, *user_id)
+        .fetch_one(&mut **transaction)
         .await?
-        .rows_affected(),
+        .count,
     )
   }
 
@@ -445,42 +445,6 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn get_user_meditation_entries(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-  ) -> Result<Vec<Meditation>> {
-    Ok(
-      Meditation::user_entries(*guild_id, *user_id)
-        .fetch_all(&mut **transaction)
-        .await?,
-    )
-  }
-
-  pub async fn get_meditation_entry(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    meditation_id: &str,
-  ) -> Result<Option<Meditation>> {
-    Ok(
-      Meditation::full_entry(*guild_id, meditation_id)
-        .fetch_optional(&mut **transaction)
-        .await?,
-    )
-  }
-
-  pub async fn get_latest_meditation_entry(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-  ) -> Result<Option<Meditation>> {
-    Ok(
-      Meditation::latest_entry(*guild_id, *user_id)
-        .fetch_optional(&mut **transaction)
-        .await?,
-    )
-  }
-
   pub async fn update_meditation_entry(
     transaction: &mut Transaction<'_, Postgres>,
     meditation_entry: &Meditation,
@@ -523,6 +487,42 @@ impl DatabaseHandler {
     migration.update_query().execute(&mut **transaction).await?;
 
     Ok(())
+  }
+
+  pub async fn get_meditation_entry(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    meditation_id: &str,
+  ) -> Result<Option<Meditation>> {
+    Ok(
+      Meditation::full_entry(*guild_id, meditation_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn get_latest_meditation_entry(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+  ) -> Result<Option<Meditation>> {
+    Ok(
+      Meditation::latest_entry(*guild_id, *user_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn get_user_meditation_entries(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+  ) -> Result<Vec<Meditation>> {
+    Ok(
+      Meditation::user_entries(*guild_id, *user_id)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
   }
 
   pub fn get_winner_candidates<'a>(
@@ -712,6 +712,19 @@ impl DatabaseHandler {
       .await?;
 
     Ok(())
+  }
+
+  pub async fn quote_exists(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    quote_id: &str,
+  ) -> Result<bool> {
+    Ok(
+      Quote::exists_query::<Exists>(*guild_id, quote_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
+    )
   }
 
   pub async fn get_quote(
@@ -1010,6 +1023,42 @@ impl DatabaseHandler {
     Ok(())
   }
 
+  pub async fn remove_steam_key(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    key: &str,
+  ) -> Result<()> {
+    SteamKey::delete_query(*guild_id, key)
+      .execute(&mut **transaction)
+      .await?;
+
+    Ok(())
+  }
+
+  pub async fn unused_key_exists(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<bool> {
+    Ok(
+      SteamKey::exists_query::<Exists>(*guild_id, None)
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
+    )
+  }
+
+  pub async fn get_key_and_mark_used(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<Option<String>> {
+    Ok(
+      SteamKey::consume(*guild_id)
+        .fetch_optional(&mut **transaction)
+        .await?
+        .map(|consumed| consumed.key),
+    )
+  }
+
   pub async fn get_all_steam_keys(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -1019,6 +1068,31 @@ impl DatabaseHandler {
         .fetch_all(&mut **transaction)
         .await?,
     )
+  }
+
+  pub async fn reserve_key(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+  ) -> Result<Option<String>> {
+    Ok(
+      SteamKey::reserve(*guild_id, *user_id)
+        .fetch_optional(&mut **transaction)
+        .await?
+        .map(|reserved| reserved.key),
+    )
+  }
+
+  pub async fn unreserve_key(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
+    SteamKey::unreserve(key).execute(&mut **connection).await?;
+
+    Ok(())
+  }
+
+  pub async fn mark_key_used(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
+    SteamKey::mark_used(key).execute(&mut **connection).await?;
+
+    Ok(())
   }
 
   pub async fn add_term(
@@ -1438,55 +1512,6 @@ impl DatabaseHandler {
     Ok(glossary)
   }
 
-  pub async fn unused_key_exists(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<bool> {
-    Ok(
-      SteamKey::exists_query::<Exists>(*guild_id, None)
-        .fetch_one(&mut **transaction)
-        .await?
-        .exists,
-    )
-  }
-
-  pub async fn reserve_key(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-  ) -> Result<Option<String>> {
-    Ok(
-      SteamKey::reserve(*guild_id, *user_id)
-        .fetch_optional(&mut **transaction)
-        .await?
-        .map(|reserved| reserved.key),
-    )
-  }
-
-  pub async fn unreserve_key(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
-    SteamKey::unreserve(key).execute(&mut **connection).await?;
-
-    Ok(())
-  }
-
-  pub async fn mark_key_used(connection: &mut PoolConnection<Postgres>, key: &str) -> Result<()> {
-    SteamKey::mark_used(key).execute(&mut **connection).await?;
-
-    Ok(())
-  }
-
-  pub async fn get_key_and_mark_used(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<Option<String>> {
-    Ok(
-      SteamKey::consume(*guild_id)
-        .fetch_optional(&mut **transaction)
-        .await?
-        .map(|consumed| consumed.key),
-    )
-  }
-
   pub async fn remove_course(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -1501,18 +1526,6 @@ impl DatabaseHandler {
     )
     .execute(&mut **transaction)
     .await?;
-
-    Ok(())
-  }
-
-  pub async fn remove_steam_key(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    key: &str,
-  ) -> Result<()> {
-    SteamKey::delete_query(*guild_id, key)
-      .execute(&mut **transaction)
-      .await?;
 
     Ok(())
   }
@@ -1952,19 +1965,6 @@ impl DatabaseHandler {
     };
 
     Ok(guild_stats)
-  }
-
-  pub async fn quote_exists(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    quote_id: &str,
-  ) -> Result<bool> {
-    Ok(
-      Quote::exists_query::<Exists>(*guild_id, quote_id)
-        .fetch_one(&mut **transaction)
-        .await?
-        .exists,
-    )
   }
 
   pub async fn get_user_chart_stats(
@@ -2448,15 +2448,16 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn get_star_message(
+  pub async fn add_star_message(
     transaction: &mut Transaction<'_, Postgres>,
-    message_id: &MessageId,
-  ) -> Result<Option<StarMessage>> {
-    Ok(
-      StarMessage::retrieve(*message_id)
-        .fetch_optional(&mut **transaction)
-        .await?,
-    )
+    star_message: &StarMessage,
+  ) -> Result<()> {
+    star_message
+      .insert_query()
+      .execute(&mut **transaction)
+      .await?;
+
+    Ok(())
   }
 
   pub async fn remove_star_message(
@@ -2470,16 +2471,15 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn add_star_message(
+  pub async fn get_star_message(
     transaction: &mut Transaction<'_, Postgres>,
-    star_message: &StarMessage,
-  ) -> Result<()> {
-    star_message
-      .insert_query()
-      .execute(&mut **transaction)
-      .await?;
-
-    Ok(())
+    message_id: &MessageId,
+  ) -> Result<Option<StarMessage>> {
+    Ok(
+      StarMessage::retrieve(*message_id)
+        .fetch_optional(&mut **transaction)
+        .await?,
+    )
   }
 }
 
