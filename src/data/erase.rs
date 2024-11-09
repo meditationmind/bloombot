@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use poise::serenity_prelude::{GuildId, UserId};
-use sqlx::{postgres::PgArguments, query::Query, FromRow, Postgres};
+use sqlx::query::{Query, QueryAs};
+use sqlx::{postgres::PgArguments, FromRow, Postgres};
 use ulid::Ulid;
 
 use crate::{
@@ -41,6 +42,18 @@ impl Erase {
       reason: reason.into(),
       occurred_at: *datetime,
     }
+  }
+
+  /// Retrieves all [`Erase`]s for the specified `user_id`.
+  pub fn retrieve_all<'a>(
+    guild_id: GuildId,
+    user_id: UserId,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    sqlx::query_as(
+      "SELECT record_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC",
+    )
+    .bind(user_id.to_string())
+    .bind(guild_id.to_string())
   }
 }
 

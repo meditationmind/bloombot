@@ -414,15 +414,11 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Vec<Erase>> {
-    let erases: Vec<Erase> = sqlx::query_as(
-      "SELECT record_id, message_link, reason, occurred_at FROM erases WHERE user_id = $1 AND guild_id = $2 ORDER BY occurred_at DESC",
+    Ok(
+      Erase::retrieve_all(*guild_id, *user_id)
+        .fetch_all(&mut **transaction)
+        .await?,
     )
-    .bind(user_id.to_string())
-    .bind(guild_id.to_string())
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    Ok(erases)
   }
 
   pub async fn add_meditation_entry(
