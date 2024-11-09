@@ -28,7 +28,7 @@ impl StarMessage {
     }
   }
 
-  /// Retrieves all [`Recipient`]s from the database.
+  /// Retrieves a [`StarMessage`] from the database.
   pub fn retrieve<'a>(message_id: MessageId) -> QueryAs<'a, Postgres, Self, PgArguments> {
     sqlx::query_as(
       "SELECT record_id, starred_message_id, board_message_id, starred_channel_id FROM star WHERE starred_message_id = $1",
