@@ -1,9 +1,10 @@
 use poise::serenity_prelude::{ChannelId, GuildId, MessageId};
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
-use sqlx::{FromRow, Postgres, Row};
+use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};
 use ulid::Ulid;
 
+use crate::data::common;
 use crate::handlers::database::{DeleteQuery, InsertQuery};
 
 pub struct StarMessage {
@@ -58,37 +59,10 @@ impl DeleteQuery for StarMessage {
 }
 
 impl FromRow<'_, PgRow> for StarMessage {
-  fn from_row(row: &'_ PgRow) -> sqlx::Result<Self, sqlx::Error> {
-    let starred_channel: String = row.try_get("starred_channel_id").unwrap_or("1".to_string());
-    let starred_channel = match starred_channel.parse::<u64>() {
-      Ok(id) => ChannelId::new(id),
-      Err(e) => {
-        return Err(sqlx::Error::ColumnDecode {
-          index: "starred_channel_id".to_string(),
-          source: Box::new(e),
-        })
-      }
-    };
-    let starred_message: String = row.try_get("starred_message_id").unwrap_or("1".to_string());
-    let starred_message = match starred_message.parse::<u64>() {
-      Ok(id) => MessageId::new(id),
-      Err(e) => {
-        return Err(sqlx::Error::ColumnDecode {
-          index: "starred_message_id".to_string(),
-          source: Box::new(e),
-        })
-      }
-    };
-    let board_message: String = row.try_get("board_message_id").unwrap_or("1".to_string());
-    let board_message = match board_message.parse::<u64>() {
-      Ok(id) => MessageId::new(id),
-      Err(e) => {
-        return Err(sqlx::Error::ColumnDecode {
-          index: "board_message_id".to_string(),
-          source: Box::new(e),
-        })
-      }
-    };
+  fn from_row(row: &'_ PgRow) -> SqlxResult<Self, SqlxError> {
+    let starred_channel = ChannelId::new(common::decode_id_row(row, "starred_channel_id")?);
+    let starred_message = MessageId::new(common::decode_id_row(row, "starred_message_id")?);
+    let board_message = MessageId::new(common::decode_id_row(row, "board_message_id")?);
 
     Ok(Self {
       id: row.try_get("record_id").unwrap_or_default(),

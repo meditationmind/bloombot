@@ -1,10 +1,11 @@
 use poise::serenity_prelude::{GuildId, Mentionable, UserId};
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
-use sqlx::{FromRow, Postgres, Row};
+use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};
 use ulid::Ulid;
 
 use crate::commands::helpers::pagination::{PageRow, PageType};
+use crate::data::common;
 use crate::handlers::database::{DeleteQuery, ExistsQuery, InsertQuery, UpdateQuery};
 
 #[derive(Default)]
@@ -143,29 +144,9 @@ impl ExistsQuery for SteamKey {
 }
 
 impl FromRow<'_, PgRow> for SteamKey {
-  fn from_row(row: &'_ PgRow) -> sqlx::Result<Self, sqlx::Error> {
-    let guild_id: String = row.try_get("guild_id").unwrap_or("1".to_string());
-    let guild_id = match guild_id.parse::<u64>() {
-      Ok(id) => GuildId::new(id),
-      Err(e) => {
-        return Err(sqlx::Error::ColumnDecode {
-          index: "guild_id".to_string(),
-          source: Box::new(e),
-        })
-      }
-    };
-    let reserved = match row.try_get::<String, &str>("reserved") {
-      Ok(string_id) => match string_id.parse::<u64>() {
-        Ok(id) => Some(UserId::new(id)),
-        Err(e) => {
-          return Err(sqlx::Error::ColumnDecode {
-            index: "reserved".to_string(),
-            source: Box::new(e),
-          })
-        }
-      },
-      Err(_) => None,
-    };
+  fn from_row(row: &'_ PgRow) -> SqlxResult<Self, SqlxError> {
+    let guild_id = GuildId::new(common::decode_id_row(row, "guild_id")?);
+    let reserved = common::decode_option_id_row(row, "reserved")?.map(|id| UserId::new(id));
 
     Ok(Self {
       guild_id,
@@ -330,27 +311,9 @@ impl ExistsQuery for Recipient {
 }
 
 impl FromRow<'_, PgRow> for Recipient {
-  fn from_row(row: &'_ PgRow) -> sqlx::Result<Self, sqlx::Error> {
-    let guild_id: String = row.try_get("guild_id").unwrap_or("1".to_string());
-    let guild_id = match guild_id.parse::<u64>() {
-      Ok(id) => GuildId::new(id),
-      Err(e) => {
-        return Err(sqlx::Error::ColumnDecode {
-          index: "guild_id".to_string(),
-          source: Box::new(e),
-        })
-      }
-    };
-    let user_id: String = row.try_get("user_id").unwrap_or("1".to_string());
-    let user_id = match user_id.parse::<u64>() {
-      Ok(id) => UserId::new(id),
-      Err(e) => {
-        return Err(sqlx::Error::ColumnDecode {
-          index: "user_id".to_string(),
-          source: Box::new(e),
-        })
-      }
-    };
+  fn from_row(row: &'_ PgRow) -> SqlxResult<Self, SqlxError> {
+    let guild_id = GuildId::new(common::decode_id_row(row, "guild_id")?);
+    let user_id = UserId::new(common::decode_id_row(row, "user_id")?);
 
     Ok(Self {
       guild_id,

@@ -1,7 +1,7 @@
 use poise::serenity_prelude::{GuildId, UserId};
-use sqlx::postgres::PgArguments;
+use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::Query;
-use sqlx::Postgres;
+use sqlx::{Error as SqlxError, Postgres, Row};
 
 use crate::handlers::database::UpdateQuery;
 
@@ -58,5 +58,29 @@ impl UpdateQuery for Migration {
         )
       }
     }
+  }
+}
+
+pub fn decode_id_row(row: &'_ PgRow, index: &str) -> Result<u64, SqlxError> {
+  let string: String = row.try_get(index).unwrap_or("1".to_string());
+  match string.parse::<u64>() {
+    Ok(id) => Ok(id),
+    Err(e) => Err(SqlxError::ColumnDecode {
+      index: index.to_string(),
+      source: Box::new(e),
+    }),
+  }
+}
+
+pub fn decode_option_id_row(row: &'_ PgRow, index: &str) -> Result<Option<u64>, SqlxError> {
+  match row.try_get::<String, &str>(index) {
+    Ok(string_id) => match string_id.parse::<u64>() {
+      Ok(id) => Ok(Some(id)),
+      Err(e) => Err(SqlxError::ColumnDecode {
+        index: index.to_string(),
+        source: Box::new(e),
+      }),
+    },
+    Err(_) => Ok(None),
   }
 }
