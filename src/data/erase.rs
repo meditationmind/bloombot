@@ -1,25 +1,19 @@
 use chrono::{DateTime, Utc};
 use poise::serenity_prelude::{GuildId, UserId};
+use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
-use sqlx::{postgres::PgArguments, FromRow, Postgres};
+use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};
 use ulid::Ulid;
 
-use crate::{
-  commands::helpers::pagination::{PageRow, PageType},
-  handlers::database::InsertQuery,
-};
+use crate::commands::helpers::pagination::{PageRow, PageType};
+use crate::data::common;
+use crate::handlers::database::InsertQuery;
 
-#[derive(FromRow)]
 pub struct Erase {
-  #[sqlx(rename = "record_id")]
   id: String,
-  #[sqlx(skip)]
   guild_id: GuildId,
-  #[sqlx(skip)]
   user_id: UserId,
-  #[sqlx(default)]
   message_link: String,
-  #[sqlx(default)]
   reason: String,
   occurred_at: DateTime<Utc>,
 }
@@ -113,5 +107,23 @@ impl PageRow for Erase {
         self.reason, self.message_link
       )
     }
+  }
+}
+
+impl FromRow<'_, PgRow> for Erase {
+  fn from_row(row: &'_ PgRow) -> SqlxResult<Self, SqlxError> {
+    let guild_id = GuildId::new(common::decode_id_row(row, "guild_id")?);
+    let user_id = UserId::new(common::decode_id_row(row, "user_id")?);
+
+    Ok(Self {
+      id: row.try_get("record_id").unwrap_or_default(),
+      guild_id,
+      user_id,
+      message_link: row.try_get("message_link").unwrap_or_default(),
+      reason: row
+        .try_get::<Option<String>, &str>("reason")?
+        .unwrap_or_default(),
+      occurred_at: row.try_get("occurred_at").unwrap_or_default(),
+    })
   }
 }
