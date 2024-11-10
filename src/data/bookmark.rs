@@ -86,6 +86,7 @@ impl Bookmark {
 }
 
 impl InsertQuery for Bookmark {
+  /// Adds a [`Bookmark`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     sqlx::query!(
       "INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)",
@@ -140,8 +141,8 @@ impl FromRow<'_, PgRow> for Bookmark {
       guild_id,
       user_id,
       link: row.try_get("message_link").unwrap_or_default(),
-      description: row.try_get("user_desc")?,
-      added: row.try_get("occurred_at")?,
+      description: row.try_get("user_desc").unwrap_or_default(),
+      added: row.try_get("occurred_at").unwrap_or_default(),
     })
   }
 }
