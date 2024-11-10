@@ -15,7 +15,6 @@ use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
 use sqlx::{Error as SqlxError, FromRow, PgPool, Postgres, Transaction};
 use tokio::time;
-use ulid::Ulid;
 
 use crate::commands::helpers::time::{ChallengeTimeframe, Timeframe};
 use crate::commands::stats::{LeaderboardType, SortBy};
@@ -27,7 +26,8 @@ use crate::data::meditation::Meditation;
 use crate::data::pick_winner;
 use crate::data::quote::Quote;
 use crate::data::star_message::StarMessage;
-use crate::data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User};
+use crate::data::stats::{Guild, LeaderboardUser, MeditationCountByDay};
+use crate::data::stats::{Streak, Timeframe as TimeframeStats, User};
 use crate::data::steam_key::{Recipient, SteamKey};
 use crate::data::term::{Term, VectorSearch};
 use crate::data::tracking_profile::TrackingProfile;
@@ -37,11 +37,6 @@ struct Res {
   times_ago: Option<f64>,
   meditation_minutes: Option<i64>,
   meditation_count: Option<i64>,
-}
-
-#[derive(Debug)]
-struct MeditationCountByDay {
-  days_ago: Option<f64>,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -719,24 +714,9 @@ impl DatabaseHandler {
 
   pub async fn update_streak(
     transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-    current: i32,
-    longest: i32,
+    streak: &Streak,
   ) -> Result<()> {
-    sqlx::query!(
-      "
-        INSERT INTO streak (record_id, user_id, guild_id, current_streak, longest_streak) VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (user_id) DO UPDATE SET current_streak = $4, longest_streak = $5
-      ",
-      Ulid::new().to_string(),
-      user_id.to_string(),
-      guild_id.to_string(),
-      current,
-      longest,
-    )
-    .execute(&mut **transaction)
-    .await?;
+    streak.update_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -746,36 +726,12 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     user_id: &UserId,
   ) -> Result<Streak> {
-    let mut streak_data = sqlx::query_as!(
-      Streak,
-      "
-        SELECT current_streak AS current, longest_streak AS longest FROM streak WHERE guild_id = $1 AND user_id = $2
-      ",
-      guild_id.to_string(),
-      user_id.to_string(),
-    )
-    .fetch_optional(&mut **transaction)
-    .await?
-    .unwrap_or(Streak { current: 0, longest: 0 });
+    let mut streak_data = Streak::calculate(*guild_id, *user_id)
+      .fetch_optional(&mut **transaction)
+      .await?
+      .unwrap_or_default();
 
-    let mut row = sqlx::query_as!(
-      MeditationCountByDay,
-      "
-      WITH cte AS (
-        SELECT date_part('day', NOW() - DATE_TRUNC('day', occurred_at)) AS days_ago
-        FROM meditation 
-        WHERE user_id = $1 AND guild_id = $2
-        AND occurred_at::date <= NOW()::date
-      )
-      SELECT days_ago
-      FROM cte
-      GROUP BY days_ago
-      ORDER BY days_ago ASC
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-    )
-    .fetch(&mut **transaction);
+    let mut row = MeditationCountByDay::calculate(*guild_id, *user_id).fetch(&mut **transaction);
 
     let mut last = 0;
     let mut streak = 0;
@@ -783,11 +739,7 @@ impl DatabaseHandler {
 
     // Check if currently maintaining a streak
     if let Some(first) = row.try_next().await? {
-      #[allow(clippy::cast_possible_truncation)]
-      let days_ago = first
-        .days_ago
-        .with_context(|| "Failed to assign days_ago computed by DB query")?
-        as i32;
+      let days_ago = first.days_ago;
 
       if days_ago > 2 {
         streak_broken = true;
@@ -800,11 +752,7 @@ impl DatabaseHandler {
 
     // Calculate most recent streak
     while let Some(row) = row.try_next().await? {
-      #[allow(clippy::cast_possible_truncation)]
-      let days_ago = row
-        .days_ago
-        .with_context(|| "Failed to assign days_ago computed by DB query")?
-        as i32;
+      let days_ago = row.days_ago;
 
       if days_ago != last + 1 {
         last = days_ago;
@@ -818,6 +766,7 @@ impl DatabaseHandler {
     if !streak_broken {
       streak_data.current = if streak < 2 { 0 } else { streak };
     }
+
     // Return early if longest streak has already been calculated
     if streak_data.longest > 0 {
       if streak > streak_data.longest {
@@ -825,27 +774,24 @@ impl DatabaseHandler {
       }
 
       drop(row);
-      DatabaseHandler::update_streak(
-        transaction,
-        guild_id,
-        user_id,
+
+      let streak = Streak::new(
+        *guild_id,
+        *user_id,
         streak_data.current,
         streak_data.longest,
-      )
-      .await?;
+      );
+      DatabaseHandler::update_streak(transaction, &streak).await?;
 
       return Ok(streak_data);
     }
+
     streak_data.longest = if streak < 2 { 0 } else { streak };
     streak = 1;
 
     // Calculate longest streak (first time only)
     while let Some(row) = row.try_next().await? {
-      #[allow(clippy::cast_possible_truncation)]
-      let days_ago = row
-        .days_ago
-        .with_context(|| "Failed to assign days_ago computed by DB query")?
-        as i32;
+      let days_ago = row.days_ago;
 
       if days_ago != last + 1 {
         if streak > streak_data.longest {
@@ -865,14 +811,14 @@ impl DatabaseHandler {
     }
 
     drop(row);
-    DatabaseHandler::update_streak(
-      transaction,
-      guild_id,
-      user_id,
+
+    let streak = Streak::new(
+      *guild_id,
+      *user_id,
       streak_data.current,
       streak_data.longest,
-    )
-    .await?;
+    );
+    DatabaseHandler::update_streak(transaction, &streak).await?;
 
     Ok(streak_data)
   }
