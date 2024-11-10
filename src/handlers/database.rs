@@ -19,7 +19,7 @@ use tokio::time;
 use crate::commands::helpers::time::{ChallengeTimeframe, Timeframe};
 use crate::commands::stats::{LeaderboardType, SortBy};
 use crate::data::bookmark::Bookmark;
-use crate::data::common::{Aggregate, Exists, Migration};
+use crate::data::common::{Aggregate, Exists, MaterializedView, Migration, ViewType};
 use crate::data::course::Course;
 use crate::data::erase::Erase;
 use crate::data::meditation::Meditation;
@@ -1390,52 +1390,6 @@ impl DatabaseHandler {
     }
   }
 
-  pub async fn refresh_leaderboard(
-    transaction: &mut Transaction<'_, Postgres>,
-    timeframe: &Timeframe,
-  ) -> Result<()> {
-    match timeframe {
-      Timeframe::Yearly => {
-        sqlx::query!(
-          "
-            REFRESH MATERIALIZED VIEW CONCURRENTLY yearly_leaderboard;
-          "
-        )
-        .execute(&mut **transaction)
-        .await?;
-      }
-      Timeframe::Monthly => {
-        sqlx::query!(
-          "
-            REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_leaderboard;
-          "
-        )
-        .execute(&mut **transaction)
-        .await?;
-      }
-      Timeframe::Weekly => {
-        sqlx::query!(
-          "
-            REFRESH MATERIALIZED VIEW CONCURRENTLY weekly_leaderboard;
-          "
-        )
-        .execute(&mut **transaction)
-        .await?;
-      }
-      Timeframe::Daily => {
-        sqlx::query!(
-          "
-            REFRESH MATERIALIZED VIEW CONCURRENTLY daily_leaderboard;
-          "
-        )
-        .execute(&mut **transaction)
-        .await?;
-      }
-    }
-
-    Ok(())
-  }
-
   pub async fn get_user_stats(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -1979,40 +1933,24 @@ impl DatabaseHandler {
     Ok(stats)
   }
 
+  pub async fn refresh_leaderboard(
+    transaction: &mut Transaction<'_, Postgres>,
+    timeframe: &Timeframe,
+  ) -> Result<()> {
+    MaterializedView::refresh(&ViewType::Leaderboard, timeframe)
+      .execute(&mut **transaction)
+      .await?;
+
+    Ok(())
+  }
+
   pub async fn refresh_chart_stats(
     transaction: &mut Transaction<'_, Postgres>,
     timeframe: &Timeframe,
   ) -> Result<()> {
-    match timeframe {
-      Timeframe::Yearly => {
-        sqlx::query!(
-          "
-            REFRESH MATERIALIZED VIEW yearly_data;
-          "
-        )
-        .execute(&mut **transaction)
-        .await?;
-      }
-      Timeframe::Monthly => {
-        sqlx::query!(
-          "
-            REFRESH MATERIALIZED VIEW monthly_data;
-          "
-        )
-        .execute(&mut **transaction)
-        .await?;
-      }
-      Timeframe::Weekly => {
-        sqlx::query!(
-          "
-            REFRESH MATERIALIZED VIEW weekly_data;
-          "
-        )
-        .execute(&mut **transaction)
-        .await?;
-      }
-      Timeframe::Daily => {}
-    }
+    MaterializedView::refresh(&ViewType::ChartStats, timeframe)
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }

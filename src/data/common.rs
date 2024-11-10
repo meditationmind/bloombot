@@ -3,6 +3,7 @@ use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::Query;
 use sqlx::{Error as SqlxError, Postgres, Row};
 
+use crate::commands::helpers::time::Timeframe;
 use crate::handlers::database::UpdateQuery;
 
 #[derive(Default, sqlx::FromRow)]
@@ -29,6 +30,13 @@ pub struct Migration {
 pub enum MigrationType {
   TrackingProfile,
   MeditationEntries,
+}
+
+pub struct MaterializedView {}
+
+pub enum ViewType {
+  Leaderboard,
+  ChartStats,
 }
 
 impl Migration {
@@ -67,6 +75,29 @@ impl UpdateQuery for Migration {
         )
       }
     }
+  }
+}
+
+impl MaterializedView {
+  pub fn refresh<'a>(
+    view_type: &ViewType,
+    timeframe: &Timeframe,
+  ) -> Query<'a, Postgres, PgArguments> {
+    let query = match view_type {
+      ViewType::Leaderboard => match timeframe {
+        Timeframe::Yearly => "REFRESH MATERIALIZED VIEW CONCURRENTLY yearly_leaderboard",
+        Timeframe::Monthly => "REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_leaderboard",
+        Timeframe::Weekly => "REFRESH MATERIALIZED VIEW CONCURRENTLY weekly_leaderboard",
+        Timeframe::Daily => "REFRESH MATERIALIZED VIEW CONCURRENTLY daily_leaderboard",
+      },
+      ViewType::ChartStats => match timeframe {
+        Timeframe::Yearly => "REFRESH MATERIALIZED VIEW yearly_data",
+        Timeframe::Monthly => "REFRESH MATERIALIZED VIEW monthly_data",
+        Timeframe::Weekly => "REFRESH MATERIALIZED VIEW weekly_data",
+        Timeframe::Daily => unreachable!("No daily_data materialized view"),
+      },
+    };
+    sqlx::query(query)
   }
 }
 
