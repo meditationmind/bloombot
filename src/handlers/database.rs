@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-
 use std::env;
 use std::pin::Pin;
 use std::time::Duration;
@@ -26,18 +24,11 @@ use crate::data::meditation::Meditation;
 use crate::data::pick_winner;
 use crate::data::quote::Quote;
 use crate::data::star_message::StarMessage;
+use crate::data::stats::{ByInterval, Streak, Timeframe as TimeframeStats, User};
 use crate::data::stats::{Guild, LeaderboardUser, MeditationCountByDay};
-use crate::data::stats::{Streak, Timeframe as TimeframeStats, User};
 use crate::data::steam_key::{Recipient, SteamKey};
 use crate::data::term::{Term, VectorSearch};
 use crate::data::tracking_profile::TrackingProfile;
-
-#[derive(Debug)]
-struct Res {
-  times_ago: Option<f64>,
-  meditation_minutes: Option<i64>,
-  meditation_count: Option<i64>,
-}
 
 #[allow(clippy::module_name_repetitions)]
 pub struct DatabaseHandler {
@@ -1136,48 +1127,34 @@ impl DatabaseHandler {
     user_id: &UserId,
     timeframe: &ChallengeTimeframe,
   ) -> Result<User> {
-    // Get total count, total sum, and count/sum for timeframe
+    // Add 840 minutes to end_time to account for maximum time zone offset.
     let end_time = Utc::now() + ChronoDuration::minutes(840);
     let start_time = match timeframe {
       ChallengeTimeframe::Monthly => Utc::now()
         .with_day(1)
-        .unwrap_or_default()
+        .with_context(|| "Failed to set day to 1")?
         .with_hour(0)
-        .unwrap_or_default()
+        .with_context(|| "Failed to set hour to 0")?
         .with_minute(0)
-        .unwrap_or_default(),
+        .with_context(|| "Failed to set minute to 0")?,
       ChallengeTimeframe::YearRound => Utc::now()
         .with_month(1)
-        .unwrap_or_default()
+        .with_context(|| "Failed to set month to 1")?
         .with_day(1)
-        .unwrap_or_default()
+        .with_context(|| "Failed to set day to 1")?
         .with_hour(0)
-        .unwrap_or_default()
+        .with_context(|| "Failed to set hour to 0")?
         .with_minute(0)
-        .unwrap_or_default(),
+        .with_context(|| "Failed to set minute to 0")?,
     };
 
-    let timeframe_data = sqlx::query_as!(
-      TimeframeStats,
-      "
-        SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
-        FROM meditation
-        WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      ",
-      guild_id.to_string(),
-      user_id.to_string(),
-      start_time,
-      end_time,
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
+    let sum_and_count =
+      TimeframeStats::user_sum_and_count(*guild_id, *user_id, start_time, end_time)
+        .fetch_one(&mut **transaction)
+        .await?;
 
-    let user_stats = User {
-      all_minutes: 0,
-      all_count: 0,
-      timeframe_stats: timeframe_data,
-      streak: DatabaseHandler::get_streak(transaction, guild_id, user_id).await?,
-    };
+    let streak = DatabaseHandler::get_streak(transaction, guild_id, user_id).await?;
+    let user_stats = User::challenge_stats(sum_and_count, streak);
 
     Ok(user_stats)
   }
@@ -1190,204 +1167,11 @@ impl DatabaseHandler {
     sort_by: &SortBy,
     leaderboard_type: &LeaderboardType,
   ) -> Result<Vec<LeaderboardUser>> {
-    let limit = match leaderboard_type {
-      LeaderboardType::Top5 => 5,
-      LeaderboardType::Top10 => 10,
-    };
-    match timeframe {
-      Timeframe::Daily => {
-        let leaderboard_data = match sort_by {
-          SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM daily_leaderboard
-                WHERE guild = $1
-                ORDER BY minutes DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM daily_leaderboard
-                WHERE guild = $1
-                ORDER BY sessions DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Streak => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM daily_leaderboard
-                WHERE guild = $1
-                ORDER BY streak DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-        };
-
-        Ok(leaderboard_data)
-      }
-      Timeframe::Weekly => {
-        let leaderboard_data = match sort_by {
-          SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM weekly_leaderboard
-                WHERE guild = $1
-                ORDER BY minutes DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM weekly_leaderboard
-                WHERE guild = $1
-                ORDER BY sessions DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Streak => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM weekly_leaderboard
-                WHERE guild = $1
-                ORDER BY streak DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-        };
-
-        Ok(leaderboard_data)
-      }
-      Timeframe::Monthly => {
-        let leaderboard_data = match sort_by {
-          SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM monthly_leaderboard
-                WHERE guild = $1
-                ORDER BY minutes DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM monthly_leaderboard
-                WHERE guild = $1
-                ORDER BY sessions DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Streak => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM monthly_leaderboard
-                WHERE guild = $1
-                ORDER BY streak DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-        };
-
-        Ok(leaderboard_data)
-      }
-      Timeframe::Yearly => {
-        let leaderboard_data = match sort_by {
-          SortBy::Minutes => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM yearly_leaderboard
-                WHERE guild = $1
-                ORDER BY minutes DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Sessions => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM yearly_leaderboard
-                WHERE guild = $1
-                ORDER BY sessions DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-          SortBy::Streak => sqlx::query_as!(
-              LeaderboardUser,
-              "
-                SELECT name, minutes, sessions, streak, anonymous_tracking, streaks_active, streaks_private
-                FROM yearly_leaderboard
-                WHERE guild = $1
-                ORDER BY streak DESC
-                LIMIT $2
-              ",
-              guild_id.to_string(),
-              limit,
-            )
-            .fetch_all(&mut **transaction)
-            .await?,
-        };
-
-        Ok(leaderboard_data)
-      }
-    }
+    Ok(
+      LeaderboardUser::stats(*guild_id, timeframe, sort_by, leaderboard_type)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
   }
 
   pub async fn get_user_stats(
@@ -1396,7 +1180,7 @@ impl DatabaseHandler {
     user_id: &UserId,
     timeframe: &Timeframe,
   ) -> Result<User> {
-    // Get total count, total sum, and count/sum for timeframe
+    // Get total count, total sum, and count/sum for timeframe.
     let end_time = Utc::now() + ChronoDuration::minutes(840);
     let start_time = match timeframe {
       Timeframe::Daily => end_time - ChronoDuration::days(12),
@@ -1405,39 +1189,21 @@ impl DatabaseHandler {
       Timeframe::Yearly => end_time - ChronoDuration::days(365 * 12),
     };
 
-    let total_data = sqlx::query!(
-      "
-        SELECT COUNT(record_id) AS total_count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS total_sum
-        FROM meditation
-        WHERE guild_id = $1 AND user_id = $2
-      ",
-      guild_id.to_string(),
-      user_id.to_string(),
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
+    let total_data = TimeframeStats::user_total_sum_and_count(*guild_id, *user_id)
+      .fetch_one(&mut **transaction)
+      .await?;
 
-    let timeframe_data = sqlx::query_as!(
-      TimeframeStats,
-      "
-        SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
-        FROM meditation
-        WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-      ",
-      guild_id.to_string(),
-      user_id.to_string(),
-      start_time,
-      end_time,
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
+    let timeframe_data =
+      TimeframeStats::user_sum_and_count(*guild_id, *user_id, start_time, end_time)
+        .fetch_one(&mut **transaction)
+        .await?;
 
-    let user_stats = User {
-      all_minutes: total_data.total_sum.unwrap_or(0),
-      all_count: total_data.total_count.unwrap_or(0).try_into()?,
-      timeframe_stats: timeframe_data,
-      streak: DatabaseHandler::get_streak(transaction, guild_id, user_id).await?,
-    };
+    let user_stats = User::new(
+      total_data.sum.unwrap_or(0),
+      total_data.count.unwrap_or(0).try_into()?,
+      timeframe_data,
+      DatabaseHandler::get_streak(transaction, guild_id, user_id).await?,
+    );
 
     Ok(user_stats)
   }
@@ -1447,7 +1213,7 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     timeframe: &Timeframe,
   ) -> Result<Guild> {
-    // Get total count, total sum, and count/sum for timeframe
+    // Get total count, total sum, and count/sum for timeframe.
     let end_time = Utc::now() + ChronoDuration::minutes(840);
     let start_time = match timeframe {
       Timeframe::Daily => end_time - ChronoDuration::days(12),
@@ -1456,36 +1222,19 @@ impl DatabaseHandler {
       Timeframe::Yearly => end_time - ChronoDuration::days(365 * 12),
     };
 
-    let total_data = sqlx::query!(
-      "
-        SELECT COUNT(record_id) AS total_count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS total_sum
-        FROM meditation
-        WHERE guild_id = $1
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
+    let total_data = TimeframeStats::guild_total_sum_and_count(*guild_id)
+      .fetch_one(&mut **transaction)
+      .await?;
 
-    let timeframe_data = sqlx::query_as!(
-      TimeframeStats,
-      "
-        SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum
-        FROM meditation
-        WHERE guild_id = $1 AND occurred_at >= $2 AND occurred_at <= $3
-      ",
-      guild_id.to_string(),
-      start_time,
-      end_time,
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
+    let timeframe_data = TimeframeStats::guild_sum_and_count(*guild_id, start_time, end_time)
+      .fetch_one(&mut **transaction)
+      .await?;
 
-    let guild_stats = Guild {
-      all_minutes: total_data.total_sum.unwrap_or(0),
-      all_count: total_data.total_count.unwrap_or(0).try_into()?,
-      timeframe_stats: timeframe_data,
-    };
+    let guild_stats = Guild::new(
+      total_data.sum.unwrap_or(0),
+      total_data.count.unwrap_or(0).try_into()?,
+      timeframe_data,
+    );
 
     Ok(guild_stats)
   }
@@ -1497,177 +1246,24 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
     offset: i16,
   ) -> Result<Vec<TimeframeStats>> {
-    let mut fresh_data: Option<Res> = None;
+    let mut fresh_data: Option<ByInterval> = None;
     let now_offset = Utc::now() + ChronoDuration::minutes(offset.into());
 
-    // Calculate data for last 12 days
-    let rows: Vec<Res> = match timeframe {
-      Timeframe::Daily => {
-        sqlx::query_as!(
-          Res,
-          "
-            WITH daily_data AS
-            (
-              SELECT
-                date_part('day', $1 - DATE_TRUNC('day', occurred_at)) AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $2 AND user_id = $3 AND occurred_at <= $1
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM daily_data
-            WHERE times_ago <= 12
-            GROUP BY times_ago
-          ",
-          now_offset,
-          guild_id.to_string(),
-          user_id.to_string(),
-        )
+    let rows: Vec<ByInterval> = if let Timeframe::Daily = timeframe {
+      // Calculate fresh data for last 12 days.
+      ByInterval::user_fresh(*guild_id, *user_id, timeframe, now_offset)
         .fetch_all(&mut **transaction)
         .await?
-      }
-      // Calculate fresh data for present week, get previous 11 weeks from materialized view
-      Timeframe::Weekly => {
-        fresh_data = sqlx::query_as!(
-          Res,
-          "
-            WITH current_week_data AS
-            (
-              SELECT
-                floor(
-                  extract(epoch from ((date_trunc('week', now()) + interval '1 week') - interval '1 second') - occurred_at) /
-                  (60*60*24*7)
-                )::float AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $1 AND user_id = $2
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM current_week_data
-            WHERE times_ago = 0
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-          user_id.to_string(),
-        ).fetch_optional(&mut **transaction).await?;
+    } else {
+      // Calculate fresh data for present week/month/year.
+      fresh_data = ByInterval::user_fresh(*guild_id, *user_id, timeframe, now_offset)
+        .fetch_optional(&mut **transaction)
+        .await?;
 
-        sqlx::query_as!(
-          Res,
-          "
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM weekly_data
-            WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-          user_id.to_string(),
-        )
+      // Get data for previous 11 weeks/months/years from materialized view.
+      ByInterval::user_from_view(*guild_id, *user_id, timeframe)
         .fetch_all(&mut **transaction)
         .await?
-      }
-      // Calculate fresh data for present month, get previous 11 month from materialized view
-      Timeframe::Monthly => {
-        fresh_data = sqlx::query_as!(
-          Res,
-          "
-            WITH current_month_data AS
-            (
-              SELECT
-                floor(
-                  extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at) /
-                  extract(epoch from (((date_trunc('month', occurred_at) + interval '1 month') - interval '1 second') - (date_trunc('month', occurred_at))))
-                )::float AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $1 AND user_id = $2
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM current_month_data
-            WHERE times_ago = 0
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-          user_id.to_string(),
-        ).fetch_optional(&mut **transaction).await?;
-
-        sqlx::query_as!(
-          Res,
-          "
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM monthly_data
-            WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-          user_id.to_string(),
-        )
-        .fetch_all(&mut **transaction)
-        .await?
-      }
-      // Calculate fresh data for present year, get previous 11 years from materialized view
-      Timeframe::Yearly => {
-        fresh_data = sqlx::query_as!(
-          Res,
-          "
-            WITH current_year_data AS
-            (
-              SELECT
-                floor(
-                  extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at) /
-                  extract(epoch from (((date_trunc('year', occurred_at) + interval '1 year') - interval '1 second') - (date_trunc('year', occurred_at))))
-                )::float AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $1 AND user_id = $2
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM current_year_data
-            WHERE times_ago = 0
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-          user_id.to_string(),
-        ).fetch_optional(&mut **transaction).await?;
-
-        sqlx::query_as!(
-          Res,
-          "
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM yearly_data
-            WHERE guild_id = $1 AND user_id = $2 AND times_ago > 0 AND times_ago <= 12
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-          user_id.to_string(),
-        )
-        .fetch_all(&mut **transaction)
-        .await?
-      }
     };
 
     let daily = matches!(timeframe, Timeframe::Daily);
@@ -1684,34 +1280,21 @@ impl DatabaseHandler {
             == f64::from(i)
         });
 
-        let meditation_minutes = match row {
-          Some(row) => row.meditation_minutes.unwrap_or(0),
-          None => 0,
-        };
+        let meditation_minutes = row.map_or(0, |row| row.meditation_minutes.unwrap_or(0));
+        let meditation_count = row.map_or(0, |row| row.meditation_count.unwrap_or(0));
 
-        let meditation_count = match row {
-          Some(row) => row.meditation_count.unwrap_or(0),
-          None => 0,
-        };
-
-        TimeframeStats {
-          sum: Some(meditation_minutes),
-          count: Some(meditation_count),
-        }
+        TimeframeStats::new(Some(meditation_minutes), Some(meditation_count))
       })
       .rev()
       .collect();
 
     if let Some(fresh_data) = fresh_data {
-      stats.push(TimeframeStats {
-        sum: Some(fresh_data.meditation_minutes.unwrap_or(0)),
-        count: Some(fresh_data.meditation_count.unwrap_or(0)),
-      });
+      stats.push(TimeframeStats::new(
+        Some(fresh_data.meditation_minutes.unwrap_or(0)),
+        Some(fresh_data.meditation_count.unwrap_or(0)),
+      ));
     } else if !daily {
-      stats.push(TimeframeStats {
-        sum: Some(0),
-        count: Some(0),
-      });
+      stats.push(TimeframeStats::new(Some(0), Some(0)));
     }
 
     Ok(stats)
@@ -1722,168 +1305,23 @@ impl DatabaseHandler {
     guild_id: &GuildId,
     timeframe: &Timeframe,
   ) -> Result<Vec<TimeframeStats>> {
-    let mut fresh_data: Option<Res> = None;
+    let mut fresh_data: Option<ByInterval> = None;
 
-    // Calculate data for last 12 days
-    let rows: Vec<Res> = match timeframe {
-      Timeframe::Daily => {
-        sqlx::query_as!(
-          Res,
-          "
-            WITH daily_data AS
-            (
-              SELECT
-                date_part('day', NOW() - DATE_TRUNC('day', occurred_at)) AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $1
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM daily_data
-            WHERE times_ago <= 12
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-        )
+    let rows: Vec<ByInterval> = if let Timeframe::Daily = timeframe {
+      // Calculate fresh data for last 12 days.
+      ByInterval::guild_fresh(*guild_id, timeframe)
         .fetch_all(&mut **transaction)
         .await?
-      }
-      // Calculate fresh data for present week, get previous 11 weeks from materialized view
-      Timeframe::Weekly => {
-        fresh_data = sqlx::query_as!(
-          Res,
-          "
-            WITH current_week_data AS
-            (
-              SELECT
-                floor(
-                  extract(epoch from ((date_trunc('week', now()) + interval '1 week') - interval '1 second') - occurred_at) /
-                  (60*60*24*7)
-                )::float AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $1
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM current_week_data
-            WHERE times_ago = 0
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-        ).fetch_optional(&mut **transaction).await?;
+    } else {
+      // Calculate fresh data for present week/month/year.
+      fresh_data = ByInterval::guild_fresh(*guild_id, timeframe)
+        .fetch_optional(&mut **transaction)
+        .await?;
 
-        sqlx::query_as!(
-          Res,
-          "
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM weekly_data
-            WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-        )
+      // Get data for previous 11 weeks/months/years from materialized view.
+      ByInterval::guild_from_view(*guild_id, timeframe)
         .fetch_all(&mut **transaction)
         .await?
-      }
-      // Calculate fresh data for present month, get previous 11 month from materialized view
-      Timeframe::Monthly => {
-        fresh_data = sqlx::query_as!(
-          Res,
-          "
-            WITH current_month_data AS
-            (
-              SELECT
-                floor(
-                  extract(epoch from ((date_trunc('month', now()) + interval '1 month') - interval '1 second') - occurred_at) /
-                  extract(epoch from (((date_trunc('month', occurred_at) + interval '1 month') - interval '1 second') - (date_trunc('month', occurred_at))))
-                )::float AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $1
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM current_month_data
-            WHERE times_ago = 0
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-        ).fetch_optional(&mut **transaction).await?;
-
-        sqlx::query_as!(
-          Res,
-          "
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM monthly_data
-            WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-        )
-        .fetch_all(&mut **transaction)
-        .await?
-      }
-      // Calculate fresh data for present year, get previous 11 years from materialized view
-      Timeframe::Yearly => {
-        fresh_data = sqlx::query_as!(
-          Res,
-          "
-            WITH current_year_data AS
-            (
-              SELECT
-                floor(
-                  extract(epoch from ((date_trunc('year', now()) + interval '1 year') - interval '1 second') - occurred_at) /
-                  extract(epoch from (((date_trunc('year', occurred_at) + interval '1 year') - interval '1 second') - (date_trunc('year', occurred_at))))
-                )::float AS times_ago,
-                meditation_minutes,
-                meditation_seconds
-              FROM meditation
-              WHERE guild_id = $1
-            )
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM current_year_data
-            WHERE times_ago = 0
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-        ).fetch_optional(&mut **transaction).await?;
-
-        sqlx::query_as!(
-          Res,
-          "
-            SELECT
-              times_ago,
-              (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS meditation_minutes,
-              COUNT(*) AS meditation_count
-            FROM yearly_data
-            WHERE guild_id = $1 AND times_ago > 0 AND times_ago <= 12
-            GROUP BY times_ago
-          ",
-          guild_id.to_string(),
-        )
-        .fetch_all(&mut **transaction)
-        .await?
-      }
     };
 
     let daily = matches!(timeframe, Timeframe::Daily);
@@ -1900,34 +1338,21 @@ impl DatabaseHandler {
             == f64::from(i)
         });
 
-        let meditation_minutes = match row {
-          Some(row) => row.meditation_minutes.unwrap_or(0),
-          None => 0,
-        };
+        let meditation_minutes = row.map_or(0, |row| row.meditation_minutes.unwrap_or(0));
+        let meditation_count = row.map_or(0, |row| row.meditation_count.unwrap_or(0));
 
-        let meditation_count = match row {
-          Some(row) => row.meditation_count.unwrap_or(0),
-          None => 0,
-        };
-
-        TimeframeStats {
-          sum: Some(meditation_minutes),
-          count: Some(meditation_count),
-        }
+        TimeframeStats::new(Some(meditation_minutes), Some(meditation_count))
       })
       .rev()
       .collect();
 
     if let Some(fresh_data) = fresh_data {
-      stats.push(TimeframeStats {
-        sum: Some(fresh_data.meditation_minutes.unwrap_or(0)),
-        count: Some(fresh_data.meditation_count.unwrap_or(0)),
-      });
+      stats.push(TimeframeStats::new(
+        Some(fresh_data.meditation_minutes.unwrap_or(0)),
+        Some(fresh_data.meditation_count.unwrap_or(0)),
+      ));
     } else if !daily {
-      stats.push(TimeframeStats {
-        sum: Some(0),
-        count: Some(0),
-      });
+      stats.push(TimeframeStats::new(Some(0), Some(0)));
     }
 
     Ok(stats)
