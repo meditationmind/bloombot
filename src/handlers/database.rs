@@ -527,6 +527,56 @@ impl DatabaseHandler {
     )
   }
 
+  pub async fn get_user_meditation_sum(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+  ) -> Result<i64> {
+    Ok(
+      Meditation::user_sum::<Aggregate>(*guild_id, *user_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .sum,
+    )
+  }
+
+  pub async fn get_user_meditation_count(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+  ) -> Result<u64> {
+    Ok(
+      Meditation::user_count::<Aggregate>(*guild_id, *user_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .count,
+    )
+  }
+
+  pub async fn get_guild_meditation_sum(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<i64> {
+    Ok(
+      Meditation::guild_sum::<Aggregate>(*guild_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .sum,
+    )
+  }
+
+  pub async fn get_guild_meditation_count(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<u64> {
+    Ok(
+      Meditation::guild_count::<Aggregate>(*guild_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .count,
+    )
+  }
+
   pub fn get_winner_candidates<'a>(
     conn: &'a mut PoolConnection<Postgres>,
     start_date: DateTime<Utc>,
@@ -567,90 +617,6 @@ impl DatabaseHandler {
         .await?
         .count,
     )
-  }
-
-  pub async fn get_user_meditation_sum(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-  ) -> Result<i64> {
-    let row = sqlx::query!(
-      "
-        SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS user_total FROM meditation WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let user_total = row
-      .user_total
-      .with_context(|| "Failed to assign user_total computed by DB query")?;
-
-    Ok(user_total)
-  }
-
-  pub async fn get_user_meditation_count(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    user_id: &UserId,
-  ) -> Result<u64> {
-    let row = sqlx::query!(
-      "
-        SELECT COUNT(record_id) AS user_total FROM meditation WHERE user_id = $1 AND guild_id = $2
-      ",
-      user_id.to_string(),
-      guild_id.to_string(),
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let user_total = row
-      .user_total
-      .with_context(|| "Failed to assign user_total computed by DB query")?;
-
-    Ok(user_total.try_into()?)
-  }
-
-  pub async fn get_guild_meditation_sum(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<i64> {
-    let row = sqlx::query!(
-      "
-        SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS guild_total FROM meditation WHERE guild_id = $1
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let guild_total = row
-      .guild_total
-      .with_context(|| "Failed to assign guild_total computed by DB query")?;
-
-    Ok(guild_total)
-  }
-
-  pub async fn get_guild_meditation_count(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<u64> {
-    let row = sqlx::query!(
-      "
-        SELECT COUNT(record_id) AS guild_total FROM meditation WHERE guild_id = $1
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let guild_total = row
-      .guild_total
-      .with_context(|| "Failed to assign guild_total computed by DB query")?;
-
-    Ok(guild_total.try_into()?)
   }
 
   pub async fn add_quote(transaction: &mut Transaction<'_, Postgres>, quote: &Quote) -> Result<()> {

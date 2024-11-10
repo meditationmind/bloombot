@@ -99,6 +99,44 @@ impl Meditation {
       guild_id.to_string(),
     )
   }
+
+  pub fn user_sum<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
+    user_id: UserId,
+  ) -> QueryAs<'a, Postgres, T, PgArguments> {
+    sqlx::query_as(
+      "SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum FROM meditation WHERE user_id = $1 AND guild_id = $2",
+    )
+    .bind(user_id.to_string())
+    .bind(guild_id.to_string())
+  }
+
+  pub fn user_count<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
+    user_id: UserId,
+  ) -> QueryAs<'a, Postgres, T, PgArguments> {
+    sqlx::query_as(
+      "SELECT COUNT(record_id) AS count FROM meditation WHERE user_id = $1 AND guild_id = $2",
+    )
+    .bind(user_id.to_string())
+    .bind(guild_id.to_string())
+  }
+
+  pub fn guild_sum<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
+  ) -> QueryAs<'a, Postgres, T, PgArguments> {
+    sqlx::query_as(
+      "SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum FROM meditation WHERE guild_id = $1",
+    )
+    .bind(guild_id.to_string())
+  }
+
+  pub fn guild_count<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
+  ) -> QueryAs<'a, Postgres, T, PgArguments> {
+    sqlx::query_as("SELECT COUNT(record_id) AS count FROM meditation WHERE guild_id = $1")
+      .bind(guild_id.to_string())
+  }
 }
 
 impl InsertQuery for Meditation {
