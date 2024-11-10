@@ -59,13 +59,9 @@ async fn add(
 
     let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-    if let Err(e) = DatabaseHandler::add_term(
-      &mut transaction,
-      Term::from_modal(guild_id, term_name, term_data),
-      vector,
-    )
-    .await
-    {
+    let term = Term::from_modal(guild_id, term_name, term_data, Some(vector));
+
+    if let Err(e) = DatabaseHandler::add_term(&mut transaction, &term).await {
       ctx
         .send(
           CreateReply::default()
@@ -139,13 +135,9 @@ async fn edit(
       ))
     };
 
-    if let Err(e) = DatabaseHandler::update_term(
-      &mut transaction,
-      Term::from_modal(guild_id, term_name, term_data),
-      vector,
-    )
-    .await
-    {
+    let term = Term::from_modal(guild_id, term_name, term_data, vector);
+
+    if let Err(e) = DatabaseHandler::update_term(&mut transaction, &term).await {
       ctx
         .send(
           CreateReply::default()
@@ -198,7 +190,7 @@ async fn remove(
   }
 
   if let Err(e) =
-    DatabaseHandler::remove_term(&mut transaction, term_name.as_str(), &guild_id).await
+    DatabaseHandler::remove_term(&mut transaction, &guild_id, term_name.as_str()).await
   {
     ctx
       .send(
@@ -240,10 +232,9 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
 
   for term in terms {
     let Some(existing_term) =
-      DatabaseHandler::get_term_meaning(&mut transaction, &guild_id, term.term_name.as_str())
-        .await?
+      DatabaseHandler::get_term_meaning(&mut transaction, &guild_id, term.name.as_str()).await?
     else {
-      info!("Unable to retrieve term: {}", term.term_name);
+      info!("Unable to retrieve term: {}", term.name);
       continue;
     };
 
@@ -252,19 +243,14 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
         .data()
         .embeddings
         .create_embedding(
-          format!("{} {}", term.term_name, existing_term.meaning),
+          format!("{} {}", term.name, existing_term.meaning),
           ctx.author().id,
         )
         .await?,
     ));
 
-    DatabaseHandler::update_term_embedding(
-      &mut transaction,
-      &guild_id,
-      term.term_name.as_str(),
-      vector,
-    )
-    .await?;
+    DatabaseHandler::update_term_embedding(&mut transaction, &guild_id, term.name.as_str(), vector)
+      .await?;
   }
 
   database::commit_and_say(

@@ -1,21 +1,25 @@
+use pgvector::Vector;
 use poise::serenity_prelude::GuildId;
 use poise::Modal;
 use sqlx::postgres::{PgArguments, PgRow};
-use sqlx::query::QueryAs;
-use sqlx::{FromRow, Postgres};
+use sqlx::query::{Query, QueryAs};
+use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};
+use ulid::Ulid;
 
 use crate::commands::helpers::pagination::{PageRow, PageType};
-use crate::handlers::database::ExistsQuery;
+use crate::data::common;
+use crate::handlers::database::{DeleteQuery, ExistsQuery, InsertQuery, UpdateQuery};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Term {
-  pub guild_id: GuildId,
+  guild_id: GuildId,
   pub name: String,
   pub meaning: String,
   pub usage: Option<String>,
   pub links: Option<Vec<String>>,
   pub category: Option<String>,
   pub aliases: Option<Vec<String>>,
+  vector: Option<Vector>,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -38,16 +42,10 @@ pub struct TermModal {
 }
 
 #[derive(Debug, FromRow)]
-pub struct SearchResult {
+pub struct VectorSearch {
   pub term_name: String,
   pub meaning: String,
   pub distance_score: Option<f64>,
-}
-
-#[derive(Debug)]
-pub struct Names {
-  pub term_name: String,
-  pub aliases: Option<Vec<String>>,
 }
 
 impl Term {
@@ -59,6 +57,7 @@ impl Term {
     guild_id: impl Into<GuildId>,
     name: impl Into<String>,
     meaning: impl Into<String>,
+    vector: Option<Vector>,
   ) -> Self {
     Self {
       guild_id: guild_id.into(),
@@ -68,6 +67,7 @@ impl Term {
       links: None,
       category: None,
       aliases: None,
+      vector,
     }
   }
 
@@ -137,6 +137,7 @@ impl Term {
     guild_id: impl Into<GuildId>,
     name: impl Into<String>,
     modal: TermModal,
+    vector: Option<Vector>,
   ) -> Self {
     Self {
       guild_id: guild_id.into(),
@@ -150,13 +151,134 @@ impl Term {
       aliases: modal
         .aliases
         .map(|aliases| aliases.split(',').map(|s| s.trim().to_string()).collect()),
+      vector,
     }
+  }
+
+  /// Updates the vector embeddings for a [`Term`] in the database.
+  pub fn update_embedding<'a>(
+    guild_id: GuildId,
+    term_name: impl Into<String>,
+    vector: Option<Vector>,
+  ) -> Query<'a, Postgres, PgArguments> {
+    sqlx::query(
+      "UPDATE term SET embedding = $3 WHERE guild_id = $1 AND (LOWER(term_name) = LOWER($2))",
+    )
+    .bind(guild_id.to_string())
+    .bind(term_name.into())
+    .bind(vector)
+  }
+
+  /// Retrieves a [`Term`] from the database.
+  pub fn retrieve<'a>(
+    guild_id: GuildId,
+    term_name: &str,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    sqlx::query_as(
+      "SELECT term_name, meaning, usage, links, category, aliases FROM term WHERE guild_id = $2 AND (LOWER(term_name) = LOWER($1)) OR (f_textarr2text(aliases) ~* ('(?:^|,)' || $1 || '(?:$|,)'))",
+    )
+    .bind(term_name.to_string())
+    .bind(guild_id.to_string())
+  }
+
+  /// Retrieves a [`Term`] definition from the database.
+  pub fn retrieve_meaning<'a>(
+    guild_id: GuildId,
+    term_name: &str,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    sqlx::query_as(
+      "SELECT meaning FROM term WHERE guild_id = $2 AND (LOWER(term_name) = LOWER($1))",
+    )
+    .bind(term_name.to_string())
+    .bind(guild_id.to_string())
+  }
+
+  /// Retrieves a list of [`Term`]s and their aliases from the database.
+  pub fn retrieve_list<'a>(guild_id: GuildId) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    sqlx::query_as(
+      "SELECT term_name, aliases FROM term WHERE guild_id = $1 ORDER BY term_name DESC",
+    )
+    .bind(guild_id.to_string())
+  }
+
+  /// Retrieves up to five [`Term`]s from the database with names most similar to the specified
+  /// `term_name`, with the similarity threshold set by `similarity`.
+  pub fn retrieve_similar<'a>(
+    guild_id: GuildId,
+    term_name: &str,
+    similarity: f32,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    sqlx::query_as(
+      "SELECT term_name, meaning, usage, links, category, aliases, SET_LIMIT($2) FROM term WHERE guild_id = $3 AND (LOWER(term_name) % LOWER($1)) OR (f_textarr2text(aliases) ILIKE '%' || $1 || '%') ORDER BY SIMILARITY(LOWER(term_name), LOWER($1)) DESC LIMIT 5",
+    )
+    .bind(term_name.to_string())
+    .bind(similarity)
+    .bind(guild_id.to_string())
+  }
+
+  /// Calculates the total count of [`Term`]s in the database.
+  pub fn count<'a, T: for<'r> FromRow<'r, PgRow>>(
+    guild_id: GuildId,
+  ) -> QueryAs<'a, Postgres, T, PgArguments> {
+    sqlx::query_as("SELECT COUNT(record_id) AS count FROM term WHERE guild_id = $1")
+      .bind(guild_id.to_string())
+  }
+}
+
+impl InsertQuery for Term {
+  /// Adds a [`Term`] to the database.
+  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+    sqlx::query(
+      "
+        INSERT INTO term (record_id, term_name, meaning, usage, links, category, aliases, guild_id, embedding) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ",
+    )
+    .bind(Ulid::new().to_string())
+    .bind(self.name.clone())
+    .bind(self.meaning.clone())
+    .bind(self.usage.clone())
+    .bind(self.links.clone())
+    .bind(self.category.clone())
+    .bind(self.aliases.clone())
+    .bind(self.guild_id.to_string())
+    .bind(self.vector.clone())
+  }
+}
+
+impl UpdateQuery for Term {
+  /// Updates a [`Term`] in the database.
+  fn update_query(&self) -> Query<Postgres, PgArguments> {
+    sqlx::query(
+      "UPDATE term SET meaning = $1, usage = $2, links = $3, category = $4, aliases = $5, embedding = COALESCE($6, embedding) WHERE LOWER(term_name) = LOWER($7)",
+    )
+    .bind(self.meaning.clone())
+    .bind(self.usage.clone())
+    .bind(self.links.clone())
+    .bind(self.category.clone())
+    .bind(self.aliases.clone())
+    .bind(self.vector.clone())
+    .bind(self.name.clone())
+  }
+}
+
+impl DeleteQuery for Term {
+  /// Removes a [`Term`] from the database.
+  fn delete_query<'a>(
+    guild_id: GuildId,
+    term_name: impl Into<String>,
+  ) -> Query<'a, Postgres, PgArguments> {
+    sqlx::query!(
+      "DELETE FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2",
+      term_name.into(),
+      guild_id.to_string(),
+    )
   }
 }
 
 impl ExistsQuery for Term {
   type Item<'a> = &'a str;
 
+  /// Checks to see if a [`Term`] exists in the database.
   fn exists_query<'a, T: for<'r> FromRow<'r, PgRow>>(
     guild_id: GuildId,
     term_name: Self::Item<'a>,
@@ -179,6 +301,23 @@ impl PageRow for Term {
   }
 }
 
+impl FromRow<'_, PgRow> for Term {
+  fn from_row(row: &'_ PgRow) -> SqlxResult<Self, SqlxError> {
+    let guild_id = GuildId::new(common::decode_id_row(row, "guild_id")?);
+
+    Ok(Self {
+      guild_id,
+      name: row.try_get("term_name").unwrap_or_default(),
+      meaning: row.try_get("meaning").unwrap_or_default(),
+      usage: row.try_get("usage").unwrap_or_default(),
+      links: row.try_get("links").unwrap_or_default(),
+      category: row.try_get("category").unwrap_or_default(),
+      aliases: row.try_get("aliases").unwrap_or_default(),
+      vector: row.try_get("embedding").unwrap_or_default(),
+    })
+  }
+}
+
 impl From<Term> for TermModal {
   /// Converts a [`Term`] into a [`TermModal`]. Note that the [`GuildId`][gid]
   /// and `name` fields will be lost in the conversion. To convert back to a [`Term`],
@@ -193,5 +332,20 @@ impl From<Term> for TermModal {
       links: term.links.map(|links| links.join(", ")),
       aliases: term.aliases.map(|aliases| aliases.join(", ")),
     }
+  }
+}
+
+impl VectorSearch {
+  pub fn result<'a>(
+    guild_id: GuildId,
+    search_vector: Vector,
+    limit: i64,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    sqlx::query_as(
+      "SELECT term_name, meaning, embedding <=> $1 AS distance_score FROM term WHERE guild_id = $2 ORDER BY distance_score ASC LIMIT $3",
+    )
+    .bind(search_vector)
+    .bind(guild_id.to_string())
+    .bind(limit)
   }
 }

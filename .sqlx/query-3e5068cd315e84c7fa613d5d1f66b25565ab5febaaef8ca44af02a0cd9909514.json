@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3e5068cd315e84c7fa613d5d1f66b25565ab5febaaef8ca44af02a0cd9909514"
+}

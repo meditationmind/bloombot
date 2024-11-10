@@ -49,11 +49,11 @@ async fn list(
   let mut sorted_terms = Vec::<(String, String)>::with_capacity(term_count);
 
   for term in term_names {
-    let char = match term.term_name.chars().next() {
+    let char = match term.name.chars().next() {
       Some(char) => char.to_string(),
       None => String::new(),
     };
-    let mut full_term = term.term_name.clone();
+    let mut full_term = term.name.clone();
     let aliases = term.aliases.clone().unwrap_or(Vec::new());
     if !aliases.is_empty() {
       full_term.push_str(" (");

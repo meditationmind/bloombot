@@ -29,7 +29,7 @@ use crate::data::quote::Quote;
 use crate::data::star_message::StarMessage;
 use crate::data::stats::{Guild, LeaderboardUser, Streak, Timeframe as TimeframeStats, User};
 use crate::data::steam_key::{Recipient, SteamKey};
-use crate::data::term::{Names, SearchResult, Term};
+use crate::data::term::{Term, VectorSearch};
 use crate::data::tracking_profile::TrackingProfile;
 
 #[derive(Debug)]
@@ -1001,19 +1001,6 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn steam_key_exists(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    key: &str,
-  ) -> Result<bool> {
-    Ok(
-      SteamKey::exists_query::<Exists>(*guild_id, Some(key))
-        .fetch_one(&mut **transaction)
-        .await?
-        .exists,
-    )
-  }
-
   pub async fn add_steam_key(
     transaction: &mut Transaction<'_, Postgres>,
     steam_key: &SteamKey,
@@ -1033,6 +1020,19 @@ impl DatabaseHandler {
       .await?;
 
     Ok(())
+  }
+
+  pub async fn steam_key_exists(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    key: &str,
+  ) -> Result<bool> {
+    Ok(
+      SteamKey::exists_query::<Exists>(*guild_id, Some(key))
+        .fetch_one(&mut **transaction)
+        .await?
+        .exists,
+    )
   }
 
   pub async fn unused_key_exists(
@@ -1095,145 +1095,14 @@ impl DatabaseHandler {
     Ok(())
   }
 
-  pub async fn add_term(
-    transaction: &mut Transaction<'_, Postgres>,
-    term: Term,
-    vector: Vector,
-  ) -> Result<()> {
-    sqlx::query(
-      "
-        INSERT INTO term (record_id, term_name, meaning, usage, links, category, aliases, guild_id, embedding) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ")
-      .bind(Ulid::new().to_string())
-      .bind(term.name)
-      .bind(term.meaning)
-      .bind(term.usage)
-      .bind(term.links)
-      .bind(term.category)
-      .bind(term.aliases)
-      .bind(term.guild_id.to_string())
-      .bind(vector)
-      .execute(&mut **transaction)
-      .await?;
+  pub async fn add_term(transaction: &mut Transaction<'_, Postgres>, term: &Term) -> Result<()> {
+    term.insert_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
 
-  pub async fn search_terms_by_vector(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    search_vector: Vector,
-    limit: usize,
-  ) -> Result<Vec<SearchResult>> {
-    // limit should be a small integer
-    #[allow(clippy::cast_possible_wrap)]
-    let terms: Vec<SearchResult> = sqlx::query_as(
-      "
-        SELECT term_name, meaning, embedding <=> $1 AS distance_score
-        FROM term
-        WHERE guild_id = $2
-        ORDER BY distance_score ASC
-        LIMIT $3
-      ",
-    )
-    .bind(search_vector)
-    .bind(guild_id.to_string())
-    .bind(limit as i64)
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    Ok(terms)
-  }
-
-  pub async fn get_term(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    term_name: &str,
-  ) -> Result<Option<Term>> {
-    let row = sqlx::query!(
-      "
-        SELECT term_name, meaning, usage, links, category, aliases
-        FROM term
-        WHERE guild_id = $2
-        AND (LOWER(term_name) = LOWER($1)) OR (f_textarr2text(aliases) ~* ('(?:^|,)' || $1 || '(?:$|,)'))
-      ",
-      term_name,
-      guild_id.to_string(),
-    )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let term = match row {
-      Some(row) => Some(Term {
-        guild_id: *guild_id,
-        name: row.term_name,
-        meaning: row.meaning,
-        usage: row.usage,
-        links: row.links,
-        category: row.category,
-        aliases: row.aliases,
-      }),
-      None => None,
-    };
-
-    Ok(term)
-  }
-
-  pub async fn get_term_meaning(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-    term_name: &str,
-  ) -> Result<Option<Term>> {
-    let row = sqlx::query!(
-      "
-        SELECT meaning
-        FROM term
-        WHERE guild_id = $2
-        AND (LOWER(term_name) = LOWER($1))
-      ",
-      term_name,
-      guild_id.to_string(),
-    )
-    .fetch_optional(&mut **transaction)
-    .await?;
-
-    let term = match row {
-      Some(row) => Some(Term {
-        guild_id: *guild_id,
-        name: String::new(),
-        meaning: row.meaning,
-        usage: None,
-        links: None,
-        category: None,
-        aliases: None,
-      }),
-      None => None,
-    };
-
-    Ok(term)
-  }
-
-  pub async fn update_term(
-    transaction: &mut Transaction<'_, Postgres>,
-    term: Term,
-    vector: Option<Vector>,
-  ) -> Result<()> {
-    sqlx::query(
-      "
-        UPDATE term
-        SET meaning = $1, usage = $2, links = $3, category = $4, aliases = $5, embedding = COALESCE($6, embedding)
-        WHERE LOWER(term_name) = LOWER($7)
-      ",
-    )
-    .bind(term.meaning)
-    .bind(term.usage)
-    .bind(term.links)
-    .bind(term.category)
-    .bind(term.aliases)
-    .bind(vector)
-    .bind(term.name)
-    .execute(&mut **transaction)
-    .await?;
+  pub async fn update_term(transaction: &mut Transaction<'_, Postgres>, term: &Term) -> Result<()> {
+    term.update_query().execute(&mut **transaction).await?;
 
     Ok(())
   }
@@ -1244,138 +1113,23 @@ impl DatabaseHandler {
     term_name: &str,
     vector: Option<pgvector::Vector>,
   ) -> Result<()> {
-    sqlx::query(
-      "
-        UPDATE term
-        SET embedding = $3
-        WHERE guild_id = $1
-        AND (LOWER(term_name) = LOWER($2))
-      ",
-    )
-    .bind(guild_id.to_string())
-    .bind(term_name)
-    .bind(vector)
-    .execute(&mut **transaction)
-    .await?;
+    Term::update_embedding(*guild_id, term_name, vector)
+      .execute(&mut **transaction)
+      .await?;
 
     Ok(())
   }
 
-  pub async fn get_possible_terms(
+  pub async fn remove_term(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     term_name: &str,
-    similarity: f32,
-  ) -> Result<Vec<Term>> {
-    let row = sqlx::query!(
-      "
-        SELECT term_name, meaning, usage, links, category, aliases, SET_LIMIT($2), SIMILARITY(LOWER(term_name), LOWER($1)) AS similarity_score
-        FROM term
-        WHERE guild_id = $3
-        AND (LOWER(term_name) % LOWER($1)) OR (f_textarr2text(aliases) ILIKE '%' || $1 || '%')
-        ORDER BY similarity_score DESC
-        LIMIT 5
-      ",
-      term_name,
-      similarity,
-      guild_id.to_string(),
-    )
-    .fetch_all(&mut **transaction)
-    .await?;
+  ) -> Result<()> {
+    Term::delete_query(*guild_id, term_name)
+      .execute(&mut **transaction)
+      .await?;
 
-    Ok(
-      row
-        .into_iter()
-        .map(|row| Term {
-          guild_id: *guild_id,
-          name: row.term_name,
-          meaning: row.meaning,
-          usage: row.usage,
-          links: row.links,
-          category: row.category,
-          aliases: row.aliases,
-        })
-        .collect(),
-    )
-  }
-
-  pub async fn get_term_count(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<u64> {
-    let row = sqlx::query!(
-      "
-        SELECT COUNT(record_id) AS term_count FROM term WHERE guild_id = $1
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_one(&mut **transaction)
-    .await?;
-
-    let term_count = row
-      .term_count
-      .with_context(|| "Failed to assign term_count computed by DB query")?;
-
-    Ok(term_count.try_into()?)
-  }
-
-  pub async fn get_term_list(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<Vec<Names>> {
-    let rows = sqlx::query!(
-      "
-        SELECT term_name, aliases
-        FROM term
-        WHERE guild_id = $1
-        ORDER BY term_name DESC
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    let term_list = rows
-      .into_iter()
-      .map(|row| Names {
-        term_name: row.term_name,
-        aliases: row.aliases,
-      })
-      .collect();
-
-    Ok(term_list)
-  }
-
-  pub async fn get_all_glossary_terms(
-    transaction: &mut Transaction<'_, Postgres>,
-    guild_id: &GuildId,
-  ) -> Result<Vec<Term>> {
-    let rows = sqlx::query!(
-      "
-        SELECT term_name, meaning
-        FROM term
-        WHERE guild_id = $1
-        ORDER BY term_name ASC
-      ",
-      guild_id.to_string(),
-    )
-    .fetch_all(&mut **transaction)
-    .await?;
-
-    let glossary = rows
-      .into_iter()
-      .map(|row| Term {
-        guild_id: *guild_id,
-        name: row.term_name,
-        meaning: row.meaning,
-        usage: None,
-        links: None,
-        category: None,
-        aliases: None,
-      })
-      .collect();
-
-    Ok(glossary)
+    Ok(())
   }
 
   pub async fn term_exists(
@@ -1391,22 +1145,77 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn remove_term(
+  pub async fn get_term(
     transaction: &mut Transaction<'_, Postgres>,
-    term_name: &str,
     guild_id: &GuildId,
-  ) -> Result<()> {
-    sqlx::query!(
-      "
-        DELETE FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2
-      ",
-      term_name,
-      guild_id.to_string(),
+    term_name: &str,
+  ) -> Result<Option<Term>> {
+    Ok(
+      Term::retrieve(*guild_id, term_name)
+        .fetch_optional(&mut **transaction)
+        .await?,
     )
-    .execute(&mut **transaction)
-    .await?;
+  }
 
-    Ok(())
+  pub async fn get_term_meaning(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    term_name: &str,
+  ) -> Result<Option<Term>> {
+    Ok(
+      Term::retrieve_meaning(*guild_id, term_name)
+        .fetch_optional(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn get_term_list(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<Vec<Term>> {
+    Ok(
+      Term::retrieve_list(*guild_id)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn get_possible_terms(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    term_name: &str,
+    similarity: f32,
+  ) -> Result<Vec<Term>> {
+    Ok(
+      Term::retrieve_similar(*guild_id, term_name, similarity)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn search_terms_by_vector(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    search_vector: Vector,
+    limit: i64,
+  ) -> Result<Vec<VectorSearch>> {
+    Ok(
+      VectorSearch::result(*guild_id, search_vector, limit)
+        .fetch_all(&mut **transaction)
+        .await?,
+    )
+  }
+
+  pub async fn get_term_count(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+  ) -> Result<u64> {
+    Ok(
+      Term::count::<Aggregate>(*guild_id)
+        .fetch_one(&mut **transaction)
+        .await?
+        .count,
+    )
   }
 
   pub async fn get_challenge_stats(
