@@ -39,7 +39,7 @@ impl StarMessage {
 
 impl InsertQuery for StarMessage {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "INSERT INTO star (record_id, starred_message_id, board_message_id, starred_channel_id) VALUES ($1, $2, $3, $4) ON CONFLICT (starred_message_id) DO UPDATE SET board_message_id = $3",
       self.id,
       self.starred_message.to_string(),
@@ -54,7 +54,7 @@ impl DeleteQuery for StarMessage {
     _guild_id: GuildId,
     record_id: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!("DELETE FROM star WHERE record_id = $1", record_id.into())
+    query!("DELETE FROM star WHERE record_id = $1", record_id.into())
   }
 }
 

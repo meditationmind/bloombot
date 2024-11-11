@@ -50,7 +50,7 @@ impl SteamKey {
 
   /// Marks a [`SteamKey`] as unreserved.
   pub fn unreserve(key: &str) -> Query<'_, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "UPDATE steamkey SET reserved = NULL WHERE steam_key = $1",
       key,
     )
@@ -58,7 +58,7 @@ impl SteamKey {
 
   /// Marks a [`SteamKey`] as used.
   pub fn mark_used(key: &str) -> Query<'_, Postgres, PgArguments> {
-    sqlx::query!("UPDATE steamkey SET used = TRUE WHERE steam_key = $1", key,)
+    query!("UPDATE steamkey SET used = TRUE WHERE steam_key = $1", key,)
   }
 
   /// Retrieves a [`SteamKey`] and marks it as used.
@@ -79,7 +79,7 @@ impl SteamKey {
 impl InsertQuery for SteamKey {
   /// Adds a [`SteamKey`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "INSERT INTO steamkey (record_id, steam_key, guild_id, used) VALUES ($1, $2, $3, $4)",
       Ulid::new().to_string(),
       self.key,
@@ -95,7 +95,7 @@ impl DeleteQuery for SteamKey {
     guild_id: GuildId,
     key: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "DELETE FROM steamkey WHERE steam_key = $1 AND guild_id = $2",
       key.into(),
       guild_id.to_string(),
@@ -203,13 +203,13 @@ impl Recipient {
     exists: bool,
   ) -> Query<'a, Postgres, PgArguments> {
     if exists {
-      sqlx::query!(
+      query!(
         "UPDATE steamkey_recipients SET challenge_prize = TRUE, total_keys = total_keys + 1 WHERE user_id = $1 AND guild_id = $2",
         user_id.to_string(),
         guild_id.to_string(),
       )
     } else {
-      sqlx::query!(
+      query!(
         "INSERT INTO steamkey_recipients (record_id, user_id, guild_id, challenge_prize, total_keys) VALUES ($1, $2, $3, TRUE, 1)",
         Ulid::new().to_string(),
         user_id.to_string(),
@@ -222,7 +222,7 @@ impl Recipient {
 impl InsertQuery for Recipient {
   /// Adds a Steam key [`Recipient`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "INSERT INTO steamkey_recipients (record_id, user_id, guild_id, challenge_prize, donator_perk, total_keys) VALUES ($1, $2, $3, $4, $5, $6)",
       Ulid::new().to_string(),
       self.user_id.to_string(),
@@ -237,7 +237,7 @@ impl InsertQuery for Recipient {
 impl UpdateQuery for Recipient {
   /// Updates Steam key [`Recipient`] details in the database.
   fn update_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "UPDATE steamkey_recipients SET challenge_prize = $1, donator_perk = $2, total_keys = $3 WHERE user_id = $4 AND guild_id = $5",
       self.challenge_prize,
       self.donator_perk,
@@ -254,7 +254,7 @@ impl DeleteQuery for Recipient {
     guild_id: GuildId,
     user_id: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "DELETE FROM steamkey_recipients WHERE user_id = $1 AND guild_id = $2",
       user_id.into(),
       guild_id.to_string(),

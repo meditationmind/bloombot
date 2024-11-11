@@ -66,7 +66,7 @@ impl Default for Erase {
 
 impl InsertQuery for Erase {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "INSERT INTO erases (record_id, user_id, guild_id, message_link, reason, occurred_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (message_link) DO UPDATE SET reason = $5",
       self.id,
       self.user_id.to_string(),

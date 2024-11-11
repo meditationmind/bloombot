@@ -93,7 +93,7 @@ impl Meditation {
 
   /// Removes all [`Meditation`] entries for a user from the database.
   pub fn remove_all<'a>(guild_id: GuildId, user_id: UserId) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "DELETE FROM meditation WHERE user_id = $1 AND guild_id = $2",
       user_id.to_string(),
       guild_id.to_string(),
@@ -141,7 +141,7 @@ impl Meditation {
 
 impl InsertQuery for Meditation {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)",
       self.id,
       self.user_id.to_string(),
@@ -155,7 +155,7 @@ impl InsertQuery for Meditation {
 
 impl UpdateQuery for Meditation {
   fn update_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4",
       self.minutes,
       self.seconds,
@@ -170,7 +170,7 @@ impl DeleteQuery for Meditation {
     _guild_id: GuildId,
     meditation_id: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "DELETE FROM meditation WHERE record_id = $1",
       meditation_id.into(),
     )

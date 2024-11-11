@@ -59,7 +59,7 @@ impl UpdateQuery for Migration {
   fn update_query(&self) -> Query<Postgres, PgArguments> {
     match self.kind {
       MigrationType::TrackingProfile => {
-        sqlx::query!(
+        query!(
           "UPDATE tracking_profile SET user_id = $3 WHERE user_id = $1 AND guild_id = $2",
           self.old_user.to_string(),
           self.guild.to_string(),
@@ -67,7 +67,7 @@ impl UpdateQuery for Migration {
         )
       }
       MigrationType::MeditationEntries => {
-        sqlx::query!(
+        query!(
           "UPDATE meditation SET user_id = $3 WHERE user_id = $1 AND guild_id = $2",
           self.old_user.to_string(),
           self.guild.to_string(),

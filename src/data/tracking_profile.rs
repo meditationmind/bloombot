@@ -141,7 +141,7 @@ impl TrackingProfile {
 
 impl InsertQuery for TrackingProfile {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "INSERT INTO tracking_profile (record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
       Ulid::new().to_string(),
       self.user_id.to_string(),
@@ -157,7 +157,7 @@ impl InsertQuery for TrackingProfile {
 
 impl UpdateQuery for TrackingProfile {
   fn update_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5 WHERE user_id = $6 AND guild_id = $7",
       self.utc_offset,
       privacy!(self.tracking.privacy),
@@ -175,7 +175,7 @@ impl DeleteQuery for TrackingProfile {
     guild_id: GuildId,
     user_id: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "DELETE FROM tracking_profile WHERE user_id = $1 AND guild_id = $2",
       user_id.into(),
       guild_id.to_string(),

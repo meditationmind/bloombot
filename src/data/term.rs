@@ -267,7 +267,7 @@ impl DeleteQuery for Term {
     guild_id: GuildId,
     term_name: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "DELETE FROM term WHERE (LOWER(term_name) = LOWER($1)) AND guild_id = $2",
       term_name.into(),
       guild_id.to_string(),

@@ -1,6 +1,9 @@
 #![warn(clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
 #![allow(clippy::too_many_lines)]
 
+#[macro_use(query)]
+extern crate sqlx;
+
 use std::env;
 use std::sync::Arc;
 use std::time::Instant;

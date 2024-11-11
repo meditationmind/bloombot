@@ -77,7 +77,7 @@ impl Course {
 impl InsertQuery for Course {
   /// Adds a [`Course`] to the database.
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "INSERT INTO course (record_id, course_name, participant_role, graduate_role, guild_id) VALUES ($1, $2, $3, $4, $5)",
       Ulid::new().to_string(),
       self.name,
@@ -91,7 +91,7 @@ impl InsertQuery for Course {
 impl UpdateQuery for Course {
   /// Updates a [`Course`] in the database.
   fn update_query(&self) -> Query<Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "UPDATE course SET participant_role = $1, graduate_role = $2 WHERE LOWER(course_name) = LOWER($3)",
       self.participant_role.to_string(),
       self.graduate_role.to_string(),
@@ -106,7 +106,7 @@ impl DeleteQuery for Course {
     guild_id: GuildId,
     course_name: impl Into<String>,
   ) -> Query<'a, Postgres, PgArguments> {
-    sqlx::query!(
+    query!(
       "DELETE FROM course WHERE course_name = $1 AND guild_id = $2",
       course_name.into(),
       guild_id.to_string(),
