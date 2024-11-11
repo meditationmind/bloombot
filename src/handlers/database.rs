@@ -1181,7 +1181,10 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
   ) -> Result<User> {
     // Get total count, total sum, and count/sum for timeframe.
-    let end_time = Utc::now() + ChronoDuration::minutes(840);
+    let user_offset = DatabaseHandler::get_tracking_profile(transaction, guild_id, user_id)
+      .await?
+      .map_or(0, |profile| profile.utc_offset);
+    let end_time = Utc::now() + ChronoDuration::minutes(i64::from(user_offset));
     let start_time = match timeframe {
       Timeframe::Daily => end_time - ChronoDuration::days(12),
       Timeframe::Weekly => end_time - ChronoDuration::weeks(12),
