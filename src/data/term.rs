@@ -156,11 +156,11 @@ impl Term {
   }
 
   /// Updates the vector embeddings for a [`Term`] in the database.
-  pub fn update_embedding<'a>(
+  pub fn update_embedding(
     guild_id: GuildId,
     term_name: impl Into<String>,
-    vector: Option<Vector>,
-  ) -> Query<'a, Postgres, PgArguments> {
+    vector: Option<&Vector>,
+  ) -> Query<'_, Postgres, PgArguments> {
     sqlx::query(
       "UPDATE term SET embedding = $3 WHERE guild_id = $1 AND (LOWER(term_name) = LOWER($2))",
     )
@@ -336,11 +336,11 @@ impl From<Term> for TermModal {
 }
 
 impl VectorSearch {
-  pub fn result<'a>(
+  pub fn result(
     guild_id: GuildId,
-    search_vector: Vector,
+    search_vector: &Vector,
     limit: i64,
-  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+  ) -> QueryAs<'_, Postgres, Self, PgArguments> {
     sqlx::query_as(
       "SELECT term_name, meaning, embedding <=> $1 AS distance_score FROM term WHERE guild_id = $2 ORDER BY distance_score ASC LIMIT $3",
     )

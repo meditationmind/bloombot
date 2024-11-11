@@ -12,8 +12,8 @@ use sqlx::{FromRow, Postgres};
 /// [pw]: crate::commands::pick_winner
 pub fn retrieve_candidate<'a, T: for<'r> FromRow<'r, PgRow>>(
   guild_id: GuildId,
-  start_date: DateTime<Utc>,
-  end_date: DateTime<Utc>,
+  start_date: &'a DateTime<Utc>,
+  end_date: &'a DateTime<Utc>,
 ) -> QueryAs<'a, Postgres, T, PgArguments> {
   // All entries between the start and end dates that are greater than 0 minutes.
   // We only want a user ID to show up once, so we group by user ID.
@@ -30,8 +30,8 @@ pub fn retrieve_candidate<'a, T: for<'r> FromRow<'r, PgRow>>(
 pub fn candidate_sum<'a, T: for<'r> FromRow<'r, PgRow>>(
   guild_id: GuildId,
   user_id: UserId,
-  start_date: DateTime<Utc>,
-  end_date: DateTime<Utc>,
+  start_date: &'a DateTime<Utc>,
+  end_date: &'a DateTime<Utc>,
 ) -> QueryAs<'a, Postgres, T, PgArguments> {
   sqlx::query_as(
     "SELECT (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4",
@@ -47,8 +47,8 @@ pub fn candidate_sum<'a, T: for<'r> FromRow<'r, PgRow>>(
 pub fn candidate_count<'a, T: for<'r> FromRow<'r, PgRow>>(
   guild_id: GuildId,
   user_id: UserId,
-  start_date: DateTime<Utc>,
-  end_date: DateTime<Utc>,
+  start_date: &'a DateTime<Utc>,
+  end_date: &'a DateTime<Utc>,
 ) -> QueryAs<'a, Postgres, T, PgArguments> {
   sqlx::query_as(
     "SELECT COUNT(record_id) AS count FROM meditation WHERE user_id = $1 AND guild_id = $2 AND occurred_at >= $3 AND occurred_at <= $4",

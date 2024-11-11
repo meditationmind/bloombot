@@ -132,8 +132,8 @@ impl Timeframe {
   pub fn user_sum_and_count<'a>(
     guild_id: GuildId,
     user_id: UserId,
-    start_time: DateTime<Utc>,
-    end_time: DateTime<Utc>,
+    start_time: &'a DateTime<Utc>,
+    end_time: &'a DateTime<Utc>,
   ) -> QueryAs<'a, Postgres, Self, PgArguments> {
     sqlx::query_as(
       "SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum FROM meditation WHERE guild_id = $1 AND user_id = $2 AND occurred_at >= $3 AND occurred_at <= $4",
@@ -157,8 +157,8 @@ impl Timeframe {
 
   pub fn guild_sum_and_count<'a>(
     guild_id: GuildId,
-    start_time: DateTime<Utc>,
-    end_time: DateTime<Utc>,
+    start_time: &'a DateTime<Utc>,
+    end_time: &'a DateTime<Utc>,
   ) -> QueryAs<'a, Postgres, Self, PgArguments> {
     sqlx::query_as(
       "SELECT COUNT(record_id) AS count, (SUM(meditation_minutes) + (SUM(meditation_seconds) / 60)) AS sum FROM meditation WHERE guild_id = $1 AND occurred_at >= $2 AND occurred_at <= $3",
@@ -245,7 +245,7 @@ impl ByInterval {
     guild_id: GuildId,
     user_id: UserId,
     timeframe: &StatsTimeframe,
-    now_offset: DateTime<Utc>,
+    now_offset: &'a DateTime<Utc>,
   ) -> QueryAs<'a, Postgres, Self, PgArguments> {
     let query = match timeframe {
       StatsTimeframe::Yearly => {

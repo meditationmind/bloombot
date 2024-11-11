@@ -565,8 +565,8 @@ impl DatabaseHandler {
 
   pub fn get_winner_candidates<'a>(
     conn: &'a mut PoolConnection<Postgres>,
-    start_date: DateTime<Utc>,
-    end_date: DateTime<Utc>,
+    start_date: &'a DateTime<Utc>,
+    end_date: &'a DateTime<Utc>,
     guild_id: &'a GuildId,
   ) -> impl Stream<Item = Result<UserId>> + 'a {
     let stream: Pin<Box<dyn Stream<Item = Result<Meditation, SqlxError>> + Send>> =
@@ -579,8 +579,8 @@ impl DatabaseHandler {
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     user_id: &UserId,
-    start_date: DateTime<Utc>,
-    end_date: DateTime<Utc>,
+    start_date: &DateTime<Utc>,
+    end_date: &DateTime<Utc>,
   ) -> Result<i64> {
     Ok(
       pick_winner::candidate_sum::<Aggregate>(*guild_id, *user_id, start_date, end_date)
@@ -594,8 +594,8 @@ impl DatabaseHandler {
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     user_id: &UserId,
-    start_date: DateTime<Utc>,
-    end_date: DateTime<Utc>,
+    start_date: &DateTime<Utc>,
+    end_date: &DateTime<Utc>,
   ) -> Result<u64> {
     Ok(
       pick_winner::candidate_count::<Aggregate>(*guild_id, *user_id, start_date, end_date)
@@ -1014,7 +1014,7 @@ impl DatabaseHandler {
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     term_name: &str,
-    vector: Option<pgvector::Vector>,
+    vector: Option<&Vector>,
   ) -> Result<()> {
     Term::update_embedding(*guild_id, term_name, vector)
       .execute(&mut **transaction)
@@ -1099,7 +1099,7 @@ impl DatabaseHandler {
   pub async fn search_terms_by_vector(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
-    search_vector: Vector,
+    search_vector: &Vector,
     limit: i64,
   ) -> Result<Vec<VectorSearch>> {
     Ok(
@@ -1149,7 +1149,7 @@ impl DatabaseHandler {
     };
 
     let sum_and_count =
-      TimeframeStats::user_sum_and_count(*guild_id, *user_id, start_time, end_time)
+      TimeframeStats::user_sum_and_count(*guild_id, *user_id, &start_time, &end_time)
         .fetch_one(&mut **transaction)
         .await?;
 
@@ -1162,7 +1162,6 @@ impl DatabaseHandler {
   pub async fn get_leaderboard_stats(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
-    //user_id: &UserId,
     timeframe: &Timeframe,
     sort_by: &SortBy,
     leaderboard_type: &LeaderboardType,
@@ -1181,10 +1180,12 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
   ) -> Result<User> {
     // Get total count, total sum, and count/sum for timeframe.
+    // If the user has set a custom time zone, we use that for our timeframe.
+    // Otherwise, we default to UTC.
     let user_offset = DatabaseHandler::get_tracking_profile(transaction, guild_id, user_id)
       .await?
       .map_or(0, |profile| profile.utc_offset);
-    let end_time = Utc::now() + ChronoDuration::minutes(i64::from(user_offset));
+    let end_time = Utc::now() + ChronoDuration::minutes(user_offset.into());
     let start_time = match timeframe {
       Timeframe::Daily => end_time - ChronoDuration::days(12),
       Timeframe::Weekly => end_time - ChronoDuration::weeks(12),
@@ -1197,7 +1198,7 @@ impl DatabaseHandler {
       .await?;
 
     let timeframe_data =
-      TimeframeStats::user_sum_and_count(*guild_id, *user_id, start_time, end_time)
+      TimeframeStats::user_sum_and_count(*guild_id, *user_id, &start_time, &end_time)
         .fetch_one(&mut **transaction)
         .await?;
 
@@ -1217,7 +1218,8 @@ impl DatabaseHandler {
     timeframe: &Timeframe,
   ) -> Result<Guild> {
     // Get total count, total sum, and count/sum for timeframe.
-    let end_time = Utc::now() + ChronoDuration::minutes(840);
+    // We use UTC for our timeframe, since it is the bot default.
+    let end_time = Utc::now();
     let start_time = match timeframe {
       Timeframe::Daily => end_time - ChronoDuration::days(12),
       Timeframe::Weekly => end_time - ChronoDuration::weeks(12),
@@ -1229,7 +1231,7 @@ impl DatabaseHandler {
       .fetch_one(&mut **transaction)
       .await?;
 
-    let timeframe_data = TimeframeStats::guild_sum_and_count(*guild_id, start_time, end_time)
+    let timeframe_data = TimeframeStats::guild_sum_and_count(*guild_id, &start_time, &end_time)
       .fetch_one(&mut **transaction)
       .await?;
 
@@ -1254,12 +1256,12 @@ impl DatabaseHandler {
 
     let rows: Vec<ByInterval> = if let Timeframe::Daily = timeframe {
       // Calculate fresh data for last 12 days.
-      ByInterval::user_fresh(*guild_id, *user_id, timeframe, now_offset)
+      ByInterval::user_fresh(*guild_id, *user_id, timeframe, &now_offset)
         .fetch_all(&mut **transaction)
         .await?
     } else {
       // Calculate fresh data for present week/month/year.
-      fresh_data = ByInterval::user_fresh(*guild_id, *user_id, timeframe, now_offset)
+      fresh_data = ByInterval::user_fresh(*guild_id, *user_id, timeframe, &now_offset)
         .fetch_optional(&mut **transaction)
         .await?;
 

@@ -342,7 +342,7 @@ pub async fn pick_winner(
   let mut conn = data.db.get_connection_with_retry(5).await?;
   // Since the stream is async, we can't use the same connection for the transaction
   let mut database_winner_candidates =
-    DatabaseHandler::get_winner_candidates(&mut conn, start_datetime, end_datetime, &guild_id);
+    DatabaseHandler::get_winner_candidates(&mut conn, &start_datetime, &end_datetime, &guild_id);
 
   // The database already randomizes the order... we can use the first one that has the role
   let winner_role_id = RoleId::new(ROLES.meditation_challenger);
@@ -371,8 +371,8 @@ pub async fn pick_winner(
       &mut transaction,
       &guild_id,
       &member.user.id,
-      start_datetime,
-      end_datetime,
+      &start_datetime,
+      &end_datetime,
     )
     .await?;
 
@@ -380,8 +380,8 @@ pub async fn pick_winner(
       &mut transaction,
       &guild_id,
       &member.user.id,
-      start_datetime,
-      end_datetime,
+      &start_datetime,
+      &end_datetime,
     )
     .await?;
 

@@ -381,7 +381,7 @@ async fn search(
       .await?,
   );
   let possible_terms =
-    DatabaseHandler::search_terms_by_vector(&mut transaction, &guild_id, vector, 3).await?;
+    DatabaseHandler::search_terms_by_vector(&mut transaction, &guild_id, &vector, 3).await?;
   let search_time = start_time.elapsed();
 
   let mut embed = BloomBotEmbed::new();

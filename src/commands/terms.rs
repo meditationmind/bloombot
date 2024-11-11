@@ -249,8 +249,13 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
         .await?,
     ));
 
-    DatabaseHandler::update_term_embedding(&mut transaction, &guild_id, term.name.as_str(), vector)
-      .await?;
+    DatabaseHandler::update_term_embedding(
+      &mut transaction,
+      &guild_id,
+      term.name.as_str(),
+      vector.as_ref(),
+    )
+    .await?;
   }
 
   database::commit_and_say(
