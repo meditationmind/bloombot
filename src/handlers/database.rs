@@ -3,7 +3,8 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Datelike, Duration as ChronoDuration, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration as ChronoDuration, DurationRound, Months};
+use chrono::{TimeDelta, Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use pgvector::Vector;
@@ -1186,11 +1187,25 @@ impl DatabaseHandler {
       .await?
       .map_or(0, |profile| profile.utc_offset);
     let end_time = Utc::now() + ChronoDuration::minutes(user_offset.into());
+    let end_trunc = end_time.duration_trunc(TimeDelta::days(1))?;
     let start_time = match timeframe {
-      Timeframe::Daily => end_time - ChronoDuration::days(12),
-      Timeframe::Weekly => end_time - ChronoDuration::weeks(12),
-      Timeframe::Monthly => end_time - ChronoDuration::days(30 * 12),
-      Timeframe::Yearly => end_time - ChronoDuration::days(365 * 12),
+      Timeframe::Daily => end_trunc - ChronoDuration::days(11),
+      Timeframe::Weekly => {
+        let target_week = end_trunc - ChronoDuration::weeks(11);
+        target_week - TimeDelta::days(target_week.weekday().number_from_monday().into())
+      }
+      Timeframe::Monthly => end_trunc
+        .checked_sub_months(Months::new(11))
+        .with_context(|| "Failed to subtract 11 months")?
+        .with_day(1)
+        .with_context(|| "Failed to set day to 1")?,
+      Timeframe::Yearly => end_trunc
+        .checked_sub_months(Months::new(12 * 11))
+        .with_context(|| "Failed to subtract 11 years")?
+        .with_month(1)
+        .with_context(|| "Failed to set month to 1")?
+        .with_day(1)
+        .with_context(|| "Failed to set day to 1")?,
     };
 
     let total_data = TimeframeStats::user_total_sum_and_count(*guild_id, *user_id)
@@ -1220,11 +1235,25 @@ impl DatabaseHandler {
     // Get total count, total sum, and count/sum for timeframe.
     // We use UTC for our timeframe, since it is the bot default.
     let end_time = Utc::now();
+    let end_trunc = end_time.duration_trunc(TimeDelta::days(1))?;
     let start_time = match timeframe {
-      Timeframe::Daily => end_time - ChronoDuration::days(12),
-      Timeframe::Weekly => end_time - ChronoDuration::weeks(12),
-      Timeframe::Monthly => end_time - ChronoDuration::days(30 * 12),
-      Timeframe::Yearly => end_time - ChronoDuration::days(365 * 12),
+      Timeframe::Daily => end_trunc - ChronoDuration::days(11),
+      Timeframe::Weekly => {
+        let target_week = end_trunc - ChronoDuration::weeks(11);
+        target_week - TimeDelta::days(target_week.weekday().number_from_monday().into())
+      }
+      Timeframe::Monthly => end_trunc
+        .checked_sub_months(Months::new(11))
+        .with_context(|| "Failed to subtract 11 months")?
+        .with_day(1)
+        .with_context(|| "Failed to set day to 1")?,
+      Timeframe::Yearly => end_trunc
+        .checked_sub_months(Months::new(12 * 11))
+        .with_context(|| "Failed to subtract 11 years")?
+        .with_month(1)
+        .with_context(|| "Failed to set month to 1")?
+        .with_day(1)
+        .with_context(|| "Failed to set day to 1")?,
     };
 
     let total_data = TimeframeStats::guild_total_sum_and_count(*guild_id)
