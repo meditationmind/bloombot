@@ -8,7 +8,7 @@ use poise::serenity_prelude::{CreateInteractionResponse, CreateInteractionRespon
 use poise::CreateReply;
 
 use crate::commands::helpers::common::Visibility;
-use crate::config::BloomBotEmbed;
+use crate::config::{BloomBotEmbed, ENTRIES_PER_PAGE};
 use crate::Context;
 
 #[derive(Debug, Copy, Clone)]
@@ -42,36 +42,25 @@ impl<'a> Paginator<'a> {
   /// [Discord Embed Limits]: https://discord.com/developers/docs/resources/message#embed-object-embed-limits
   pub fn new(
     title: impl Display,
-    entries: &[&'a (dyn PageRow + Send + Sync)],
+    entries: &'a [&'a (dyn PageRow + Send + Sync)],
     entries_per_page: usize,
   ) -> Self {
     // Limit entries per page to embed fields limit (25)
-    let entries_per_page = if entries_per_page > 25 {
-      25
-    } else {
-      entries_per_page
-    };
+    let entries_per_page = entries_per_page.min(25);
 
     let entries_count = entries.len();
-    let page_count = if entries_count == 0 {
-      1
-    } else {
-      (entries_count / entries_per_page) + usize::from(entries_count % entries_per_page > 0)
-    };
+    let page_count = ((entries_count / entries_per_page)
+      + usize::from(entries_count % entries_per_page > 0))
+    .max(1);
 
-    let page_data = if entries_count == 0 {
-      vec![PaginationPage {
-        entries: vec![],
-        page_number: 0,
-        page_count: 1,
-        entries_per_page,
-      }]
+    let page_data = if entries_count < 1 {
+      vec![PaginationPage::default()]
     } else {
       entries
         .chunks(entries_per_page)
         .enumerate()
         .map(|(page_number, entries)| PaginationPage {
-          entries: entries.to_vec(),
+          entries,
           page_number,
           page_count,
           entries_per_page,
@@ -91,7 +80,6 @@ impl<'a> Paginator<'a> {
   }
 
   pub fn get_last_page_number(&self) -> usize {
-    // We can do this unchecked because we use entries.is_empty on instantiation
     self.page_count - 1
   }
 
@@ -100,42 +88,25 @@ impl<'a> Paginator<'a> {
   }
 
   pub fn update_page_number(&self, current_page: usize, change_by: isize) -> usize {
-    if change_by < 0 {
-      if change_by.unsigned_abs() > current_page {
-        self.page_count - (change_by.unsigned_abs() - current_page)
-      } else {
-        current_page - change_by.unsigned_abs()
-      }
-    } else if current_page + change_by.unsigned_abs() >= self.page_count {
-      (current_page + change_by.unsigned_abs()) - self.page_count
+    if change_by >= 0 {
+      return (current_page + change_by.unsigned_abs()) % self.page_count;
+    }
+    if change_by.unsigned_abs() > current_page {
+      self.page_count - (change_by.unsigned_abs() - current_page)
     } else {
-      current_page + change_by.unsigned_abs()
+      current_page - change_by.unsigned_abs()
     }
   }
 
   pub fn create_page_embed(&self, page: usize, page_type: PageType) -> CreateEmbed {
-    let mut embed = BloomBotEmbed::new();
-    let page = self.get_page(page);
-
-    if let Some(page) = page {
-      // If it is a valid page that is empty, it must be page 0.
-      // This implies that there are no entries to display.
-      if page.is_empty() {
-        embed = embed
-          .title(self.title.clone())
-          .description("No entries have been added yet.");
-
-        embed
-      } else {
-        page.to_embed(self.title.as_str(), page_type).clone()
-      }
-    } else {
-      // This should never happen unless we have a bug in our pagination code
-      embed = embed
+    match self.get_page(page) {
+      Some(page) if page.is_empty() => BloomBotEmbed::new()
         .title(self.title.clone())
-        .description("This page does not exist.");
-
-      embed
+        .description("No entries have been added yet."),
+      Some(page) => page.to_embed(self.title.as_str(), page_type),
+      None => BloomBotEmbed::new()
+        .title(self.title.clone())
+        .description("This page does not exist."),
     }
   }
 
@@ -219,7 +190,7 @@ impl<'a> Paginator<'a> {
 
 #[allow(clippy::module_name_repetitions)]
 pub struct PaginationPage<'a> {
-  entries: Vec<&'a (dyn PageRow + Send + Sync)>,
+  entries: &'a [&'a (dyn PageRow + Send + Sync)],
   page_number: usize,
   page_count: usize,
   entries_per_page: usize,
@@ -251,6 +222,17 @@ impl PaginationPage<'_> {
     )));
 
     embed
+  }
+}
+
+impl Default for PaginationPage<'_> {
+  fn default() -> Self {
+    Self {
+      entries: &[],
+      page_number: 0,
+      page_count: 1,
+      entries_per_page: ENTRIES_PER_PAGE.default,
+    }
   }
 }
 
