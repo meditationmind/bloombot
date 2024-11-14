@@ -16,6 +16,11 @@ use crate::database::DatabaseHandler;
 use crate::events;
 use crate::Context;
 
+enum LargeAdd {
+  Confirmed,
+  Cancelled,
+}
+
 /// Add a meditation entry
 ///
 /// Adds a specified number of minutes to your meditation time. You can add minutes each time you meditate or add the combined minutes for multiple sessions.
@@ -40,14 +45,12 @@ pub async fn add(
   plus_offset: Option<PlusOffsetChoice>,
   #[description = "Set visibility of response (defaults to public)"] privacy: Option<Privacy>,
 ) -> Result<()> {
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let tracking_profile =
     DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id)
@@ -56,7 +59,22 @@ pub async fn add(
 
   let privacy = privacy!(privacy, tracking_profile.tracking.privacy);
 
-  // Usually not necessary, but defer to avoid possible unknown interaction
+  let offset =
+    match time::offset_from_choice(minus_offset, plus_offset, tracking_profile.utc_offset) {
+      Ok(offset) => offset,
+      Err(e) => {
+        let msg = format!(
+          "{} Unable to determine UTC offset based on your choice: {e}",
+          EMOJI.mminfo,
+        );
+        ctx
+          .send(CreateReply::default().content(msg).ephemeral(true))
+          .await?;
+        return Ok(()); // Return early to avoid further processing
+      }
+    };
+
+  // Usually not necessary, but defer to avoid potential unknown interaction
   // errors due to slow DB lookups, workload redeployment, etc.
   if privacy {
     ctx.defer_ephemeral().await?;
@@ -64,32 +82,13 @@ pub async fn add(
     ctx.defer().await?;
   }
 
-  let offset = match time::offset_from_choice(
-    minus_offset,
-    plus_offset,
-    tracking_profile.utc_offset,
-  ) {
-    Ok(offset) => offset,
-    Err(e) => {
-      ctx
-          .send(
-            CreateReply::default()
-              .content(format!(
-                "A problem occurred while attempting to determine the UTC offset based on your choice: {e}"
-              ))
-              .ephemeral(true),
-          )
-          .await?;
-      return Ok(()); // Return early to avoid further processing
-    }
-  };
-
-  let seconds = seconds.unwrap_or(0);
-
   let datetime = match offset {
     0 => Utc::now(),
     _ => Utc::now() + ChronoDuration::minutes(i64::from(offset)),
   };
+
+  let seconds = seconds.unwrap_or(0);
+  let (minutes, seconds) = (minutes + (seconds / 60), seconds % 60);
 
   let meditation = Meditation::new(guild_id, user_id, minutes, seconds, &datetime);
 
@@ -109,155 +108,33 @@ pub async fn add(
   )
   .await?;
 
-  if minutes > 300 {
-    let ctx_id = ctx.id();
-
-    let confirm_id = format!("{ctx_id}confirm");
-    let cancel_id = format!("{ctx_id}cancel");
-
-    let check = ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "Are you sure you want to add **{minutes}** minutes to your meditation time?"
-          ))
-          .ephemeral(privacy)
-          .components(vec![CreateActionRow::Buttons(vec![
-            CreateButton::new(confirm_id.clone())
-              .label("Yes")
-              .style(ButtonStyle::Success),
-            CreateButton::new(cancel_id.clone())
-              .label("No")
-              .style(ButtonStyle::Danger),
-          ])]),
-      )
-      .await?;
-
-    // Loop through incoming interactions with the navigation buttons
-    while let Some(press) = ComponentInteractionCollector::new(ctx)
-      // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-      // button was pressed
-      .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-      // Timeout when no navigation button has been pressed in one minute
-      .timeout(Duration::from_secs(60))
-      .await
-    {
-      // Depending on which button was pressed, go to next or previous page
-      if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
-        // This is an unrelated button interaction
-        continue;
-      }
-
-      let confirm = press.data.custom_id == confirm_id;
-
-      // Update the message to reflect the action
-      match press
-        .create_response(
-          ctx,
-          CreateInteractionResponse::UpdateMessage({
-            if confirm {
-              if privacy {
-                CreateInteractionResponseMessage::new()
-                  .content(format!(
-                    "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
-                  ))
-                  .ephemeral(privacy)
-                  .components(Vec::new())
-              } else {
-                CreateInteractionResponseMessage::new()
-                  .content(&response)
-                  .ephemeral(privacy)
-                  .components(Vec::new())
-              }
-            } else {
-              CreateInteractionResponseMessage::new()
-                .content("Cancelled.")
-                .ephemeral(privacy)
-                .components(Vec::new())
-            }
-          }),
-        )
-        .await
-      {
-        Ok(()) => {
-          if confirm {
-            match DatabaseHandler::commit_transaction(transaction).await {
-              Ok(()) => {}
-              Err(e) => {
-                check.edit(ctx, CreateReply::default()
-                  .content(format!("{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.", EMOJI.mminfo))
-                  .ephemeral(privacy)).await?;
-                return Err(anyhow!("Could not send message: {e}"));
-              }
-            }
-          }
-        }
-        Err(e) => {
-          check
-            .edit(ctx, CreateReply::default()
-              .content(format!("{} An error may have occurred. If your command failed, please contact staff for assistance.", EMOJI.mminfo))
-                .ephemeral(privacy)
-            )
-            .await?;
-          return Err(anyhow!("Could not send message: {e}"));
-        }
-      }
-
-      if confirm && privacy {
-        ctx
-          .channel_id()
-          .send_message(ctx, CreateMessage::new().content(response))
-          .await?;
-      }
-
-      if confirm {
-        // Log large add in Bloom logs channel
-        let description = if seconds > 0 {
-          format!(
-            "**User**: {}\n**Time**: {} minutes {} second(s)",
-            ctx.author(),
-            minutes,
-            seconds,
-          )
-        } else {
-          format!("**User**: {}\n**Time**: {} minutes", ctx.author(), minutes,)
-        };
-        let log_embed = BloomBotEmbed::new()
-          .title("Large Meditation Entry Added")
-          .description(description)
-          .footer(
-            CreateEmbedFooter::new(format!(
-              "Added by {} ({})",
-              ctx.author().name,
-              ctx.author().id
-            ))
-            .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-          )
-          .clone();
-
-        let log_channel = ChannelId::new(CHANNELS.bloomlogs);
-
-        log_channel
-          .send_message(ctx, CreateMessage::new().embed(log_embed))
-          .await?;
-      }
-
-      return Ok(());
-    }
-  }
-
   // We only need to get the streak if streaks are active. If inactive,
   // this variable will be unused, so just assign a default value of 0.
-  let user_streak = if tracking_profile.streak.status == Status::Enabled {
-    let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
-    streak.current
-  } else {
-    0
+  let user_streak = match tracking_profile.streak.status {
+    Status::Enabled => {
+      let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
+      streak.current
+    }
+    Status::Disabled => 0,
   };
 
-  let guild_time_in_hours = tracking::get_guild_hours(&mut transaction, &guild_id).await?;
+  let guild_hours = tracking::get_guild_hours(&mut transaction, &guild_id).await?;
 
-  if privacy {
+  if minutes > 300 {
+    let result = large_add(
+      ctx,
+      transaction,
+      minutes,
+      seconds,
+      user_sum,
+      privacy,
+      &response,
+    )
+    .await?;
+    if matches!(result, LargeAdd::Cancelled) {
+      return Ok(());
+    }
+  } else if privacy {
     let private_response = format!(
       "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
     );
@@ -283,7 +160,7 @@ pub async fn add(
     .await?;
   }
 
-  tracking::post_guild_hours(&ctx, &guild_time_in_hours).await?;
+  tracking::post_guild_hours(&ctx, &guild_hours).await?;
 
   let member = guild_id.member(ctx, user_id).await?;
   tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
@@ -292,14 +169,159 @@ pub async fn add(
   }
 
   // Spawn a Tokio task to update leaderboards every 10th add
-  if guild_time_in_hours.is_some() {
+  if guild_hours.is_some() {
     tokio::spawn(events::leaderboards::update(
       module_path!(),
       ctx.serenity_context().http.clone(),
-      data.db.clone(),
+      ctx.data().db.clone(),
       guild_id,
     ));
   }
 
   Ok(())
+}
+
+async fn large_add(
+  ctx: Context<'_>,
+  transaction: sqlx::Transaction<'_, sqlx::Postgres>,
+  minutes: i32,
+  seconds: i32,
+  user_sum: i64,
+  privacy: bool,
+  response: &str,
+) -> Result<LargeAdd> {
+  let author_id = ctx.author().id;
+  let ctx_id = ctx.id();
+
+  let confirm_id = format!("{ctx_id}confirm");
+  let cancel_id = format!("{ctx_id}cancel");
+
+  let check = ctx
+    .send(
+      CreateReply::default()
+        .content(format!(
+          "Are you sure you want to add **{minutes}** minutes to your meditation time?"
+        ))
+        .ephemeral(privacy)
+        .components(vec![CreateActionRow::Buttons(vec![
+          CreateButton::new(confirm_id.clone())
+            .label("Yes")
+            .style(ButtonStyle::Success),
+          CreateButton::new(cancel_id.clone())
+            .label("No")
+            .style(ButtonStyle::Danger),
+        ])]),
+    )
+    .await?;
+
+  while let Some(press) = ComponentInteractionCollector::new(ctx)
+    .filter(move |press| {
+      press.user.id == author_id && press.data.custom_id.starts_with(&ctx_id.to_string())
+    })
+    .timeout(Duration::from_secs(60))
+    .await
+  {
+    if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
+      // This is an unrelated button interaction.
+      continue;
+    }
+
+    let confirm = press.data.custom_id == confirm_id;
+
+    match press
+      .create_response(
+        ctx,
+        CreateInteractionResponse::UpdateMessage({
+          if confirm {
+            if privacy {
+              CreateInteractionResponseMessage::new()
+                .content(format!(
+                  "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+                ))
+                .ephemeral(privacy)
+                .components(Vec::new())
+            } else {
+              CreateInteractionResponseMessage::new()
+                .content(response)
+                .ephemeral(privacy)
+                .components(Vec::new())
+            }
+          } else {
+            CreateInteractionResponseMessage::new()
+              .content("Cancelled.")
+              .ephemeral(privacy)
+              .components(Vec::new())
+          }
+        }),
+      )
+      .await
+    {
+      Ok(()) => {
+        if !confirm {
+          return Ok(LargeAdd::Cancelled);
+        }
+        break;
+      }
+      Err(e) => {
+        let msg = format!(
+          "{} An error may have occurred. If your command failed, please contact staff for assistance.",
+          EMOJI.mminfo
+        );
+        check
+          .edit(ctx, CreateReply::default().content(msg).ephemeral(privacy))
+          .await?;
+        return Err(anyhow!("Failed to respond to button press: {e}"));
+      }
+    }
+  }
+
+  if let Err(e) = DatabaseHandler::commit_transaction(transaction).await {
+    let msg = format!(
+      "{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.",
+      EMOJI.mminfo
+    );
+    check
+      .edit(ctx, CreateReply::default().content(msg).ephemeral(privacy))
+      .await?;
+    return Err(anyhow!("Failed to commit add: {e}"));
+  }
+
+  if privacy {
+    ctx
+      .channel_id()
+      .send_message(ctx, CreateMessage::new().content(response))
+      .await?;
+  }
+
+  // Log large add in Bloom logs channel
+  let description = if seconds > 0 {
+    format!(
+      "**User**: {}\n**Time**: {} minutes {} second(s)",
+      ctx.author(),
+      minutes,
+      seconds,
+    )
+  } else {
+    format!("**User**: {}\n**Time**: {} minutes", ctx.author(), minutes,)
+  };
+  let log_embed = BloomBotEmbed::new()
+    .title("Large Meditation Entry Added")
+    .description(description)
+    .footer(
+      CreateEmbedFooter::new(format!(
+        "Added by {} ({})",
+        ctx.author().name,
+        ctx.author().id
+      ))
+      .icon_url(ctx.author().avatar_url().unwrap_or_default()),
+    )
+    .clone();
+
+  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+
+  log_channel
+    .send_message(ctx, CreateMessage::new().embed(log_embed))
+    .await?;
+
+  Ok(LargeAdd::Confirmed)
 }

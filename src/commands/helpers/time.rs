@@ -141,7 +141,9 @@ pub fn offset_from_choice(
 ) -> Result<i16, String> {
   match (minus_offset, plus_offset) {
     (None, None) => Ok(default),
-    (Some(_), Some(_)) => Err(String::from("Cannot have both minus and plus offsets")),
+    (Some(_), Some(_)) => Err(String::from(
+      "Cannot have both minus and plus offsets. Please try again with only one offset.",
+    )),
     (Some(minus_offset), None) => Ok(match minus_offset {
       MinusOffsetChoice::UTCMinus12 => -720,
       MinusOffsetChoice::UTCMinus11 => -660,
@@ -242,6 +244,9 @@ mod tests {
     ) else {
       panic!("Expected Err, got Ok");
     };
-    assert_eq!(err, "Cannot have both minus and plus offsets");
+    assert_eq!(
+      err,
+      "Cannot have both minus and plus offsets. Please try again with only one offset."
+    );
   }
 }
