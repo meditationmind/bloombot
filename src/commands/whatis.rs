@@ -1,8 +1,12 @@
+use std::cmp::Ordering;
+use std::fmt::Write;
+
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::CreateEmbedFooter;
 use poise::CreateReply;
 
 use crate::config::BloomBotEmbed;
+use crate::data::term::Term;
 use crate::database::DatabaseHandler;
 use crate::Context;
 
@@ -20,90 +24,79 @@ pub async fn whatis(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  let term_info = DatabaseHandler::get_term(&mut transaction, &guild_id, term.as_str()).await?;
-  let mut embed = BloomBotEmbed::new();
-
-  if let Some(term_info) = term_info {
-    embed = embed.title(term_info.name);
-    match term_info.meaning.split_once('\n') {
-      Some(one_liner) => {
-        embed = embed.description(format!(
-          "{}\n\n*Use </glossary info:1135659962308243479> for more information.*",
-          one_liner.0
-        ));
-      }
-      None => {
-        embed = embed.description(term_info.meaning);
-      }
-    };
-  } else {
+  let Some(term_info) =
+    DatabaseHandler::get_term(&mut transaction, &guild_id, term.as_str()).await?
+  else {
     let possible_terms =
       DatabaseHandler::get_possible_terms(&mut transaction, &guild_id, term.as_str(), 0.7).await?;
+    let reply = term_not_found(&term, possible_terms.as_slice())?;
+    ctx.send(reply).await?;
+    return Ok(());
+  };
 
-    if possible_terms.len() == 1 {
-      let possible_term = possible_terms
-        .first()
-        .with_context(|| "Failed to retrieve first element of possible_terms")?;
-
-      embed = embed.title(&possible_term.name);
-      match &possible_term.meaning.split_once('\n') {
-        Some(one_liner) => {
-          embed = embed.description(format!(
-            "{}\n\n*Use </glossary info:1135659962308243479> for more information.*",
-            one_liner.0
-          ));
-        }
-        None => {
-          embed = embed.description(&possible_term.meaning);
-        }
-      };
-
-      embed = embed.footer(CreateEmbedFooter::new(format!(
-        "*You searched for '{}'. The closest term available was '{}'.",
-        term, possible_term.name,
-      )));
-    } else if possible_terms.is_empty() {
-      embed = embed.title("Term not found").description(format!(
-        "The term `{term}` was not found in the glossary. If you believe it should be included, use </glossary suggest:1135659962308243479> to suggest it for addition."
-      ));
-
-      ctx
-        .send(CreateReply::default().embed(embed).ephemeral(true))
-        .await?;
-
-      return Ok(());
-    } else {
-      embed = embed
-        .title("Term not found")
-        .description(format!("The term `{term}` was not found in the glossary."));
-
-      embed = embed.field(
-        "Did you mean one of these?",
-        {
-          let mut field = String::new();
-
-          for possible_term in possible_terms.iter().take(3) {
-            field.push_str(&format!("`{}`\n", possible_term.name));
-          }
-
-          field.push_str(
-            "\n\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search, or use </glossary suggest:1135659962308243479> to suggest the term for addition to the glossary.*",
-          );
-
-          field
-        },
-        false,
-      );
-
-      ctx
-        .send(CreateReply::default().embed(embed).ephemeral(true))
-        .await?;
-
-      return Ok(());
-    }
-  }
+  let embed = BloomBotEmbed::new()
+    .title(term_info.name)
+    .description(one_liner(term_info.meaning.as_str()));
 
   ctx.send(CreateReply::default().embed(embed)).await?;
 
   Ok(())
+}
+
+fn one_liner(term_meaning: &str) -> String {
+  term_meaning
+    .split_once('\n')
+    .map_or(term_meaning.to_string(), |one_liner| {
+      format!(
+        "{}\n\n*Use </glossary info:1135659962308243479> for more information.*",
+        one_liner.0
+      )
+    })
+}
+
+fn term_not_found(term: &str, possible_terms: &[Term]) -> Result<CreateReply> {
+  match possible_terms.len().cmp(&1) {
+    Ordering::Less => {
+      let embed = BloomBotEmbed::new()
+        .title("Term not found")
+        .description(format!(
+          "The term `{term}` was not found in the glossary. If you believe it should be included, use </glossary suggest:1135659962308243479> to suggest it for addition."
+        ));
+      Ok(CreateReply::default().embed(embed).ephemeral(true))
+    }
+    Ordering::Equal => {
+      let possible_term = possible_terms
+        .first()
+        .with_context(|| "Failed to retrieve first element of possible_terms")?;
+      let embed = BloomBotEmbed::new()
+        .title(&possible_term.name)
+        .description(one_liner(possible_term.meaning.as_str()))
+        .footer(CreateEmbedFooter::new(format!(
+          "*You searched for '{}'. The closest term available was '{}'.",
+          term, possible_term.name,
+        )));
+      Ok(CreateReply::default().embed(embed))
+    }
+    Ordering::Greater => {
+      let suggestions =
+        possible_terms
+          .iter()
+          .take(5)
+          .fold(String::new(), |mut suggestions, term| {
+            let _ = writeln!(suggestions, "`{}`", term.name);
+            suggestions
+          });
+      let embed = BloomBotEmbed::new()
+        .title("Term not found")
+        .description(format!("The term `{term}` was not found in the glossary."))
+        .field(
+          "Did you mean one of these?",
+          format!(
+            "{suggestions}\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search, or use </glossary suggest:1135659962308243479> to suggest the term for addition to the glossary.*"
+          ),
+          false,
+        );
+      Ok(CreateReply::default().embed(embed).ephemeral(true))
+    }
+  }
 }
