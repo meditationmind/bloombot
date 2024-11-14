@@ -675,7 +675,7 @@ pub async fn import(
     &mut transaction,
     &guild_id,
     &user_id,
-    &total_minutes,
+    &(total_minutes + (total_seconds / 60)),
     &user_sum,
     privacy,
   )
