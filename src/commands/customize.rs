@@ -296,7 +296,7 @@ async fn streak(
     if streak_disabled {
       let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
+      let current_streak_roles = StreakRoles::current(&member.roles);
 
       for role in current_streak_roles {
         match member.remove_role(ctx, role).await {
@@ -325,7 +325,7 @@ async fn streak(
 
       let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
+      let current_streak_roles = StreakRoles::current(&member.roles);
       #[allow(clippy::cast_sign_loss)]
       let earned_streak_role = StreakRoles::from_streak(user_streak.current as u64);
 
@@ -367,7 +367,7 @@ async fn streak(
     if streak_status == Status::Disabled {
       let member = guild_id.member(ctx, user_id).await?;
 
-      let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
+      let current_streak_roles = StreakRoles::current(&member.roles);
 
       for role in current_streak_roles {
         match member.remove_role(ctx, role).await {

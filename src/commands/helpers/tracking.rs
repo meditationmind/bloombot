@@ -156,101 +156,98 @@ pub async fn update_time_roles(
   sum: i64,
   privacy: bool,
 ) -> Result<()> {
-  let current_time_roles = TimeSumRoles::get_users_current_roles(&member.roles);
-  let updated_time_role = TimeSumRoles::from_sum(sum);
+  let Some(updated_time_role) = TimeSumRoles::from_sum(sum) else {
+    return Ok(());
+  };
 
-  if let Some(updated_time_role) = updated_time_role {
-    if !current_time_roles.contains(&updated_time_role.to_role_id()) {
-      for role in current_time_roles {
-        match member.remove_role(ctx, role).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error removing role: {err}");
-            ctx
-              .send(
-                CreateReply::default()
-                  .content(format!(
-                    "{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
-                    EMOJI.mminfo
-                  ))
-                  .allowed_mentions(CreateAllowedMentions::new())
-                  .ephemeral(true),
-              )
-              .await?;
+  let current_time_roles = TimeSumRoles::current(&member.roles);
 
-            return Ok(());
-          }
-        }
-      }
+  if current_time_roles.contains(&updated_time_role.to_role_id()) {
+    return Ok(());
+  }
 
-      match member.add_role(ctx, updated_time_role.to_role_id()).await {
-        Ok(()) => {}
-        Err(err) => {
-          error!("Error adding role: {err}");
-          ctx
-            .send(
-              CreateReply::default()
-                .content(format!(
-                  "{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
-                  EMOJI.mminfo
-                ))
-                .allowed_mentions(CreateAllowedMentions::new())
-                .ephemeral(true),
-            )
-            .await?;
+  for role in current_time_roles {
+    if let Err(err) = member.remove_role(ctx, role).await {
+      error!("Error removing role: {err}");
+      ctx
+        .send(
+          CreateReply::default()
+            .content(format!(
+              "{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
+              EMOJI.mminfo
+            ))
+            .allowed_mentions(CreateAllowedMentions::new())
+            .ephemeral(true),
+        )
+        .await?;
 
-          return Ok(());
-        }
-      }
+      return Ok(());
+    }
+  }
 
-      if ctx.command().name == "add" {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(format!(
-                ":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!",
-                member.mention(),
-                updated_time_role.to_role_id()
-              ))
-              .allowed_mentions(CreateAllowedMentions::new())
-              .ephemeral(privacy),
-          )
-          .await?;
-      } else {
-        let congrats = if ctx.guild_id().is_none() && privacy {
-          format!(
-            ":tada: Congrats {}, your hard work is paying off! Your total meditation minutes have given you the @{} role!",
-            member.mention(),
-            updated_time_role.to_role_icon()
-          )
-        } else {
-          format!(
+  if let Err(err) = member.add_role(ctx, updated_time_role.to_role_id()).await {
+    error!("Error adding role: {err}");
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} An error occured while updating your time roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
+            EMOJI.mminfo
+          ))
+          .allowed_mentions(CreateAllowedMentions::new())
+          .ephemeral(true),
+      )
+      .await?;
+
+    return Ok(());
+  }
+
+  if ctx.command().name == "add" {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
             ":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!",
             member.mention(),
             updated_time_role.to_role_id()
-          )
-        };
+          ))
+          .allowed_mentions(CreateAllowedMentions::new())
+          .ephemeral(privacy),
+      )
+      .await?;
+  } else {
+    let congrats = if ctx.guild_id().is_none() && privacy {
+      format!(
+        ":tada: Congrats {}, your hard work is paying off! Your total meditation minutes have given you the @{} role!",
+        member.mention(),
+        updated_time_role.to_role_icon()
+      )
+    } else {
+      format!(
+        ":tada: Congrats to {}, your hard work is paying off! Your total meditation minutes have given you the <@&{}> role!",
+        member.mention(),
+        updated_time_role.to_role_id()
+      )
+    };
 
-        if privacy {
-          ctx
-            .send(
-              CreateReply::default()
-                .content(congrats)
-                .allowed_mentions(CreateAllowedMentions::new())
-                .ephemeral(privacy),
-            )
-            .await?;
-        } else {
-          ChannelId::new(CHANNELS.tracking)
-            .send_message(
-              &ctx,
-              CreateMessage::new()
-                .content(congrats)
-                .allowed_mentions(CreateAllowedMentions::new()),
-            )
-            .await?;
-        }
-      }
+    if privacy {
+      ctx
+        .send(
+          CreateReply::default()
+            .content(congrats)
+            .allowed_mentions(CreateAllowedMentions::new())
+            .ephemeral(privacy),
+        )
+        .await?;
+    } else {
+      ChannelId::new(CHANNELS.tracking)
+        .send_message(
+          &ctx,
+          CreateMessage::new()
+            .content(congrats)
+            .allowed_mentions(CreateAllowedMentions::new()),
+        )
+        .await?;
     }
   }
 
@@ -276,107 +273,104 @@ pub async fn update_streak_roles(
   streak: i32,
   privacy: bool,
 ) -> Result<()> {
-  let current_streak_roles = StreakRoles::get_users_current_roles(&member.roles);
   #[allow(clippy::cast_sign_loss)]
-  let updated_streak_role = StreakRoles::from_streak(streak as u64);
+  let Some(updated_streak_role) = StreakRoles::from_streak(streak as u64) else {
+    return Ok(());
+  };
 
-  if let Some(updated_streak_role) = updated_streak_role {
-    if !current_streak_roles.contains(&updated_streak_role.to_role_id()) {
-      for role in current_streak_roles {
-        match member.remove_role(ctx, role).await {
-          Ok(()) => {}
-          Err(err) => {
-            error!("Error removing role: {err}");
+  let current_streak_roles = StreakRoles::current(&member.roles);
 
-            ctx
-              .send(
-                CreateReply::default()
-                  .content(format!(
-                    "{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
-                    EMOJI.mminfo
-                  ))
-                  .allowed_mentions(CreateAllowedMentions::new())
-                  .ephemeral(true),
-              )
-              .await?;
+  if current_streak_roles.contains(&updated_streak_role.to_role_id()) {
+    return Ok(());
+  }
 
-            return Ok(());
-          }
-        }
-      }
+  for role in current_streak_roles {
+    if let Err(err) = member.remove_role(ctx, role).await {
+      error!("Error removing role: {err}");
 
-      match member.add_role(ctx, updated_streak_role.to_role_id()).await {
-        Ok(()) => {}
-        Err(err) => {
-          error!("Error adding role: {err}");
+      ctx
+        .send(
+          CreateReply::default()
+            .content(format!(
+              "{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
+              EMOJI.mminfo
+            ))
+            .allowed_mentions(CreateAllowedMentions::new())
+            .ephemeral(true),
+        )
+        .await?;
 
-          ctx
-            .send(
-              CreateReply::default()
-                .content(format!(
-                  "{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
-                  EMOJI.mminfo
-                ))
-                .allowed_mentions(CreateAllowedMentions::new())
-                .ephemeral(true),
-            )
-            .await?;
+      return Ok(());
+    }
+  }
 
-          return Ok(());
-        }
-      }
+  if let Err(err) = member.add_role(ctx, updated_streak_role.to_role_id()).await {
+    error!("Error adding role: {err}");
 
-      if ctx.command().name == "add" {
-        ctx
-          .send(
-            CreateReply::default()
-              .content(format!(
-                ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!",
-                member.mention(),
-                streak,
-                updated_streak_role.to_role_id()
-              ))
-              .allowed_mentions(CreateAllowedMentions::new())
-              .ephemeral(privacy),
-          )
-          .await?;
-      } else {
-        let congrats = if ctx.guild_id().is_none() && privacy {
-          format!(
-            ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the @{} role!",
-            member.mention(),
-            streak,
-            updated_streak_role.to_role_icon()
-          )
-        } else {
-          format!(
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} An error occured while updating your streak roles. Your entry has been saved, but your roles have not been updated. Please contact a moderator.",
+            EMOJI.mminfo
+          ))
+          .allowed_mentions(CreateAllowedMentions::new())
+          .ephemeral(true),
+      )
+      .await?;
+
+    return Ok(());
+  }
+
+  if ctx.command().name == "add" {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
             ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!",
             member.mention(),
             streak,
             updated_streak_role.to_role_id()
-          )
-        };
+          ))
+          .allowed_mentions(CreateAllowedMentions::new())
+          .ephemeral(privacy),
+      )
+      .await?;
+  } else {
+    let congrats = if ctx.guild_id().is_none() && privacy {
+      format!(
+        ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the @{} role!",
+        member.mention(),
+        streak,
+        updated_streak_role.to_role_icon()
+      )
+    } else {
+      format!(
+        ":tada: Congrats to {}, your hard work is paying off! Your current streak is {}, giving you the <@&{}> role!",
+        member.mention(),
+        streak,
+        updated_streak_role.to_role_id()
+      )
+    };
 
-        if privacy {
-          ctx
-            .send(
-              CreateReply::default()
-                .content(congrats)
-                .allowed_mentions(CreateAllowedMentions::new())
-                .ephemeral(privacy),
-            )
-            .await?;
-        } else {
-          ChannelId::new(CHANNELS.tracking)
-            .send_message(
-              &ctx,
-              CreateMessage::new()
-                .content(congrats)
-                .allowed_mentions(CreateAllowedMentions::new()),
-            )
-            .await?;
-        }
-      }
+    if privacy {
+      ctx
+        .send(
+          CreateReply::default()
+            .content(congrats)
+            .allowed_mentions(CreateAllowedMentions::new())
+            .ephemeral(privacy),
+        )
+        .await?;
+    } else {
+      ChannelId::new(CHANNELS.tracking)
+        .send_message(
+          &ctx,
+          CreateMessage::new()
+            .content(congrats)
+            .allowed_mentions(CreateAllowedMentions::new()),
+        )
+        .await?;
     }
   }
 

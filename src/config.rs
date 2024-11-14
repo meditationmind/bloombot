@@ -1,6 +1,7 @@
 #![allow(clippy::unreadable_literal)]
-use poise::serenity_prelude::{self as serenity, Embed, GuildId, RoleId};
-use std::fmt;
+use std::fmt::{Display, Formatter, Result, Write};
+
+use poise::serenity_prelude::{CreateEmbed, Embed, GuildId, RoleId};
 
 pub const MEDITATION_MIND: GuildId = GuildId::new(244917432383176705);
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
@@ -11,12 +12,12 @@ pub struct BloomBotEmbed {}
 
 impl BloomBotEmbed {
   #[allow(clippy::new_ret_no_self)]
-  pub fn new() -> serenity::CreateEmbed {
-    serenity::CreateEmbed::default().color(EMBED_COLOR)
+  pub fn new() -> CreateEmbed {
+    CreateEmbed::default().color(EMBED_COLOR)
   }
 
-  pub fn from(embed: Embed) -> serenity::CreateEmbed {
-    serenity::CreateEmbed::from(embed).color(EMBED_COLOR)
+  pub fn from(embed: Embed) -> CreateEmbed {
+    CreateEmbed::from(embed).color(EMBED_COLOR)
   }
 }
 
@@ -137,17 +138,17 @@ pub const EMOJI: BloomEmoji = BloomEmoji {
   },
 };
 
-impl fmt::Display for SimpleEmoji<'_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for SimpleEmoji<'_> {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
     if self.animated {
       f.write_str("<a:")?;
     } else {
       f.write_str("<:")?;
     }
     f.write_str(self.name)?;
-    fmt::Write::write_char(f, ':')?;
-    fmt::Display::fmt(&self.id, f)?;
-    fmt::Write::write_char(f, '>')
+    Write::write_char(f, ':')?;
+    Display::fmt(&self.id, f)?;
+    Write::write_char(f, '>')
   }
 }
 
@@ -171,8 +172,8 @@ pub enum TimeSumRoles {
 }
 
 impl TimeSumRoles {
-  pub fn to_role_id(&self) -> serenity::RoleId {
-    serenity::RoleId::new(match self {
+  pub fn to_role_id(&self) -> RoleId {
+    RoleId::new(match self {
       TimeSumRoles::One => 504641899890475018,
       TimeSumRoles::Two => 504641945596067851,
       TimeSumRoles::Three => 504642088760115241,
@@ -191,7 +192,7 @@ impl TimeSumRoles {
     })
   }
 
-  fn from_role_id(id: serenity::RoleId) -> Option<TimeSumRoles> {
+  fn from_role_id(id: RoleId) -> Option<TimeSumRoles> {
     match <u64>::from(id) {
       504641899890475018 => Some(TimeSumRoles::One),
       504641945596067851 => Some(TimeSumRoles::Two),
@@ -232,18 +233,12 @@ impl TimeSumRoles {
     }
   }
 
-  pub fn get_users_current_roles(member_roles: &Vec<RoleId>) -> Vec<RoleId> {
-    let mut roles = Vec::new();
-
-    for user_role in member_roles {
-      let Some(matching_role_id) = TimeSumRoles::from_role_id(*user_role) else {
-        continue;
-      };
-
-      roles.push(matching_role_id.to_role_id());
-    }
-
-    roles
+  pub fn current(member_roles: &[RoleId]) -> Vec<RoleId> {
+    member_roles
+      .iter()
+      .filter_map(|role| TimeSumRoles::from_role_id(*role))
+      .map(|role| role.to_role_id())
+      .collect::<Vec<RoleId>>()
   }
 
   pub fn from_sum(sum: i64) -> Option<TimeSumRoles> {
@@ -283,8 +278,8 @@ pub enum StreakRoles {
 }
 
 impl StreakRoles {
-  pub fn to_role_id(&self) -> serenity::RoleId {
-    serenity::RoleId::new(match self {
+  pub fn to_role_id(&self) -> RoleId {
+    RoleId::new(match self {
       StreakRoles::Egg => 857242224390832158,
       StreakRoles::HatchingChick => 857242222529347584,
       StreakRoles::BabyChick => 857242220675465227,
@@ -329,21 +324,15 @@ impl StreakRoles {
     }
   }
 
-  pub fn get_users_current_roles(member_roles: &Vec<RoleId>) -> Vec<RoleId> {
-    let mut roles = Vec::new();
-
-    for user_role in member_roles {
-      let Some(matching_role_id) = StreakRoles::from_role_id(*user_role) else {
-        continue;
-      };
-
-      roles.push(matching_role_id.to_role_id());
-    }
-
-    roles
+  pub fn current(member_roles: &[RoleId]) -> Vec<RoleId> {
+    member_roles
+      .iter()
+      .filter_map(|role| StreakRoles::from_role_id(*role))
+      .map(|role| role.to_role_id())
+      .collect::<Vec<RoleId>>()
   }
 
-  fn from_role_id(id: serenity::RoleId) -> Option<StreakRoles> {
+  fn from_role_id(id: RoleId) -> Option<StreakRoles> {
     match <u64>::from(id) {
       857242224390832158 => Some(StreakRoles::Egg),
       857242222529347584 => Some(StreakRoles::HatchingChick),

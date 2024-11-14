@@ -55,16 +55,12 @@ pub async fn commit_and_say(
 
   match response {
     Ok(sent_message) => {
-      match DatabaseHandler::commit_transaction(transaction).await {
-        Ok(()) => {}
-        Err(e) => {
-          _ = sent_message.edit(ctx, CreateReply::default()
+      if let Err(e) = DatabaseHandler::commit_transaction(transaction).await {
+        _ = sent_message.edit(ctx, CreateReply::default()
             .content(format!("{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.", EMOJI.mminfo))
             .ephemeral(true)).await;
-
-          return Err(anyhow!("Could not send message: {e}"));
-        }
-      };
+        return Err(anyhow!("Could not send message: {e}"));
+      }
     }
     Err(e) => {
       DatabaseHandler::rollback_transaction(transaction).await?;
