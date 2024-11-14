@@ -21,75 +21,28 @@ pub async fn streak(
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
-  let user_id = match &user {
-    Some(user) => user.id,
-    None => ctx.author().id,
-  };
+  //let user_id = user.as_ref().map_or(ctx.author().id, |user| user.id);
+  let user = user.as_ref().unwrap_or(ctx.author());
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-  let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user_id).await?;
+  let streak = DatabaseHandler::get_streak(&mut transaction, &guild_id, &user.id).await?;
 
   let tracking_profile =
-    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id)
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user.id)
       .await?
       .unwrap_or_default();
 
   let visibility = privacy.unwrap_or(tracking_profile.streak.privacy).into();
 
-  if user.is_some() && (user_id != ctx.author().id) {
-    let user = user.with_context(|| "Failed to retrieve User")?;
-    let user_nick_or_name = user
-      .nick_in(&ctx, guild_id)
-      .await
-      .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
-
-    if tracking_profile.streak.privacy == Privacy::Private {
-      //Show for staff even when private
-      if ctx.author().has_role(&ctx, guild_id, ROLES.staff).await? {
-        let message = if streak.current == streak.longest {
-          format!(
-            "{user_nick_or_name}'s current **private** meditation streak is {} days. This is {user_nick_or_name}'s longest streak.",
-            streak.current
-          )
-        } else {
-          format!(
-            "{user_nick_or_name}'s current **private** meditation streak is {} days. {user_nick_or_name}'s longest streak is {} days.",
-            streak.current, streak.longest
-          )
-        };
-
-        database::commit_and_say(
-          ctx,
-          transaction,
-          MessageType::TextOnly(message),
-          Visibility::Ephemeral,
-        )
-        .await?;
-
-        return Ok(());
-      }
-
-      database::commit_and_say(
-        ctx,
-        transaction,
-        MessageType::TextOnly(format!(
-          "Sorry, {user_nick_or_name}'s meditation streak is set to private."
-        )),
-        Visibility::Ephemeral,
-      )
-      .await?;
-
-      return Ok(());
-    }
-
+  if user.id == ctx.author().id {
     let message = if streak.current == streak.longest {
       format!(
-        "{user_nick_or_name}'s current meditation streak is {} days. This is {user_nick_or_name}'s longest streak.",
+        "Your current meditation streak is {} days. This is your longest streak.",
         streak.current
       )
     } else {
       format!(
-        "{user_nick_or_name}'s current meditation streak is {} days. {user_nick_or_name}'s longest streak is {} days.",
+        "Your current meditation streak is {} days. Your longest streak is {} days.",
         streak.current, streak.longest
       )
     };
@@ -99,16 +52,47 @@ pub async fn streak(
     return Ok(());
   }
 
-  let message = if streak.current == streak.longest {
-    format!(
-      "Your current meditation streak is {} days. This is your longest streak.",
-      streak.current
-    )
-  } else {
-    format!(
-      "Your current meditation streak is {} days. Your longest streak is {} days.",
-      streak.current, streak.longest
-    )
+  let user_nick_or_name = user
+    .nick_in(&ctx, guild_id)
+    .await
+    .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
+
+  let staff = ctx.author().has_role(&ctx, guild_id, ROLES.staff).await?;
+
+  let (message, visibility) = match tracking_profile.streak.privacy {
+    //Show for staff even when private
+    Privacy::Private if staff && streak.current == streak.longest => (
+      format!(
+        "{user_nick_or_name}'s current **private** meditation streak is {} days. This is {user_nick_or_name}'s longest streak.",
+        streak.current
+      ),
+      Visibility::Ephemeral,
+    ),
+    Privacy::Private if staff => (
+      format!(
+        "{user_nick_or_name}'s current **private** meditation streak is {} days. {user_nick_or_name}'s longest streak is {} days.",
+        streak.current, streak.longest
+      ),
+      Visibility::Ephemeral,
+    ),
+    Privacy::Private => (
+      format!("Sorry, {user_nick_or_name}'s meditation streak is set to private."),
+      Visibility::Ephemeral,
+    ),
+    Privacy::Public if streak.current == streak.longest => (
+      format!(
+        "{user_nick_or_name}'s current meditation streak is {} days. This is {user_nick_or_name}'s longest streak.",
+        streak.current
+      ),
+      visibility,
+    ),
+    Privacy::Public => (
+      format!(
+        "{user_nick_or_name}'s current meditation streak is {} days. {user_nick_or_name}'s longest streak is {} days.",
+        streak.current, streak.longest
+      ),
+      visibility,
+    ),
   };
 
   database::commit_and_say(ctx, transaction, MessageType::TextOnly(message), visibility).await?;
