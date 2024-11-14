@@ -424,7 +424,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "charts-rs"
 version = "0.3.19"
-source = "git+https://github.com/meditationmind/charts-rs?branch=y-axis-dynamic-width#8aaf7a50919bf564b2340f38c48d870a01279e6c"
+source = "git+https://github.com/vicanso/charts-rs?branch=main#bcb41bd3de6d598c7f23e225397af915e96da50c"
 dependencies = [
  "ahash",
  "arc-swap",
@@ -443,7 +443,7 @@ dependencies = [
 [[package]]
 name = "charts-rs-derive"
 version = "0.2.2"
-source = "git+https://github.com/meditationmind/charts-rs?branch=y-axis-dynamic-width#8aaf7a50919bf564b2340f38c48d870a01279e6c"
+source = "git+https://github.com/vicanso/charts-rs?branch=main#bcb41bd3de6d598c7f23e225397af915e96da50c"
 dependencies = [
  "quote",
  "syn 2.0.87",
