@@ -564,7 +564,7 @@ impl DatabaseHandler {
     )
   }
 
-  pub fn get_winner_candidates<'a>(
+  pub fn get_candidates<'a>(
     conn: &'a mut PoolConnection<Postgres>,
     start_date: &'a DateTime<Utc>,
     end_date: &'a DateTime<Utc>,
@@ -576,7 +576,7 @@ impl DatabaseHandler {
     stream.map(|row| Ok(row?.user_id))
   }
 
-  pub async fn get_winner_candidate_meditation_sum(
+  pub async fn get_candidate_sum(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     user_id: &UserId,
@@ -591,7 +591,7 @@ impl DatabaseHandler {
     )
   }
 
-  pub async fn get_winner_candidate_meditation_count(
+  pub async fn get_candidate_count(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     user_id: &UserId,

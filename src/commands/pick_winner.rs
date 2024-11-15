@@ -4,7 +4,7 @@ use anyhow::{Context as AnyhowContext, Result};
 use chrono::Months as ChronoMonths;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use futures::StreamExt;
-use poise::serenity_prelude::{builder::*, ButtonStyle};
+use poise::serenity_prelude::{builder::*, ButtonStyle, ChannelType, GuildId};
 use poise::serenity_prelude::{ChannelId, ComponentInteractionCollector, Member, RoleId};
 use poise::{ChoiceParameter, CreateReply};
 
@@ -29,20 +29,15 @@ enum Months {
 }
 
 async fn finalize_winner(
-  reserved_key: String,
   ctx: Context<'_>,
+  guild_id: GuildId,
   winner: Member,
   minutes: i64,
   selected_date: DateTime<Utc>,
+  reserved_key: String,
 ) -> Result<()> {
   let now = Utc::now();
-  let guild_name = {
-    if let Some(guild) = ctx.guild() {
-      guild.name.clone()
-    } else {
-      "Host Server".to_owned()
-    }
-  };
+  let guild_name = guild_id.name(ctx).unwrap_or("Host Server".to_owned());
 
   let announcement_embed = BloomBotEmbed::new()
     .title(":tada: Monthly Challenge Winner :tada:")
@@ -60,7 +55,7 @@ async fn finalize_winner(
       now.format("%B %d, %Y")
     )));
 
-  let dm_embed = BloomBotEmbed::new()
+  let notification_embed = BloomBotEmbed::new()
     .title(":tada: You've won a key! :tada:")
     .thumbnail(winner.user.avatar_url().unwrap_or_default())
     .field(
@@ -74,6 +69,7 @@ async fn finalize_winner(
 
   let announcement_channel = ChannelId::new(CHANNELS.announcement);
   let dm_channel = winner.user.create_dm_channel(ctx).await?;
+  let log_channel = ChannelId::new(CHANNELS.logs);
 
   announcement_channel
     .send_message(ctx, CreateMessage::new().embed(announcement_embed))
@@ -83,64 +79,73 @@ async fn finalize_winner(
   let redeem_id = format!("{ctx_id}redeem");
   let cancel_id = format!("{ctx_id}cancel");
 
-  let Ok(mut dm_message) = dm_channel
-    .send_message(
-      ctx,
-      CreateMessage::new()
-        .embed(dm_embed)
-        .components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(redeem_id.clone())
-            .label("Redeem")
-            .style(ButtonStyle::Success),
-          CreateButton::new(cancel_id.clone())
-            .label("Cancel")
-            .style(ButtonStyle::Danger),
-        ])]),
-    )
-    .await
-  else {
-    ctx
-      .send(CreateReply::default().content(format!(
-        "{} Could not send DM to member. Please run `/usekey` and copy a key manually if they want one.\n\n**No key has been used.**",
-        EMOJI.mminfo
-      )))
+  let dm_test = CreateMessage::new().content("Hey, guess what...");
+
+  let notif_msg = CreateMessage::new()
+    .embed(notification_embed)
+    .components(vec![CreateActionRow::Buttons(vec![
+      CreateButton::new(redeem_id.clone())
+        .label("Redeem")
+        .style(ButtonStyle::Success),
+      CreateButton::new(cancel_id.clone())
+        .label("Cancel")
+        .style(ButtonStyle::Danger),
+    ])]);
+
+  let mut notification = if (dm_channel.send_message(ctx, dm_test).await).is_ok() {
+    dm_channel.send_message(ctx, notif_msg).await?
+  } else {
+    let thread_channel = ChannelId::from(CHANNELS.private_thread_default);
+    let notification_thread = thread_channel
+      .create_thread(
+        ctx,
+        CreateThread::new("Private Notification: You won!".to_string())
+          .invitable(false)
+          .kind(ChannelType::PrivateThread),
+      )
       .await?;
-    return Ok(());
+    let thread_initial_message = format!("Private notification for <@{}>:", winner.user.id);
+    notification_thread
+      .send_message(
+        ctx,
+        notif_msg
+          .content(thread_initial_message)
+          .allowed_mentions(CreateAllowedMentions::new().users([winner.user.id])),
+      )
+      .await?
   };
 
   ctx
     .send(CreateReply::default().content(format!(
-      "{} Sent DM to {} and sent announcement!",
+      "{} Notified {} and sent announcement!",
       EMOJI.mmcheck, winner.user
     )))
     .await?;
 
-  // Loop through incoming interactions with the buttons
+  // Loop through incoming interactions with the buttons.
   while let Some(press) = ComponentInteractionCollector::new(ctx)
-    // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-    // button was pressed
-    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-    // Timeout when no navigation button has been pressed for 24 hours
+    .filter(move |press| {
+      press.user.id == winner.user.id && press.data.custom_id.starts_with(&ctx_id.to_string())
+    })
+    // Timeout when no navigation button has been pressed for 24 hours.
     .timeout(Duration::from_secs(3600 * 24))
     .await
   {
-    // Depending on which button was pressed, confirm or cancel
+    // Depending on which button was pressed, confirm or cancel.
     if press.data.custom_id == redeem_id {
       let mut conn = ctx.data().db.get_connection_with_retry(5).await?;
       DatabaseHandler::mark_key_used(&mut conn, &reserved_key).await?;
       let hyperlink = format!(
         "[Redeem your key](https://store.steampowered.com/account/registerkey?key={reserved_key})"
       );
-      let guild_id = &ctx
-        .guild_id()
-        .with_context(|| "Failed to retrieve guild ID from context")?;
-      DatabaseHandler::record_steamkey_receipt(&mut conn, guild_id, &winner.user.id).await?;
+      DatabaseHandler::record_steamkey_receipt(&mut conn, &guild_id, &winner.user.id).await?;
 
-      dm_message
+      notification
         .edit(ctx, EditMessage::new().components(Vec::new()))
         .await?;
 
-      dm_channel
+      notification
+        .channel_id
         .send_message(
           ctx,
           CreateMessage::new().content(format!(
@@ -160,8 +165,6 @@ async fn finalize_winner(
             .icon_url(winner.user.avatar_url().unwrap_or_default()),
         );
 
-      let log_channel = ChannelId::new(CHANNELS.logs);
-
       log_channel
         .send_message(ctx, CreateMessage::new().embed(log_embed))
         .await?;
@@ -171,11 +174,12 @@ async fn finalize_winner(
       let mut conn = ctx.data().db.get_connection_with_retry(5).await?;
       DatabaseHandler::unreserve_key(&mut conn, &reserved_key).await?;
 
-      dm_message
+      notification
         .edit(ctx, EditMessage::new().components(Vec::new()))
         .await?;
 
-      dm_channel
+      notification
+        .channel_id
         .send_message(
           ctx,
           CreateMessage::new().content("Alright, we'll keep it for someone else. Congrats again!"),
@@ -193,8 +197,6 @@ async fn finalize_winner(
             .icon_url(winner.user.avatar_url().unwrap_or_default()),
         );
 
-      let log_channel = ChannelId::new(CHANNELS.logs);
-
       log_channel
         .send_message(ctx, CreateMessage::new().embed(log_embed))
         .await?;
@@ -202,7 +204,7 @@ async fn finalize_winner(
       return Ok(());
     }
 
-    // This is an unrelated button interaction
+    // This is an unrelated button interaction.
     continue;
   }
 
@@ -213,7 +215,7 @@ async fn finalize_winner(
     )
     .footer(CreateEmbedFooter::new(format!("From {guild_name}")));
 
-  dm_message
+  notification
     .edit(
       ctx,
       EditMessage::new()
@@ -233,8 +235,6 @@ async fn finalize_winner(
         .icon_url(winner.user.avatar_url().unwrap_or_default()),
     );
 
-  let log_channel = ChannelId::new(CHANNELS.logs);
-
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;
@@ -247,7 +247,7 @@ async fn finalize_winner(
 /// Picks the winner for the monthly meditation challenge and allows them to claim an unused Playne key.
 ///
 /// Finds a user who meets the following criteria (defaults):
-/// - Has the `@meditation challengers` role
+/// - Has the monthly challenge participant role
 /// - Has tracked at least 30 minutes during the specified month
 /// - Has at least 8 sessions during the specified month
 /// - Has not received a Playne key previously
@@ -258,50 +258,36 @@ async fn finalize_winner(
   default_member_permissions = "ADMINISTRATOR",
   category = "Admin Commands",
   rename = "pickwinner",
-  //hide_in_help,
   guild_only
 )]
 pub async fn pick_winner(
   ctx: Context<'_>,
-  #[description = "The year to pick a winner for (defaults to this year in UTC)"] year: Option<i32>,
-  #[description = "The month to pick a winner for (defaults to this month in UTC)"] month: Option<
-    Months,
-  >,
-  #[description = "Minimum minutes for eligibility (defaults to 30 minutes)"]
-  minimum_minutes: Option<i64>,
-  #[description = "Minimum session count for eligibility (defaults to 8 sessions)"]
-  minimum_count: Option<u64>,
-  #[description = "Include users who have already received a Playne key (defaults to false)"]
-  allow_multiple_keys: Option<bool>,
+  #[description = "Year to pick for (defaults to current year in UTC)"] year: Option<i32>,
+  #[description = "Month to pick for (defaults to current month in UTC)"] month: Option<Months>,
+  #[description = "Minimum minutes (defaults to 30 minutes)"] minimum_minutes: Option<i64>,
+  #[description = "Minimum sessions (defaults to 8 sessions)"] minimum_count: Option<u64>,
+  #[description = "Allow multiple keys (defaults to false)"] allow_multiple_keys: Option<bool>,
 ) -> Result<()> {
-  ctx.defer_ephemeral().await?;
-
-  let data = ctx.data();
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = data.db.start_transaction_with_retry(5).await?;
+  ctx.defer_ephemeral().await?;
+
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   if !DatabaseHandler::unused_key_exists(&mut transaction, &guild_id).await? {
+    let msg = format!("{} No unused keys found.", EMOJI.mminfo);
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!("{} No unused keys found.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Ok(());
   }
 
-  let year = year.unwrap_or_else(|| {
-    let now = Utc::now();
-    now.year()
-  });
-
-  let month = if let Some(month) = month {
-    match month {
+  let year = year.unwrap_or_else(|| Utc::now().year());
+  let month = month.map_or_else(
+    || Utc::now().month(),
+    |month| match month {
       Months::January => 1,
       Months::February => 2,
       Months::March => 3,
@@ -314,19 +300,13 @@ pub async fn pick_winner(
       Months::October => 10,
       Months::November => 11,
       Months::December => 12,
-    }
-  } else {
-    let now = Utc::now();
-    now.month()
-  };
+    },
+  );
 
   let Some(start_date) = NaiveDate::from_ymd_opt(year, month, 1) else {
+    let msg = "Invalid date.";
     ctx
-      .send(
-        CreateReply::default()
-          .content("Invalid date.")
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Ok(());
   };
@@ -336,87 +316,71 @@ pub async fn pick_winner(
   let time = NaiveTime::from_hms_opt(0, 0, 0)
     .with_context(|| "Failed to assign hardcoded 00:00:00 NaiveTime to time")?;
 
-  let start_datetime = NaiveDateTime::new(start_date, time).and_utc();
-  let end_datetime = NaiveDateTime::new(end_date, time).and_utc();
+  let start = NaiveDateTime::new(start_date, time).and_utc();
+  let end = NaiveDateTime::new(end_date, time).and_utc();
 
-  let mut conn = data.db.get_connection_with_retry(5).await?;
-  // Since the stream is async, we can't use the same connection for the transaction
-  let mut database_winner_candidates =
-    DatabaseHandler::get_winner_candidates(&mut conn, &start_datetime, &end_datetime, &guild_id);
+  // Since the stream is async, we can't use the same connection for the transaction.
+  let mut conn = ctx.data().db.get_connection_with_retry(5).await?;
+  let mut candidates = DatabaseHandler::get_candidates(&mut conn, &start, &end, &guild_id);
+  let challenger_role = RoleId::new(ROLES.meditation_challenger);
 
-  // The database already randomizes the order... we can use the first one that has the role
-  let winner_role_id = RoleId::new(ROLES.meditation_challenger);
-
-  while let Some(winner) = database_winner_candidates.next().await {
+  // The database randomizes the order, so we use the first candidate that meets all requirements.
+  while let Some(winner) = candidates.next().await {
     let Ok(winner) = winner else {
       continue;
     };
 
+    // User is a guild member.
     let Ok(member) = guild_id.member(ctx, winner).await else {
       continue;
     };
 
-    if !member.roles.contains(&winner_role_id) {
+    // User has the challenger role.
+    if !member.roles.contains(&challenger_role) {
       continue;
     }
 
+    // User has not received a key or multiple keys is allowed.
     if !allow_multiple_keys.unwrap_or(false)
-      && DatabaseHandler::steamkey_recipient_exists(&mut transaction, &guild_id, &member.user.id)
-        .await?
+      && DatabaseHandler::steamkey_recipient_exists(&mut transaction, &guild_id, &winner).await?
     {
       continue;
     }
 
-    let challenge_minutes = DatabaseHandler::get_winner_candidate_meditation_sum(
-      &mut transaction,
-      &guild_id,
-      &member.user.id,
-      &start_datetime,
-      &end_datetime,
-    )
-    .await?;
+    let minutes =
+      DatabaseHandler::get_candidate_sum(&mut transaction, &guild_id, &winner, &start, &end)
+        .await?;
+    let count =
+      DatabaseHandler::get_candidate_count(&mut transaction, &guild_id, &winner, &start, &end)
+        .await?;
 
-    let challenge_count = DatabaseHandler::get_winner_candidate_meditation_count(
-      &mut transaction,
-      &guild_id,
-      &member.user.id,
-      &start_datetime,
-      &end_datetime,
-    )
-    .await?;
-
-    // Make sure user has at least 30 minutes and 8 sessions during the challenge period
-    if challenge_minutes < minimum_minutes.unwrap_or(30)
-      || challenge_count < minimum_count.unwrap_or(8)
-    {
+    // Make sure user meets minimum tracking requirements.
+    // Default is 30 minutes and 8 sessions during the challenge period.
+    if minutes < minimum_minutes.unwrap_or(30) || count < minimum_count.unwrap_or(8) {
       continue;
     }
 
     let Some(reserved_key) =
-      DatabaseHandler::reserve_key(&mut transaction, &guild_id, &member.user.id).await?
+      DatabaseHandler::reserve_key(&mut transaction, &guild_id, &winner).await?
     else {
-      ctx
-        .send(CreateReply::default().content(format!(
-          "{} No unused keys found. Please add one and run `/usekey` to give them one if they want one.",
-          EMOJI.mminfo
-        )))
-        .await?;
+      let msg = format!(
+        "{} No unused keys found. Please add one and try again.",
+        EMOJI.mminfo
+      );
+      ctx.send(CreateReply::default().content(msg)).await?;
       return Ok(());
     };
 
     DatabaseHandler::commit_transaction(transaction).await?;
 
-    finalize_winner(reserved_key, ctx, member, challenge_minutes, start_datetime).await?;
+    finalize_winner(ctx, guild_id, member, minutes, start, reserved_key).await?;
 
     return Ok(());
   }
 
+  let msg = "No winner found.";
   ctx
-    .send(
-      CreateReply::default()
-        .content("No winner found.")
-        .ephemeral(true),
-    )
+    .send(CreateReply::default().content(msg).ephemeral(true))
     .await?;
 
   Ok(())
