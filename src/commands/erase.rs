@@ -607,7 +607,8 @@ async fn notify_user(ctx: Context<'_>, message: &Message, dm_embed: CreateEmbed)
     let mut notification_thread = thread_channel
       .create_thread(
         ctx,
-        CreateThread::new("Private Notification: Message Deleted".to_string()),
+        CreateThread::new("Private Notification: Message Deleted".to_string())
+          .kind(ChannelType::PrivateThread),
       )
       .await?;
 

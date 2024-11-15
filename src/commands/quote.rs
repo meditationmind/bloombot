@@ -20,11 +20,11 @@ pub async fn quote(
   #[description = "Refine quote pool with one or more keywords in search engine format"]
   keyword: Option<String>,
 ) -> Result<()> {
-  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
+
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   if let Some(keyword) = keyword {
     if common::is_supporter(ctx).await? {
@@ -37,11 +37,10 @@ pub async fn quote(
           quote.quote,
           quote.author.unwrap_or("Anonymous".to_string())
         ));
-
         ctx.send(CreateReply::default().embed(embed)).await?;
-
         return Ok(());
       }
+
       ctx
         .send(
           CreateReply::default()
@@ -65,19 +64,16 @@ pub async fn quote(
   }
 
   match DatabaseHandler::get_random_quote(&mut transaction, &guild_id).await? {
-    None => {
-      ctx.say("No quotes found.").await?;
-    }
+    None => ctx.say("No quotes found.").await?,
     Some(quote) => {
       let embed = BloomBotEmbed::new().description(format!(
         "{}\n\n\\― {}",
         quote.quote,
         quote.author.unwrap_or("Anonymous".to_string())
       ));
-
-      ctx.send(CreateReply::default().embed(embed)).await?;
+      ctx.send(CreateReply::default().embed(embed)).await?
     }
-  }
+  };
 
   Ok(())
 }
