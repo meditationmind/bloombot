@@ -6,9 +6,9 @@ use log::{error, info};
 use poise::serenity_prelude::{GuildId, Http, UserId};
 use tokio::time;
 
-use crate::charts::Chart;
+use crate::charts::{Chart, LeaderboardOptions};
 use crate::commands::helpers::time::Timeframe;
-use crate::commands::stats::{LeaderboardType, SortBy};
+use crate::commands::stats::{LeaderboardType, SortBy, Theme};
 use crate::data::stats::LeaderboardUser;
 use crate::database::DatabaseHandler;
 
@@ -207,57 +207,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(daily_minutes) = process_stats(http, guild_id, &daily_minutes).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top5_dark)
-      .await?
-      .leaderboard(
-        daily_minutes.clone(),
-        &Timeframe::Daily,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Daily,
+      SortBy::Minutes,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.day_min_top5_dark).await?;
+    let _ = chart.leaderboard(daily_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top5_light)
-      .await?
-      .leaderboard(
-        daily_minutes.clone(),
-        &Timeframe::Daily,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top10_dark)
-      .await?
-      .leaderboard(
-        daily_minutes.clone(),
-        &Timeframe::Daily,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Daily,
+      SortBy::Minutes,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.day_min_top10_dark).await?;
+    let _ = chart.leaderboard(daily_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.day_min_top10_light)
-      .await?
-      .leaderboard(
-        daily_minutes,
-        &Timeframe::Daily,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let weekly_minutes = DatabaseHandler::get_leaderboard_stats(
@@ -270,57 +240,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(weekly_minutes) = process_stats(http, guild_id, &weekly_minutes).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top5_dark)
-      .await?
-      .leaderboard(
-        weekly_minutes.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Weekly,
+      SortBy::Minutes,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.week_min_top5_dark).await?;
+    let _ = chart.leaderboard(weekly_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top5_light)
-      .await?
-      .leaderboard(
-        weekly_minutes.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top10_dark)
-      .await?
-      .leaderboard(
-        weekly_minutes.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Weekly,
+      SortBy::Minutes,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.week_min_top10_dark).await?;
+    let _ = chart.leaderboard(weekly_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.week_min_top10_light)
-      .await?
-      .leaderboard(
-        weekly_minutes,
-        &Timeframe::Weekly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let monthly_minutes = DatabaseHandler::get_leaderboard_stats(
@@ -333,57 +273,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(monthly_minutes) = process_stats(http, guild_id, &monthly_minutes).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top5_dark)
-      .await?
-      .leaderboard(
-        monthly_minutes.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Monthly,
+      SortBy::Minutes,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.month_min_top5_dark).await?;
+    let _ = chart.leaderboard(monthly_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top5_light)
-      .await?
-      .leaderboard(
-        monthly_minutes.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top10_dark)
-      .await?
-      .leaderboard(
-        monthly_minutes.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Monthly,
+      SortBy::Minutes,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.month_min_top10_dark).await?;
+    let _ = chart.leaderboard(monthly_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.month_min_top10_light)
-      .await?
-      .leaderboard(
-        monthly_minutes,
-        &Timeframe::Monthly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let yearly_minutes = DatabaseHandler::get_leaderboard_stats(
@@ -396,57 +306,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(yearly_minutes) = process_stats(http, guild_id, &yearly_minutes).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top5_dark)
-      .await?
-      .leaderboard(
-        yearly_minutes.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Yearly,
+      SortBy::Minutes,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.year_min_top5_dark).await?;
+    let _ = chart.leaderboard(yearly_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top5_light)
-      .await?
-      .leaderboard(
-        yearly_minutes.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top10_dark)
-      .await?
-      .leaderboard(
-        yearly_minutes.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Yearly,
+      SortBy::Minutes,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.year_min_top10_dark).await?;
+    let _ = chart.leaderboard(yearly_minutes.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.year_min_top10_light)
-      .await?
-      .leaderboard(
-        yearly_minutes,
-        &Timeframe::Yearly,
-        &SortBy::Minutes,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let daily_sessions = DatabaseHandler::get_leaderboard_stats(
@@ -459,57 +339,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(daily_sessions) = process_stats(http, guild_id, &daily_sessions).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top5_dark)
-      .await?
-      .leaderboard(
-        daily_sessions.clone(),
-        &Timeframe::Daily,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Daily,
+      SortBy::Sessions,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.day_ses_top5_dark).await?;
+    let _ = chart.leaderboard(daily_sessions.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top5_light)
-      .await?
-      .leaderboard(
-        daily_sessions.clone(),
-        &Timeframe::Daily,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top10_dark)
-      .await?
-      .leaderboard(
-        daily_sessions.clone(),
-        &Timeframe::Daily,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Daily,
+      SortBy::Sessions,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.day_ses_top10_dark).await?;
+    let _ = chart.leaderboard(daily_sessions.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.day_ses_top10_light)
-      .await?
-      .leaderboard(
-        daily_sessions,
-        &Timeframe::Daily,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let weekly_sessions = DatabaseHandler::get_leaderboard_stats(
@@ -522,57 +372,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(weekly_sessions) = process_stats(http, guild_id, &weekly_sessions).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top5_dark)
-      .await?
-      .leaderboard(
-        weekly_sessions.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Weekly,
+      SortBy::Sessions,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.week_ses_top5_dark).await?;
+    let _ = chart.leaderboard(weekly_sessions.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top5_light)
-      .await?
-      .leaderboard(
-        weekly_sessions.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top10_dark)
-      .await?
-      .leaderboard(
-        weekly_sessions.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Weekly,
+      SortBy::Sessions,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.week_ses_top10_dark).await?;
+    let _ = chart.leaderboard(weekly_sessions.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.week_ses_top10_light)
-      .await?
-      .leaderboard(
-        weekly_sessions,
-        &Timeframe::Weekly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let monthly_sessions = DatabaseHandler::get_leaderboard_stats(
@@ -585,57 +405,31 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(monthly_sessions) = process_stats(http, guild_id, &monthly_sessions).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top5_dark)
-      .await?
-      .leaderboard(
-        monthly_sessions.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        false,
-      )
+    let options = LeaderboardOptions::new(
+      Timeframe::Monthly,
+      SortBy::Sessions,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.month_ses_top5_dark).await?;
+    let _ = chart
+      .leaderboard(monthly_sessions.clone(), &options)
       .await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top5_light)
-      .await?
-      .leaderboard(
-        monthly_sessions.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top10_dark)
-      .await?
-      .leaderboard(
-        monthly_sessions.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        false,
-      )
+    let options = LeaderboardOptions::new(
+      Timeframe::Monthly,
+      SortBy::Sessions,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.month_ses_top10_dark).await?;
+    let _ = chart
+      .leaderboard(monthly_sessions.clone(), &options)
       .await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.month_ses_top10_light)
-      .await?
-      .leaderboard(
-        monthly_sessions,
-        &Timeframe::Monthly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let yearly_sessions = DatabaseHandler::get_leaderboard_stats(
@@ -648,57 +442,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(yearly_sessions) = process_stats(http, guild_id, &yearly_sessions).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top5_dark)
-      .await?
-      .leaderboard(
-        yearly_sessions.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Yearly,
+      SortBy::Sessions,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.year_ses_top5_dark).await?;
+    let _ = chart.leaderboard(yearly_sessions.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top5_light)
-      .await?
-      .leaderboard(
-        yearly_sessions.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top10_dark)
-      .await?
-      .leaderboard(
-        yearly_sessions.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Yearly,
+      SortBy::Sessions,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.year_ses_top10_dark).await?;
+    let _ = chart.leaderboard(yearly_sessions.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.year_ses_top10_light)
-      .await?
-      .leaderboard(
-        yearly_sessions,
-        &Timeframe::Yearly,
-        &SortBy::Sessions,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let daily_streaks = DatabaseHandler::get_leaderboard_stats(
@@ -711,57 +475,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(daily_streaks) = process_stats(http, guild_id, &daily_streaks).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top5_dark)
-      .await?
-      .leaderboard(
-        daily_streaks.clone(),
-        &Timeframe::Daily,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Daily,
+      SortBy::Streak,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.day_str_top5_dark).await?;
+    let _ = chart.leaderboard(daily_streaks.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top5_light)
-      .await?
-      .leaderboard(
-        daily_streaks.clone(),
-        &Timeframe::Daily,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top10_dark)
-      .await?
-      .leaderboard(
-        daily_streaks.clone(),
-        &Timeframe::Daily,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Daily,
+      SortBy::Streak,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.day_str_top10_dark).await?;
+    let _ = chart.leaderboard(daily_streaks.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.day_str_top10_light)
-      .await?
-      .leaderboard(
-        daily_streaks,
-        &Timeframe::Daily,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let weekly_streaks = DatabaseHandler::get_leaderboard_stats(
@@ -774,57 +508,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(weekly_streaks) = process_stats(http, guild_id, &weekly_streaks).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top5_dark)
-      .await?
-      .leaderboard(
-        weekly_streaks.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Weekly,
+      SortBy::Streak,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.week_str_top5_dark).await?;
+    let _ = chart.leaderboard(weekly_streaks.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top5_light)
-      .await?
-      .leaderboard(
-        weekly_streaks.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top10_dark)
-      .await?
-      .leaderboard(
-        weekly_streaks.clone(),
-        &Timeframe::Weekly,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Weekly,
+      SortBy::Streak,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.week_str_top10_dark).await?;
+    let _ = chart.leaderboard(weekly_streaks.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.week_str_top10_light)
-      .await?
-      .leaderboard(
-        weekly_streaks,
-        &Timeframe::Weekly,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let monthly_streaks = DatabaseHandler::get_leaderboard_stats(
@@ -837,57 +541,27 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(monthly_streaks) = process_stats(http, guild_id, &monthly_streaks).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top5_dark)
-      .await?
-      .leaderboard(
-        monthly_streaks.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Monthly,
+      SortBy::Streak,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.month_str_top5_dark).await?;
+    let _ = chart.leaderboard(monthly_streaks.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top5_light)
-      .await?
-      .leaderboard(
-        monthly_streaks.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top10_dark)
-      .await?
-      .leaderboard(
-        monthly_streaks.clone(),
-        &Timeframe::Monthly,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Monthly,
+      SortBy::Streak,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.month_str_top10_dark).await?;
+    let _ = chart.leaderboard(monthly_streaks.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.month_str_top10_light)
-      .await?
-      .leaderboard(
-        monthly_streaks,
-        &Timeframe::Monthly,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
   }
 
   let yearly_streaks = DatabaseHandler::get_leaderboard_stats(
@@ -900,55 +574,25 @@ async fn generate(http: &Http, db: &DatabaseHandler, guild_id: &GuildId) -> Resu
   .await?;
 
   if let Some(yearly_streaks) = process_stats(http, guild_id, &yearly_streaks).await? {
-    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top5_dark)
-      .await?
-      .leaderboard(
-        yearly_streaks.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        false,
-      )
-      .await?;
+    let options = LeaderboardOptions::new(
+      Timeframe::Yearly,
+      SortBy::Streak,
+      LeaderboardType::Top5,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.year_str_top5_dark).await?;
+    let _ = chart.leaderboard(yearly_streaks.clone(), &options).await?;
 
     time::sleep(Duration::from_secs(5)).await;
 
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top5_light)
-      .await?
-      .leaderboard(
-        yearly_streaks.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Streak,
-        &LeaderboardType::Top5,
-        true,
-      )
-      .await?;
-    */
-
-    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top10_dark)
-      .await?
-      .leaderboard(
-        yearly_streaks.clone(),
-        &Timeframe::Yearly,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        false,
-      )
-      .await?;
-
-    /*
-    let _ = Chart::new_with_name(LEADERBOARDS.year_str_top10_light)
-      .await?
-      .leaderboard(
-        yearly_streaks,
-        &Timeframe::Yearly,
-        &SortBy::Streak,
-        &LeaderboardType::Top10,
-        true,
-      )
-      .await?;
-    */
+    let options = LeaderboardOptions::new(
+      Timeframe::Yearly,
+      SortBy::Streak,
+      LeaderboardType::Top10,
+      Theme::DarkMode,
+    );
+    let chart = Chart::new_with_name(LEADERBOARDS.year_str_top10_dark).await?;
+    let _ = chart.leaderboard(yearly_streaks.clone(), &options).await?;
   }
 
   Ok(())

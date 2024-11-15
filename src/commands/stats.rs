@@ -2,10 +2,10 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use log::info;
-use poise::serenity_prelude::{builder::*, CreateAllowedMentions, User};
+use poise::serenity_prelude::{builder::*, Colour, User};
 use poise::{ChoiceParameter, CreateReply};
 
-use crate::charts::Chart;
+use crate::charts::{Chart, LeaderboardOptions, StatsOptions};
 use crate::commands::helpers::time::Timeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::tracking_profile::{privacy, Privacy, Status};
@@ -51,7 +51,7 @@ pub enum LeaderboardType {
 }
 
 #[derive(ChoiceParameter)]
-enum Theme {
+pub enum Theme {
   #[name = "light mode"]
   LightMode,
   #[name = "dark mode"]
@@ -80,18 +80,14 @@ pub async fn stats(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 async fn user(
   ctx: Context<'_>,
-  #[description = "The user to get the stats of (Defaults to you)"] user: Option<User>,
-  #[description = "The type of stats to get (Defaults to minutes)"]
+  #[description = "User to get stats for (Defaults to you)"] user: Option<User>,
+  #[description = "Type of stats to get (Defaults to minutes)"]
   #[rename = "type"]
   stats_type: Option<StatsType>,
-  #[description = "The timeframe to get the stats for (Defaults to daily)"] timeframe: Option<
-    Timeframe,
-  >,
-  #[description = "The style of chart (Defaults to bar chart)"] style: Option<ChartStyle>,
-  #[description = "Set visibility of response (Defaults to public)"] privacy: Option<Privacy>,
-  #[description = "Toggle between light mode and dark mode (Defaults to dark mode)"] theme: Option<
-    Theme,
-  >,
+  #[description = "Timeframe to get stats for (Defaults to daily)"] timeframe: Option<Timeframe>,
+  #[description = "Style of chart (Defaults to bar chart)"] style: Option<ChartStyle>,
+  #[description = "Visibility of the response (Defaults to public)"] privacy: Option<Privacy>,
+  #[description = "Toggle between light/dark mode (Defaults to dark mode)"] theme: Option<Theme>,
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
@@ -99,7 +95,7 @@ async fn user(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
-  let user = user.unwrap_or_else(|| ctx.author().clone());
+  let user = user.as_ref().unwrap_or_else(|| ctx.author());
   let user_nick_or_name = user
     .nick_in(&ctx, guild_id)
     .await
@@ -122,17 +118,10 @@ async fn user(
     && tracking_profile.stats.privacy == Privacy::Private
     && !ctx.author().has_role(&ctx, guild_id, ROLES.staff).await?
   {
+    let msg = format!("Sorry, {user_nick_or_name}'s stats are set to private.");
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "Sorry, {user_nick_or_name}'s stats are set to private."
-          ))
-          .ephemeral(true)
-          .allowed_mentions(CreateAllowedMentions::new()),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
-
     return Ok(());
   }
 
@@ -150,8 +139,7 @@ async fn user(
   let stats =
     DatabaseHandler::get_user_stats(&mut transaction, &guild_id, &user.id, &timeframe).await?;
 
-  let mut embed = BloomBotEmbed::new();
-  embed = embed
+  let mut embed = BloomBotEmbed::new()
     .title(format!("Stats for {user_nick_or_name}"))
     .author(CreateEmbedAuthor::new(format!("{user_nick_or_name}'s Stats")).icon_url(user.face()));
 
@@ -184,77 +172,55 @@ async fn user(
     }
   }
 
-  // Role-based bar color for donators; default otherwise
-  let bar_color = if user.has_role(&ctx, guild_id, ROLES.patreon).await?
-    || user.has_role(&ctx, guild_id, ROLES.kofi).await?
-  {
-    match guild_id.member(&ctx, user.id).await?.colour(ctx) {
-      Some(color) => (color.r(), color.g(), color.b(), 255),
-      None => (253, 172, 46, 255),
+  // Role-based bar color for donators; default otherwise.
+  let donator = user.has_role(&ctx, guild_id, ROLES.patreon).await?
+    || user.has_role(&ctx, guild_id, ROLES.kofi).await?;
+  let bar_color = if !donator {
+    StatsOptions::default().bar_color
+  } else if donator && user.id == ctx.author().id {
+    if let Some(member) = ctx.author_member().await {
+      let color = member
+        .colour(ctx)
+        .unwrap_or(Colour::from(StatsOptions::default().rgb()));
+      (color.r(), color.g(), color.b(), 255)
+    } else {
+      StatsOptions::default().bar_color
     }
   } else {
-    (253, 172, 46, 255)
+    let color = guild_id
+      .member(&ctx, user.id)
+      .await?
+      .colour(ctx)
+      .unwrap_or(Colour::from(StatsOptions::default().rgb()));
+    (color.r(), color.g(), color.b(), 255)
   };
 
-  // Role-based bar color for all users
-  //let bar_color = match guild_id.member(&ctx, user.id).await?.colour(&ctx) {
-  //  Some(color) => (color.r(), color.g(), color.b(), 1.0),
-  //  None => (253, 172, 46, 1.0)
-  //};
-
-  let light_mode = match theme {
-    Some(theme) => match theme {
-      Theme::LightMode => true,
-      Theme::DarkMode => false,
-    },
-    None => false,
-  };
+  let theme = theme.unwrap_or(Theme::DarkMode);
+  let offset = tracking_profile.utc_offset;
 
   let chart_stats = DatabaseHandler::get_user_chart_stats(
     &mut transaction,
     &guild_id,
     &user.id,
     &timeframe,
-    tracking_profile.utc_offset,
+    offset,
   )
   .await?;
 
-  let chart = Chart::new()
-    .await?
-    .stats(
-      &chart_stats,
-      &timeframe,
-      tracking_profile.utc_offset,
-      &stats_type,
-      &chart_style,
-      bar_color,
-      light_mode,
-    )
-    .await?;
-
-  let file_path = chart.path();
-
-  embed = embed.image(chart.url());
-
-  let average = match stats_type {
-    StatsType::MeditationMinutes => stats.timeframe_stats.sum.unwrap_or(0) / 12,
-    StatsType::MeditationCount => stats.timeframe_stats.count.unwrap_or(0) / 12,
+  let (average, label) = match stats_type {
+    StatsType::MeditationMinutes => (stats.timeframe_stats.sum.unwrap_or(0) / 12, "minutes"),
+    StatsType::MeditationCount => (stats.timeframe_stats.count.unwrap_or(0) / 12, "sessions"),
   };
 
-  let stats_type_label = match stats_type {
-    StatsType::MeditationMinutes => "minutes",
-    StatsType::MeditationCount => "sessions",
-  };
-
-  // Hide streak in footer if streaks disabled
+  // Hide streak in footer if streaks disabled.
   if tracking_profile.streak.status == Status::Enabled
-    // Hide streak in footer if streak set to private, unless own stats in ephemeral
+    // Hide streak in footer if streak set to private, unless own stats in ephemeral.
     && (tracking_profile.streak.privacy == Privacy::Public || (ctx.author().id == user.id && privacy))
   {
     embed = embed.footer(CreateEmbedFooter::new(format!(
       "Avg. {} {}: {}・Current streak: {}",
       timeframe.name().to_lowercase(),
-      stats_type_label,
+      label,
       average,
       stats.streak.current
     )));
@@ -262,18 +228,20 @@ async fn user(
     embed = embed.footer(CreateEmbedFooter::new(format!(
       "Average {} {}: {}",
       timeframe.name().to_lowercase(),
-      stats_type_label,
+      label,
       average
     )));
   }
 
-  ctx
-    .send({
-      let mut f = CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
-      f.embeds = vec![embed.clone()];
+  let options = StatsOptions::new(timeframe, offset, stats_type, chart_style, bar_color, theme);
+  let chart = Chart::new().await?;
+  let chart = chart.stats(&chart_stats, &options).await?;
 
-      f
-    })
+  embed = embed.image(chart.url());
+  let attachment = CreateAttachment::path(chart.path()).await?;
+
+  ctx
+    .send(CreateReply::default().embed(embed).attachment(attachment))
     .await?;
 
   chart.remove().await?;
@@ -289,16 +257,12 @@ async fn user(
 #[poise::command(slash_command)]
 async fn server(
   ctx: Context<'_>,
-  #[description = "The type of stats to get (Defaults to minutes)"]
+  #[description = "Type of stats to get (Defaults to minutes)"]
   #[rename = "type"]
   stats_type: Option<StatsType>,
-  #[description = "The timeframe to get the stats for (Defaults to daily)"] timeframe: Option<
-    Timeframe,
-  >,
-  #[description = "The style of chart (Defaults to bar chart)"] style: Option<ChartStyle>,
-  #[description = "Toggle between light mode and dark mode (Defaults to dark mode)"] theme: Option<
-    Theme,
-  >,
+  #[description = "Timeframe to get stats for (Defaults to daily)"] timeframe: Option<Timeframe>,
+  #[description = "Style of chart (Defaults to bar chart)"] style: Option<ChartStyle>,
+  #[description = "Toggle between light/dark mode (Defaults to dark mode)"] theme: Option<Theme>,
 ) -> Result<()> {
   ctx.defer().await?;
 
@@ -329,11 +293,9 @@ async fn server(
   };
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-
   let stats = DatabaseHandler::get_guild_stats(&mut transaction, &guild_id, &timeframe).await?;
 
-  let mut embed = BloomBotEmbed::new();
-  embed = embed
+  let mut embed = BloomBotEmbed::new()
     .title(format!("Stats for {guild_name}"))
     .author(CreateEmbedAuthor::new(format!("{guild_name}'s Stats")).icon_url(guild_icon));
 
@@ -366,42 +328,20 @@ async fn server(
     }
   }
 
-  let bar_color = (253, 172, 46, 255);
-  let light_mode = match theme {
-    Some(theme) => match theme {
-      Theme::LightMode => true,
-      Theme::DarkMode => false,
-    },
-    None => false,
-  };
+  let bar_color = StatsOptions::default().bar_color;
+  let theme = theme.unwrap_or(Theme::DarkMode);
 
   let chart_stats =
     DatabaseHandler::get_guild_chart_stats(&mut transaction, &guild_id, &timeframe).await?;
-
-  let chart = Chart::new()
-    .await?
-    .stats(
-      &chart_stats,
-      &timeframe,
-      0,
-      &stats_type,
-      &chart_style,
-      bar_color,
-      light_mode,
-    )
-    .await?;
-
-  let file_path = chart.path();
+  let options = StatsOptions::new(timeframe, 0, stats_type, chart_style, bar_color, theme);
+  let chart = Chart::new().await?;
+  let chart = chart.stats(&chart_stats, &options).await?;
 
   embed = embed.image(chart.url());
+  let attachment = CreateAttachment::path(chart.path()).await?;
 
   ctx
-    .send({
-      let mut f = CreateReply::default().attachment(CreateAttachment::path(&file_path).await?);
-      f.embeds = vec![embed.clone()];
-
-      f
-    })
+    .send(CreateReply::default().embed(embed).attachment(attachment))
     .await?;
 
   chart.remove().await?;
@@ -431,16 +371,9 @@ async fn leaderboard(
   let timeframe = timeframe.unwrap_or(Timeframe::Monthly);
   let sort_by = sort.unwrap_or(SortBy::Minutes);
   let leaderboard_type = leaderboard_type.unwrap_or(LeaderboardType::Top5);
+  let theme = theme.unwrap_or(Theme::DarkMode);
 
-  let light_mode = match theme {
-    Some(theme) => match theme {
-      Theme::LightMode => true,
-      Theme::DarkMode => false,
-    },
-    None => false,
-  };
-
-  if !light_mode {
+  if matches!(theme, Theme::DarkMode) {
     let chart = match timeframe {
       Timeframe::Yearly => match sort_by {
         SortBy::Minutes => match leaderboard_type {
@@ -500,30 +433,22 @@ async fn leaderboard(
       },
     };
 
-    let file_path = chart.path();
-
     let embed = BloomBotEmbed::new().image(chart.url());
+    let attachment = CreateAttachment::path(chart.path()).await?;
 
     if let Err(err) = ctx
       .send(
         CreateReply::default()
           .embed(embed)
           .ephemeral(false)
-          .attachment(CreateAttachment::path(&file_path).await?),
+          .attachment(attachment),
       )
       .await
     {
-      info!("Failed to send pre-generated leaderboard file: {:?}", err);
+      info!("Failed to send pre-generated leaderboard file: {err:?}");
+      let msg = format!("{} Sorry, no leaderboard data available.", EMOJI.mminfo);
       ctx
-        .send(
-          CreateReply::default()
-            .content(format!(
-              "{} Sorry, no leaderboard data available.",
-              EMOJI.mminfo
-            ))
-            .ephemeral(true)
-            .allowed_mentions(CreateAllowedMentions::new()),
-        )
+        .send(CreateReply::default().content(msg).ephemeral(true))
         .await?;
     }
     return Ok(());
@@ -534,7 +459,6 @@ async fn leaderboard(
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-
   let stats = DatabaseHandler::get_leaderboard_stats(
     &mut transaction,
     &guild_id,
@@ -544,49 +468,32 @@ async fn leaderboard(
   )
   .await?;
 
-  let leaderboard_data = leaderboards::process_stats(ctx.http(), &guild_id, &stats).await?;
-
-  if let Some(leaderboard_data) = leaderboard_data {
-    let chart = Chart::new()
-      .await?
-      .leaderboard(
-        leaderboard_data,
-        &timeframe,
-        &sort_by,
-        &leaderboard_type,
-        light_mode,
-      )
-      .await?;
-
-    let file_path = chart.path();
-
-    let embed = BloomBotEmbed::new().image(chart.url());
-
+  let Some(leaderboard_data) = leaderboards::process_stats(ctx.http(), &guild_id, &stats).await?
+  else {
+    let msg = format!("{} Sorry, no leaderboard data available.", EMOJI.mminfo);
     ctx
-      .send(
-        CreateReply::default()
-          .embed(embed)
-          .ephemeral(false)
-          .attachment(CreateAttachment::path(&file_path).await?),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
-
-    chart.remove().await?;
-
     return Ok(());
-  }
+  };
+
+  let options = LeaderboardOptions::new(timeframe, sort_by, leaderboard_type, theme);
+  let chart = Chart::new().await?;
+  let chart = chart.leaderboard(leaderboard_data, &options).await?;
+
+  let embed = BloomBotEmbed::new().image(chart.url());
+  let attachment = CreateAttachment::path(chart.path()).await?;
 
   ctx
     .send(
       CreateReply::default()
-        .content(format!(
-          "{} Sorry, no leaderboard data available.",
-          EMOJI.mminfo
-        ))
-        .ephemeral(true)
-        .allowed_mentions(CreateAllowedMentions::new()),
+        .embed(embed)
+        .ephemeral(false)
+        .attachment(attachment),
     )
     .await?;
+
+  chart.remove().await?;
 
   Ok(())
 }

@@ -15,8 +15,24 @@ use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 
 use crate::commands::helpers::time::Timeframe;
-use crate::commands::stats::{ChartStyle, LeaderboardType, SortBy, StatsType};
+use crate::commands::stats::{ChartStyle, LeaderboardType, SortBy, StatsType, Theme};
 use crate::data::stats::Timeframe as TimeframeStats;
+
+pub struct StatsOptions {
+  timeframe: Timeframe,
+  offset: i16,
+  stats_type: StatsType,
+  chart_style: ChartStyle,
+  pub bar_color: (u8, u8, u8, u8),
+  theme: Theme,
+}
+
+pub struct LeaderboardOptions {
+  timeframe: Timeframe,
+  sort_by: SortBy,
+  leaderboard_type: LeaderboardType,
+  theme: Theme,
+}
 
 #[derive(Debug)]
 pub struct Chart<'a> {
@@ -60,31 +76,21 @@ impl<'a> Chart<'a> {
     })
   }
 
-  #[allow(clippy::too_many_arguments)]
-  pub async fn stats(
-    mut self,
-    stats: &[TimeframeStats],
-    timeframe: &Timeframe,
-    offset: i16,
-    stats_type: &StatsType,
-    chart_style: &ChartStyle,
-    bar_color: (u8, u8, u8, u8),
-    light_mode: bool,
-  ) -> Result<Self> {
+  pub async fn stats(mut self, stats: &[TimeframeStats], options: &StatsOptions) -> Result<Self> {
     if stats.len() != 12 {
       return Err(anyhow!("Not enough stats to draw chart"));
     }
 
-    let title = if let ChartStyle::BarCombined = chart_style {
+    let title = if let ChartStyle::BarCombined = options.chart_style {
       String::new()
     } else {
-      match stats_type {
+      match options.stats_type {
         StatsType::MeditationMinutes => String::from("Meditation Minutes"),
         StatsType::MeditationCount => String::from("Meditation Sessions"),
       }
     };
 
-    let series_data = if let ChartStyle::BarCombined = chart_style {
+    let series_data = if let ChartStyle::BarCombined = options.chart_style {
       let minutes = stats
         .iter()
         .map(|x| x.sum.unwrap_or(0) as f32)
@@ -98,7 +104,7 @@ impl<'a> Chart<'a> {
         Series::new("Sessions".to_string(), sessions),
       ]
     } else {
-      let (series_name, stats) = match stats_type {
+      let (series_name, stats) = match options.stats_type {
         StatsType::MeditationMinutes => (
           String::from("Minutes"),
           stats
@@ -120,9 +126,9 @@ impl<'a> Chart<'a> {
     let now = Utc::now();
     let mut x_labels: Vec<String> = vec![];
     for n in 1..13 {
-      let label = match timeframe {
+      let label = match options.timeframe {
         Timeframe::Daily => {
-          let date = (now + Duration::minutes(offset.into())) - Duration::days(12 - n);
+          let date = (now + Duration::minutes(options.offset.into())) - Duration::days(12 - n);
           date.format("%m/%d").to_string()
         }
         Timeframe::Weekly => {
@@ -182,13 +188,10 @@ impl<'a> Chart<'a> {
     bar_chart.x_axis_height = 40.0;
     bar_chart.y_axis_configs[0].axis_font_size = 22.0;
     bar_chart.y_axis_configs[0].axis_split_number = 7;
-    bar_chart.series_colors = vec![
-      (bar_color.0, bar_color.1, bar_color.2, bar_color.3).into(),
-      (bar_color.0, bar_color.1, bar_color.2, 190).into(),
-    ];
+    bar_chart.series_colors = vec![options.bar_color.into(), options.rgb_with_alpha(190).into()];
     bar_chart.series_list[0].label_show = false;
 
-    if light_mode {
+    if matches!(options.theme, Theme::LightMode) {
       bar_chart.background_color = (227, 229, 232).into();
       bar_chart.grid_stroke_color = (140, 140, 140).into();
       bar_chart.title_font_color = (30, 31, 34).into();
@@ -208,7 +211,7 @@ impl<'a> Chart<'a> {
       bar_chart.y_axis_configs[0].axis_font_color = (216, 217, 218).into();
     }
 
-    if let ChartStyle::Bar = chart_style {
+    if let ChartStyle::Bar = options.chart_style {
     } else {
       bar_chart.series_fill = true;
       bar_chart.series_smooth = true;
@@ -226,7 +229,7 @@ impl<'a> Chart<'a> {
         bottom: 15.0,
       };
       // Add a second line
-      if let ChartStyle::BarCombined = chart_style {
+      if let ChartStyle::BarCombined = options.chart_style {
         bar_chart.y_axis_hidden = false;
         bar_chart.y_axis_configs[0].axis_width = Some(0.0);
         bar_chart.series_list[0].category = Some(SeriesCategory::Bar);
@@ -262,20 +265,17 @@ impl<'a> Chart<'a> {
   pub async fn leaderboard(
     mut self,
     mut data: Vec<Vec<String>>,
-    timeframe: &Timeframe,
-    sort_by: &SortBy,
-    leaderboard_type: &LeaderboardType,
-    light_mode: bool,
+    options: &LeaderboardOptions,
   ) -> Result<Self> {
-    match leaderboard_type {
+    match options.leaderboard_type {
       LeaderboardType::Top5 => data.truncate(6),
       LeaderboardType::Top10 => data.truncate(11),
     };
-    let title = match leaderboard_type {
+    let title = match options.leaderboard_type {
       LeaderboardType::Top5 => String::from("Leaderboard (Top 5)"),
       LeaderboardType::Top10 => String::from("Leaderboard (Top 10)"),
     };
-    let subtitle = match timeframe {
+    let subtitle = match options.timeframe {
       Timeframe::Daily => Utc::now().format("%B %-d, %Y").to_string(),
       Timeframe::Weekly => format!(
         "Week starting {}",
@@ -292,20 +292,20 @@ impl<'a> Chart<'a> {
     let mut cell_styles: Vec<TableCellStyle> = vec![];
     for i in 1..=data.len() {
       cell_styles.push(TableCellStyle {
-        font_color: if light_mode {
+        font_color: if matches!(options.theme, Theme::LightMode) {
           Some((102, 103, 108).into())
         } else {
           Some((235, 236, 236).into())
         },
         font_weight: Some("bold".to_string()),
-        background_color: if light_mode {
+        background_color: if matches!(options.theme, Theme::LightMode) {
           Some((202, 204, 207).into())
         } else {
           Some((44, 46, 50).into())
         },
         indexes: vec![
           i,
-          match sort_by {
+          match options.sort_by {
             SortBy::Minutes => 1,
             SortBy::Sessions => 2,
             SortBy::Streak => 3,
@@ -353,7 +353,7 @@ impl<'a> Chart<'a> {
     };
     leaderboard.cell_styles = cell_styles;
 
-    if light_mode {
+    if matches!(options.theme, Theme::LightMode) {
       leaderboard.background_color = (227, 229, 232).into();
       leaderboard.border_color = (197, 199, 200).into();
       leaderboard.header_background_color = (180, 183, 187).into();
@@ -395,5 +395,73 @@ impl<'a> Chart<'a> {
   pub async fn remove(&self) -> Result<()> {
     fs::remove_file(self.path()).await?;
     Ok(())
+  }
+}
+
+impl StatsOptions {
+  pub fn new(
+    timeframe: Timeframe,
+    offset: i16,
+    stats_type: StatsType,
+    chart_style: ChartStyle,
+    bar_color: (u8, u8, u8, u8),
+    theme: Theme,
+  ) -> Self {
+    Self {
+      timeframe,
+      offset,
+      stats_type,
+      chart_style,
+      bar_color,
+      theme,
+    }
+  }
+
+  fn rgb_with_alpha(&self, alpha: u8) -> (u8, u8, u8, u8) {
+    (self.bar_color.0, self.bar_color.1, self.bar_color.2, alpha)
+  }
+
+  pub fn rgb(&self) -> (u8, u8, u8) {
+    (self.bar_color.0, self.bar_color.1, self.bar_color.2)
+  }
+}
+
+impl Default for StatsOptions {
+  fn default() -> Self {
+    Self {
+      timeframe: Timeframe::Daily,
+      offset: 0,
+      stats_type: StatsType::MeditationMinutes,
+      chart_style: ChartStyle::Bar,
+      bar_color: (253, 172, 46, 255),
+      theme: Theme::DarkMode,
+    }
+  }
+}
+
+impl LeaderboardOptions {
+  pub fn new(
+    timeframe: Timeframe,
+    sort_by: SortBy,
+    leaderboard_type: LeaderboardType,
+    theme: Theme,
+  ) -> Self {
+    Self {
+      timeframe,
+      sort_by,
+      leaderboard_type,
+      theme,
+    }
+  }
+}
+
+impl Default for LeaderboardOptions {
+  fn default() -> Self {
+    Self {
+      timeframe: Timeframe::Monthly,
+      sort_by: SortBy::Minutes,
+      leaderboard_type: LeaderboardType::Top5,
+      theme: Theme::DarkMode,
+    }
   }
 }
