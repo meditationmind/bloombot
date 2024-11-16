@@ -71,12 +71,9 @@ async fn add_key(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   if DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
+    let msg = format!("{} Key already exists.", EMOJI.mminfo);
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!("{} Key already exists.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Ok(());
   }
@@ -108,12 +105,9 @@ async fn remove_key(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::steam_key_exists(&mut transaction, &guild_id, key.as_str()).await? {
+    let msg = format!("{} Key does not exist.", EMOJI.mminfo);
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!("{} Key does not exist.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Ok(());
   }
@@ -145,14 +139,10 @@ async fn use_key(ctx: Context<'_>) -> Result<()> {
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   if !DatabaseHandler::unused_key_exists(&mut transaction, &guild_id).await? {
+    let msg = format!("{} No unused keys found.", EMOJI.mminfo);
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!("{} No unused keys found.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
-
     return Ok(());
   };
 
@@ -173,7 +163,7 @@ async fn use_key(ctx: Context<'_>) -> Result<()> {
 
   let log_embed = BloomBotEmbed::new()
     .title("Playne Key Retrieved")
-    .description(format!("**Key**: {key}"))
+    .description(format!("**Key**: `{key}`"))
     .footer(
       CreateEmbedFooter::new(format!(
         "Retrieved by {} ({})",
@@ -181,8 +171,7 @@ async fn use_key(ctx: Context<'_>) -> Result<()> {
         ctx.author().id
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-    )
-    .clone();
+    );
 
   let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
@@ -217,20 +206,14 @@ async fn list_recipients(
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let recipients = DatabaseHandler::get_steamkey_recipients(&mut transaction, &guild_id).await?;
-  let recipients: Vec<PageRowRef> = recipients
-    .iter()
-    .map(|recipient| recipient as PageRowRef)
-    .collect();
+  let recipients: Vec<PageRowRef> = recipients.iter().map(|recip| recip as PageRowRef).collect();
 
   drop(transaction);
 
-  Paginator::new(
-    "Playne Key Recipients",
-    &recipients,
-    ENTRIES_PER_PAGE.default,
-  )
-  .paginate(ctx, page, PageType::Standard, Visibility::Ephemeral)
-  .await?;
+  let title = "Playne Key Recipients";
+  Paginator::new(title, &recipients, ENTRIES_PER_PAGE.default)
+    .paginate(ctx, page, PageType::Standard, Visibility::Ephemeral)
+    .await?;
 
   Ok(())
 }
@@ -250,23 +233,17 @@ async fn update_recipient(
   #[min = 0]
   total_keys: Option<i16>,
 ) -> Result<()> {
-  if challenge_prize.is_none() && donator_perk.is_none() && total_keys.is_none() {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} No input provided. Update aborted.",
-            EMOJI.mminfo
-          ))
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
-  }
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
+
+  if challenge_prize.is_none() && donator_perk.is_none() && total_keys.is_none() {
+    let msg = format!("{} No input provided. Update aborted.", EMOJI.mminfo);
+    ctx
+      .send(CreateReply::default().content(msg).ephemeral(true))
+      .await?;
+    return Ok(());
+  }
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let Some(steamkey_recipient) =
@@ -295,15 +272,12 @@ async fn update_recipient(
       return Ok(());
     }
 
+    let msg = format!(
+      "{} No existing record for recipient. Please specify a number of keys to create a new record.",
+      EMOJI.mminfo
+    );
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} No existing record for recipient. Please specify a number of keys to create a new record.",
-            EMOJI.mminfo
-          ))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     DatabaseHandler::rollback_transaction(transaction).await?;
     return Ok(());
@@ -325,10 +299,10 @@ async fn update_recipient(
           ))
           .ephemeral(true)
           .components(vec![CreateActionRow::Buttons(vec![
-            CreateButton::new(confirm_id.clone())
+            CreateButton::new(confirm_id.as_str())
               .label("Yes")
               .style(ButtonStyle::Success),
-            CreateButton::new(cancel_id.clone())
+            CreateButton::new(cancel_id.as_str())
               .label("No")
               .style(ButtonStyle::Danger),
           ])]),
@@ -352,58 +326,37 @@ async fn update_recipient(
 
       // Update the response.
       if confirmed {
-        match press
-          .create_response(
-            ctx,
-            CreateInteractionResponse::UpdateMessage(
-              CreateInteractionResponseMessage::new()
-                .content("Confirmed.")
-                .components(Vec::new()),
-            ),
-          )
+        let msg = CreateInteractionResponseMessage::new()
+          .content(format!("{} Confirmed.", EMOJI.mmcheck))
+          .components(Vec::new());
+        if let Err(e) = press
+          .create_response(ctx, CreateInteractionResponse::UpdateMessage(msg))
           .await
         {
-          Ok(()) => {
-            DatabaseHandler::commit_transaction(transaction).await?;
-            return Ok(());
-          }
-          Err(e) => {
-            DatabaseHandler::rollback_transaction(transaction).await?;
-            return Err(anyhow!(
-              "Failed to tell user that {} ({}) was removed from the recipient database: {}",
-              recipient.name,
-              recipient.id,
-              e,
-            ));
-          }
+          DatabaseHandler::rollback_transaction(transaction).await?;
+          return Err(anyhow!(
+            "Failed to tell user that {} ({}) was removed from the recipient database: {e}",
+            recipient.name,
+            recipient.id,
+          ));
         }
+        DatabaseHandler::commit_transaction(transaction).await?;
+        return Ok(());
       }
 
+      let msg = CreateInteractionResponseMessage::new()
+        .content(format!("{} Cancelled.", EMOJI.mmx))
+        .components(Vec::new());
       press
-        .create_response(
-          ctx,
-          CreateInteractionResponse::UpdateMessage(
-            CreateInteractionResponseMessage::new()
-              .content("Cancelled.")
-              .components(Vec::new()),
-          ),
-        )
+        .create_response(ctx, CreateInteractionResponse::UpdateMessage(msg))
         .await?;
     }
     // This happens when the user didn't press any button for 60 seconds.
     return Ok(());
   }
 
-  let challenge_prize = if challenge_prize.is_none() {
-    steamkey_recipient.challenge_prize
-  } else {
-    challenge_prize
-  };
-  let donator_perk = if donator_perk.is_none() {
-    steamkey_recipient.donator_perk
-  } else {
-    donator_perk
-  };
+  let challenge_prize = challenge_prize.or(steamkey_recipient.challenge_prize);
+  let donator_perk = donator_perk.or(steamkey_recipient.donator_perk);
   let total_keys = total_keys.unwrap_or(steamkey_recipient.total_keys);
 
   let recipient = Recipient::new(
