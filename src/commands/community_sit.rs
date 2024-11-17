@@ -12,10 +12,10 @@ use crate::Context;
 
 async fn is_helper(ctx: Context<'_>) -> Result<bool> {
   let community_sit_helper = RoleId::from(ROLES.community_sit_helper);
-  let has_role = match ctx.author_member().await {
-    Some(member) => member.roles.contains(&community_sit_helper),
-    None => false,
-  };
+  let has_role = ctx
+    .author_member()
+    .await
+    .is_some_and(|member| member.roles.contains(&community_sit_helper));
 
   if !has_role {
     ctx
@@ -59,6 +59,7 @@ pub async fn community_sit(_: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 async fn start(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
+
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -96,27 +97,25 @@ async fn start(ctx: Context<'_>) -> Result<()> {
             .embed(embed)
             .ephemeral(true)
             .components(vec![CreateActionRow::Buttons(vec![
-              CreateButton::new(confirm_id.clone())
+              CreateButton::new(confirm_id.as_str())
                 .label("Start Event")
                 .style(ButtonStyle::Success),
-              CreateButton::new(cancel_id.clone())
+              CreateButton::new(cancel_id.as_str())
                 .label("Cancel")
                 .style(ButtonStyle::Danger),
             ])]),
         )
         .await?;
 
-      // Loop through incoming interactions with the navigation buttons
+      // Loop through incoming interactions with the navigation buttons.
       while let Some(press) = ComponentInteractionCollector::new(ctx)
-        // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-        // button was pressed
         .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-        // Timeout when no navigation button has been pressed in one minute
+        // Timeout when no navigation button has been pressed in one minute.
         .timeout(Duration::from_secs(60))
         .await
       {
         if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
-          // This is an unrelated button interaction
+          // This is an unrelated button interaction.
           continue;
         }
 
@@ -164,8 +163,7 @@ async fn start(ctx: Context<'_>) -> Result<()> {
                     ctx.author().id
                   ))
                   .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-                )
-                .clone();
+                );
 
               let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
@@ -177,9 +175,8 @@ async fn start(ctx: Context<'_>) -> Result<()> {
             }
             Err(e) => {
               return Err(anyhow::anyhow!(
-                "Failed to start \"{}\" due to error: {}",
-                event.name,
-                e
+                "Failed to start \"{}\" due to error: {e}",
+                event.name
               ));
             }
           }
@@ -190,7 +187,7 @@ async fn start(ctx: Context<'_>) -> Result<()> {
             ctx,
             CreateInteractionResponse::UpdateMessage(
               CreateInteractionResponseMessage::new()
-                .content("Cancelled.")
+                .content(format!("{} Cancelled.", EMOJI.mmx))
                 .ephemeral(true)
                 .embeds(Vec::new())
                 .components(Vec::new()),
@@ -199,20 +196,17 @@ async fn start(ctx: Context<'_>) -> Result<()> {
           .await?;
       }
 
-      // This happens when the user didn't press any button for 60 seconds
+      // This happens when the user didn't press any button for 60 seconds.
       return Ok(());
     }
   }
 
-  ctx
-    .send(
-      CreateReply::default()
-        .content(format!(
+  let msg = format!(
           "{} No eligible community sit event found. Please try again within 15 minutes of starting time.",
           EMOJI.mminfo
-        ))
-        .ephemeral(true),
-    )
+        );
+  ctx
+    .send(CreateReply::default().content(msg).ephemeral(true))
     .await?;
 
   Ok(())
@@ -224,6 +218,7 @@ async fn start(ctx: Context<'_>) -> Result<()> {
 #[poise::command(slash_command)]
 async fn end(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
+
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -258,27 +253,25 @@ async fn end(ctx: Context<'_>) -> Result<()> {
             .embed(embed)
             .ephemeral(true)
             .components(vec![CreateActionRow::Buttons(vec![
-              CreateButton::new(confirm_id.clone())
+              CreateButton::new(confirm_id.as_str())
                 .label("End Event")
                 .style(ButtonStyle::Success),
-              CreateButton::new(cancel_id.clone())
+              CreateButton::new(cancel_id.as_str())
                 .label("Cancel")
                 .style(ButtonStyle::Danger),
             ])]),
         )
         .await?;
 
-      // Loop through incoming interactions with the navigation buttons
+      // Loop through incoming interactions with the navigation buttons.
       while let Some(press) = ComponentInteractionCollector::new(ctx)
-        // We defined our button IDs to start with `ctx_id`. If they don't, some other command's
-        // button was pressed
         .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
-        // Timeout when no navigation button has been pressed in one minute
+        // Timeout when no navigation button has been pressed in one minute.
         .timeout(Duration::from_secs(60))
         .await
       {
         if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
-          // This is an unrelated button interaction
+          // This is an unrelated button interaction.
           continue;
         }
 
@@ -329,8 +322,7 @@ async fn end(ctx: Context<'_>) -> Result<()> {
                     ctx.author().id
                   ))
                   .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-                )
-                .clone();
+                );
 
               let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 
@@ -342,9 +334,8 @@ async fn end(ctx: Context<'_>) -> Result<()> {
             }
             Err(e) => {
               return Err(anyhow!(
-                "Failed to end \"{}\" due to error: {}",
-                event.name,
-                e
+                "Failed to end \"{}\" due to error: {e}",
+                event.name
               ));
             }
           }
@@ -355,7 +346,7 @@ async fn end(ctx: Context<'_>) -> Result<()> {
             ctx,
             CreateInteractionResponse::UpdateMessage(
               CreateInteractionResponseMessage::new()
-                .content("Cancelled.")
+                .content(format!("{} Cancelled.", EMOJI.mmx))
                 .ephemeral(true)
                 .embeds(Vec::new())
                 .components(Vec::new()),
@@ -364,20 +355,14 @@ async fn end(ctx: Context<'_>) -> Result<()> {
           .await?;
       }
 
-      // This happens when the user didn't press any button for 60 seconds
+      // This happens when the user didn't press any button for 60 seconds.
       return Ok(());
     }
   }
 
+  let msg = format!("{} No active community sit event found.", EMOJI.mminfo);
   ctx
-    .send(
-      CreateReply::default()
-        .content(format!(
-          "{} No active community sit event found.",
-          EMOJI.mminfo
-        ))
-        .ephemeral(true),
-    )
+    .send(CreateReply::default().content(msg).ephemeral(true))
     .await?;
 
   Ok(())
