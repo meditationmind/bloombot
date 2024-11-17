@@ -70,7 +70,7 @@ impl TrackingProfile {
   /// Assigns a [`UserID`][uid] to a [`TrackingProfile`].
   ///
   /// [uid]: poise::serenity_prelude::model::id::UserId
-  pub fn user_id(mut self, user_id: impl Into<UserId>) -> Self {
+  pub fn with_user_id(mut self, user_id: impl Into<UserId>) -> Self {
     self.user_id = user_id.into();
     self
   }
@@ -78,7 +78,7 @@ impl TrackingProfile {
   /// Assigns a [`GuildId`][gid] to a [`TrackingProfile`].
   ///
   /// [gid]: poise::serenity_prelude::model::id::GuildId
-  pub fn guild_id(mut self, guild_id: impl Into<GuildId>) -> Self {
+  pub fn with_guild_id(mut self, guild_id: impl Into<GuildId>) -> Self {
     self.guild_id = guild_id.into();
     self
   }
@@ -89,8 +89,8 @@ impl TrackingProfile {
   ///
   /// [poc]: crate::commands::helpers::time::PlusOffsetChoice
   /// [moc]: crate::commands::helpers::time::MinusOffsetChoice
-  pub fn utc_offset(mut self, utc_offset: i16) -> Self {
-    if matches!(time::choice_from_offset(utc_offset), (None, None)) {
+  pub fn with_offset(mut self, utc_offset: i16) -> Self {
+    if utc_offset != 0 && matches!(time::choice_from_offset(utc_offset), (None, None)) {
       self
     } else {
       self.utc_offset = utc_offset;
@@ -100,28 +100,28 @@ impl TrackingProfile {
 
   /// Sets tracking [`Privacy`] for a [`TrackingProfile`].
   /// Default is [`Privacy::Public`].
-  pub fn tracking_privacy(mut self, privacy: Privacy) -> Self {
+  pub fn with_tracking_privacy(mut self, privacy: Privacy) -> Self {
     self.tracking.privacy = privacy;
     self
   }
 
   /// Sets streak reporting [`Status`] for a [`TrackingProfile`].
   /// Default is [`Status::Enabled`].
-  pub fn streak_status(mut self, status: Status) -> Self {
+  pub fn with_streak_status(mut self, status: Status) -> Self {
     self.streak.status = status;
     self
   }
 
   /// Sets streak [`Privacy`] for a [`TrackingProfile`].
   /// Default is [`Privacy::Public`].
-  pub fn streak_privacy(mut self, privacy: Privacy) -> Self {
+  pub fn with_streak_privacy(mut self, privacy: Privacy) -> Self {
     self.streak.privacy = privacy;
     self
   }
 
   /// Sets stats [`Privacy`] for a [`TrackingProfile`].
   /// Default is [`Privacy::Public`].
-  pub fn stats_privacy(mut self, privacy: Privacy) -> Self {
+  pub fn with_stats_privacy(mut self, privacy: Privacy) -> Self {
     self.stats.privacy = privacy;
     self
   }
@@ -314,31 +314,31 @@ mod tests {
       ..Default::default()
     };
     let profile2 = TrackingProfile::default()
-      .utc_offset(180)
-      .streak_privacy(Privacy::Private)
-      .stats_privacy(Privacy::Private);
+      .with_offset(180)
+      .with_streak_privacy(Privacy::Private)
+      .with_stats_privacy(Privacy::Private);
     assert_eq!(profile1.utc_offset, profile2.utc_offset);
     assert_eq!(profile1.streak.privacy, profile2.streak.privacy);
     assert_eq!(profile1.stats.privacy, profile2.stats.privacy);
 
     assert_eq!(TrackingProfile::default().utc_offset, 0);
-    assert_eq!(TrackingProfile::default().utc_offset(5).utc_offset, 0);
-    assert_eq!(TrackingProfile::default().utc_offset(540).utc_offset, 540);
+    assert_eq!(TrackingProfile::default().with_offset(5).utc_offset, 0);
+    assert_eq!(TrackingProfile::default().with_offset(540).utc_offset, 540);
   }
 
   #[test]
   #[allow(clippy::unreadable_literal)]
   fn test_id_methods() {
     let guild_id = GuildId::new(1300863845429936139);
-    let profile = TrackingProfile::default().guild_id(guild_id);
+    let profile = TrackingProfile::default().with_guild_id(guild_id);
     assert_eq!(profile.guild_id, GuildId::new(1300863845429936139));
 
     let int_user_id = 1300863845429936139;
     let str_guild_id = 1300863845429936139;
 
     let profile = TrackingProfile::default()
-      .user_id(int_user_id)
-      .guild_id(str_guild_id);
+      .with_user_id(int_user_id)
+      .with_guild_id(str_guild_id);
     assert_eq!(profile.user_id, UserId::new(1300863845429936139));
     assert_eq!(profile.guild_id, GuildId::new(1300863845429936139));
 
@@ -349,7 +349,7 @@ mod tests {
 
   #[test]
   fn test_privacy_macro() {
-    let profile = TrackingProfile::default().streak_privacy(Privacy::Private);
+    let profile = TrackingProfile::default().with_streak_privacy(Privacy::Private);
     assert!(privacy!(Privacy::Private));
     assert!(!(privacy!(Some(Privacy::Public), profile.streak.privacy)));
     assert!(privacy!(None, profile.streak.privacy));
