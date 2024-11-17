@@ -29,7 +29,7 @@ impl OpenAIHandler {
   ///
   /// # Errors
   /// Returns an error if more than one embedding was generated.
-  pub async fn create_embedding(&self, input: String, user: UserId) -> Result<Vec<f32>> {
+  pub async fn create_embedding(&self, input: &str, user: UserId) -> Result<Vec<f32>> {
     let request = CreateEmbeddingRequestArgs::default()
       .model("text-embedding-ada-002")
       .input(input)

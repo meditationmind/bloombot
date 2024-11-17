@@ -51,7 +51,7 @@ async fn add(
         .data()
         .embeddings
         .create_embedding(
-          format!("{term_name} {}", term_data.meaning),
+          format!("{term_name} {}", term_data.meaning).as_str(),
           ctx.author().id,
         )
         .await?,
@@ -128,7 +128,7 @@ async fn edit(
           .data()
           .embeddings
           .create_embedding(
-            format!("{} {}", term_name, term_data.meaning),
+            format!("{} {}", term_name, term_data.meaning).as_str(),
             ctx.author().id,
           )
           .await?,
@@ -243,7 +243,7 @@ async fn update_embeddings(ctx: Context<'_>) -> Result<()> {
         .data()
         .embeddings
         .create_embedding(
-          format!("{} {}", term.name, existing_term.meaning),
+          format!("{} {}", term.name, existing_term.meaning).as_str(),
           ctx.author().id,
         )
         .await?,
