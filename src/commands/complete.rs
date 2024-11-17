@@ -26,82 +26,82 @@ pub async fn complete(
   let Some(course) =
     DatabaseHandler::get_course_in_dm(&mut transaction, course_name.as_str()).await?
   else {
-    ctx
-      .say(format!(
-        "{} Course not found. Please contact server staff for assistance.",
-        EMOJI.mminfo
-      ))
-      .await?;
+    let msg = format!(
+      "{} Course not found. Please contact server staff for assistance.",
+      EMOJI.mminfo
+    );
+    ctx.say(msg).await?;
     return Ok(());
   };
 
   let guild_id = course.guild_id;
+  let participant_role = course.participant_role;
+  let graduate_role = course.graduate_role;
 
   if guild_id.to_guild_cached(&ctx).is_none() {
-    ctx
-      .say(format!(
-        "{} Can't retrieve server information. Please contact server staff for assistance.",
-        EMOJI.mminfo
-      ))
-      .await?;
+    let msg = format!(
+      "{} Can't retrieve server information. Please contact server staff for assistance.",
+      EMOJI.mminfo
+    );
+    ctx.say(msg).await?;
     return Ok(());
   }
 
   let Ok(member) = guild_id.member(ctx, ctx.author().id).await else {
-    ctx
-      .say(format!(
-        "{} You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.",
-        EMOJI.mminfo
-      ))
-      .await?;
+    let msg = format!(
+      "{} You don't appear to be a member of the server. If I'm mistaken, please contact server staff for assistance.",
+      EMOJI.mminfo
+    );
+    ctx.say(msg).await?;
     return Ok(());
   };
 
   if !member
     .user
-    .has_role(ctx, guild_id, course.participant_role)
+    .has_role(ctx, guild_id, participant_role)
     .await?
   {
-    ctx
-      .say(format!(
-        "{} You are not in the course: **{course_name}**.",
-        EMOJI.mminfo
-      ))
-      .await?;
+    let msg = format!(
+      "{} You are not enrolled in the course: **{course_name}**.",
+      EMOJI.mminfo
+    );
+    ctx.say(msg).await?;
     return Ok(());
   }
 
-  if member
-    .user
-    .has_role(ctx, guild_id, course.graduate_role)
-    .await?
-  {
-    ctx
-      .say(format!(
-        "{} You have already claimed the graduate role for course: **{course_name}**.",
-        EMOJI.mminfo
-      ))
-      .await?;
+  if member.user.has_role(ctx, guild_id, graduate_role).await? {
+    let msg = format!(
+      "{} You have already claimed the graduate role for course: **{course_name}**.",
+      EMOJI.mminfo
+    );
+    ctx.say(msg).await?;
     return Ok(());
   }
 
-  member.add_role(ctx, course.graduate_role).await?;
-  member.remove_role(ctx, course.participant_role).await?;
+  if member.add_role(ctx, graduate_role).await.is_err() {
+    let msg = format!(
+      "{} An error occurred while attempting to add the graduate role. Please contact server staff for assistance.",
+      EMOJI.mminfo
+    );
+    ctx.say(msg).await?;
+    return Ok(());
+  };
 
-  ctx
-    .say(format!(
-      ":tada: Congrats! You are now a graduate of the course: **{course_name}**!"
-    ))
-    .await?;
+  if let Ok(()) = member.remove_role(ctx, participant_role).await {
+    let msg = format!(":tada: Congrats! You are now a graduate of the course: **{course_name}**!");
+    ctx.say(msg).await?;
+  } else {
+    let msg = format!(
+      ":tada: Congrats! You are now a graduate of the course: **{course_name}**!\n\n{} An error occurred while attempting to remove the participant role. Please contact server staff to have it manually removed. Your graduate role is unaffected.",
+      EMOJI.mminfo
+    );
+    ctx.say(msg).await?;
+  };
 
-  // Log completion in staff logs
+  // Log completion in staff logs.
   let log_embed = BloomBotEmbed::new()
     .title("New Course Graduate")
-    .description(format!(
-      "**User**: <@{}>\n**Course**: {}",
-      member.user.id, course_name
-    ))
-    .clone();
+    .description(format!("**User**: {member}\n**Course**: {course_name}"));
 
   let log_channel = ChannelId::new(CHANNELS.logs);
 
