@@ -1,5 +1,5 @@
-use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::Role;
+use anyhow::{anyhow, Context as AnyhowContext, Result};
+use poise::serenity_prelude::{GuildId, Role};
 use poise::CreateReply;
 
 use crate::commands::helpers::common::Visibility;
@@ -47,6 +47,7 @@ async fn add(
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+
   if DatabaseHandler::course_exists(&mut transaction, &guild_id, course_name.as_str()).await? {
     ctx
       .say(format!("{} Course already exists.", EMOJI.mminfo))
@@ -54,73 +55,9 @@ async fn add(
     return Ok(());
   }
 
-  // Verify that the roles are in the guild
-  if !participant_role.guild_id.eq(&guild_id) {
-    ctx
-      .say(format!(
-        "{} The participant role must be in the same guild as the command.",
-        EMOJI.mminfo
-      ))
-      .await?;
-    return Ok(());
-  }
-  if !graduate_role.guild_id.eq(&guild_id) {
-    ctx
-      .say(format!(
-        "{} The graduate role must be in the same guild as the command.",
-        EMOJI.mminfo
-      ))
-      .await?;
-    return Ok(());
-  }
-
-  // Verify that the roles are not managed by an integration
-  if participant_role.managed {
-    ctx
-      .say(format!(
-        "{} The participant role must not be a bot role.",
-        EMOJI.mminfo
-      ))
-      .await?;
-    return Ok(());
-  }
-  if graduate_role.managed {
-    ctx
-      .say(format!(
-        "{} The graduate role must not be a bot role.",
-        EMOJI.mminfo
-      ))
-      .await?;
-    return Ok(());
-  }
-
-  // Verify that the roles are not privileged
-  if participant_role.permissions.administrator() {
-    ctx
-      .say(format!(
-        "{} The participant role must not be an administrator role.",
-        EMOJI.mminfo
-      ))
-      .await?;
-    return Ok(());
-  }
-  if graduate_role.permissions.administrator() {
-    ctx
-      .say(format!(
-        "{} The graduate role must not be an administrator role.",
-        EMOJI.mminfo
-      ))
-      .await?;
-    return Ok(());
-  }
-
-  if participant_role == graduate_role {
-    ctx
-      .say(format!(
-        "{} The participant role and the graduate role must not be the same.",
-        EMOJI.mminfo
-      ))
-      .await?;
+  if let Err(e) = check_eligibility(guild_id, &participant_role, &graduate_role) {
+    let msg = format!("{} {e}", EMOJI.mminfo);
+    ctx.say(msg).await?;
     return Ok(());
   }
 
@@ -151,113 +88,55 @@ async fn edit(
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  if participant_role.is_none() && graduate_role.is_none() {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(format!("{} No changes were provided.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
-      .await?;
-    return Ok(());
-  }
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-  let course =
-    DatabaseHandler::get_course(&mut transaction, &guild_id, course_name.as_str()).await?;
-
-  // Verify that the course exists
-  if course.is_none() {
-    courses::course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
-    return Ok(());
-  }
-
-  let course = course.with_context(|| "Failed to assign CourseData to course")?;
-
-  let participant_role = match participant_role {
-    Some(participant_role) => {
-      if !participant_role.guild_id.eq(&guild_id) {
-        ctx
-          .say(format!(
-            "{} The participant role must be in the same guild as the command.",
-            EMOJI.mminfo
-          ))
-          .await?;
-        return Ok(());
-      }
-      if participant_role.managed {
-        ctx
-          .say(format!(
-            "{} The participant role must not be a bot role.",
-            EMOJI.mminfo
-          ))
-          .await?;
-        return Ok(());
-      }
-      if participant_role.permissions.administrator() {
-        ctx
-          .say(format!(
-            "{} The participant role must not be an administrator role.",
-            EMOJI.mminfo
-          ))
-          .await?;
-        return Ok(());
-      }
-      participant_role.id
-    }
-    None => course.participant_role,
-  };
-
-  let graduate_role = match graduate_role {
-    Some(graduate_role) => {
-      if !graduate_role.guild_id.eq(&guild_id) {
-        ctx
-          .say(format!(
-            "{} The graduate role must be in the same guild as the command.",
-            EMOJI.mminfo
-          ))
-          .await?;
-        return Ok(());
-      }
-      if graduate_role.managed {
-        ctx
-          .say(format!(
-            "{} The graduate role must not be a bot role.",
-            EMOJI.mminfo
-          ))
-          .await?;
-        return Ok(());
-      }
-      if graduate_role.permissions.administrator() {
-        ctx
-          .say(format!(
-            "{} The graduate role must not be an administrator role.",
-            EMOJI.mminfo
-          ))
-          .await?;
-        return Ok(());
-      }
-      graduate_role.id
-    }
-    None => course.graduate_role,
-  };
-
-  // Verify that the roles are not the same
-  if participant_role == graduate_role {
+  if participant_role.is_none() && graduate_role.is_none() {
+    let msg = format!("{} No changes were provided.", EMOJI.mminfo);
     ctx
-      .say(format!(
-        "{} The participant role and the graduate role must not be the same.",
-        EMOJI.mminfo
-      ))
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Ok(());
   }
 
-  let course = Course::new(course_name, participant_role, graduate_role, guild_id);
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+
+  let Some(course) =
+    DatabaseHandler::get_course(&mut transaction, &guild_id, course_name.as_str()).await?
+  else {
+    courses::course_not_found(ctx, &mut transaction, guild_id, course_name).await?;
+    return Ok(());
+  };
+
+  let no_changes = (participant_role.is_none()
+    || participant_role
+      .as_ref()
+      .is_some_and(|role| role.id == course.participant_role))
+    && (graduate_role.is_none()
+      || graduate_role
+        .as_ref()
+        .is_some_and(|role| role.id == course.graduate_role));
+
+  if no_changes {
+    let msg = format!("{} No changes were provided.", EMOJI.mminfo);
+    ctx
+      .send(CreateReply::default().content(msg).ephemeral(true))
+      .await?;
+    return Ok(());
+  }
+
+  let participant_role =
+    participant_role.unwrap_or(guild_id.role(ctx, course.participant_role).await?);
+  let graduate_role = graduate_role.unwrap_or(guild_id.role(ctx, course.graduate_role).await?);
+
+  if let Err(e) = check_eligibility(guild_id, &participant_role, &graduate_role) {
+    let msg = format!("{} {e}", EMOJI.mminfo);
+    ctx.say(msg).await?;
+    return Ok(());
+  }
+
+  let course = Course::new(course_name, participant_role.id, graduate_role.id, guild_id);
 
   DatabaseHandler::update_course(&mut transaction, &course).await?;
 
@@ -331,4 +210,44 @@ async fn remove(
   .await?;
 
   Ok(())
+}
+
+fn check_eligibility(
+  guild_id: GuildId,
+  participant_role: &Role,
+  graduate_role: &Role,
+) -> Result<bool> {
+  // Verify that the roles are in the guild.
+  if participant_role.guild_id.ne(&guild_id) {
+    return Err(anyhow!(
+      "Participant role must belong to the same guild as the command."
+    ));
+  }
+  if graduate_role.guild_id.ne(&guild_id) {
+    return Err(anyhow!(
+      "Graduate role must belong to the same guild as the command."
+    ));
+  }
+  // Verify that the roles are not managed by an integration.
+  if participant_role.managed {
+    return Err(anyhow!("Participant role cannot be a bot role."));
+  }
+  if graduate_role.managed {
+    return Err(anyhow!("Graduate role cannot be a bot role."));
+  }
+  // Verify that the roles are not privileged.
+  if participant_role.permissions.administrator() {
+    return Err(anyhow!("Participant role cannot be an administrator role."));
+  }
+  if graduate_role.permissions.administrator() {
+    return Err(anyhow!("Graduate role cannot be an administrator role."));
+  }
+  // Verify that roles do not match.
+  if participant_role == graduate_role {
+    return Err(anyhow!(
+      "Participant and graduate roles must not be the same."
+    ));
+  }
+
+  Ok(true)
 }
