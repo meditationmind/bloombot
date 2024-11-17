@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context, Result};
 use poise::ChoiceParameter;
 
 #[derive(ChoiceParameter)]
@@ -138,10 +139,10 @@ pub fn offset_from_choice(
   minus_offset: Option<MinusOffsetChoice>,
   plus_offset: Option<PlusOffsetChoice>,
   default: i16,
-) -> Result<i16, String> {
+) -> Result<i16> {
   match (minus_offset, plus_offset) {
     (None, None) => Ok(default),
-    (Some(_), Some(_)) => Err(String::from(
+    (Some(_), Some(_)) => Err(anyhow!(
       "Cannot have both minus and plus offsets. Please try again with only one offset.",
     )),
     (Some(minus_offset), None) => Ok(match minus_offset {
@@ -189,6 +190,61 @@ pub fn offset_from_choice(
       PlusOffsetChoice::UTCPlus14 => 840,
     }),
   }
+}
+
+pub fn name_from_offset(offset: i16) -> Result<String> {
+  let name = match offset {
+    -720 => MinusOffsetChoice::UTCMinus12.name(),
+    -660 => MinusOffsetChoice::UTCMinus11.name(),
+    -600 => MinusOffsetChoice::UTCMinus10.name(),
+    -570 => MinusOffsetChoice::UTCMinus9_30.name(),
+    -540 => MinusOffsetChoice::UTCMinus9.name(),
+    -480 => MinusOffsetChoice::UTCMinus8.name(),
+    -420 => MinusOffsetChoice::UTCMinus7.name(),
+    -360 => MinusOffsetChoice::UTCMinus6.name(),
+    -300 => MinusOffsetChoice::UTCMinus5.name(),
+    -270 => MinusOffsetChoice::UTCMinus4_30.name(),
+    -240 => MinusOffsetChoice::UTCMinus4.name(),
+    -210 => MinusOffsetChoice::UTCMinus3_30.name(),
+    -180 => MinusOffsetChoice::UTCMinus3.name(),
+    -150 => MinusOffsetChoice::UTCMinus2_30.name(),
+    -120 => MinusOffsetChoice::UTCMinus2.name(),
+    -60 => MinusOffsetChoice::UTCMinus1.name(),
+    0 => "UTC",
+    60 => PlusOffsetChoice::UTCPlus1.name(),
+    120 => PlusOffsetChoice::UTCPlus2.name(),
+    180 => PlusOffsetChoice::UTCPlus3.name(),
+    210 => PlusOffsetChoice::UTCPlus3_30.name(),
+    240 => PlusOffsetChoice::UTCPlus4.name(),
+    270 => PlusOffsetChoice::UTCPlus4_30.name(),
+    300 => PlusOffsetChoice::UTCPlus5.name(),
+    330 => PlusOffsetChoice::UTCPlus5_30.name(),
+    345 => PlusOffsetChoice::UTCPlus5_45.name(),
+    360 => PlusOffsetChoice::UTCPlus6.name(),
+    390 => PlusOffsetChoice::UTCPlus6_30.name(),
+    420 => PlusOffsetChoice::UTCPlus7.name(),
+    480 => PlusOffsetChoice::UTCPlus8.name(),
+    525 => PlusOffsetChoice::UTCPlus8_45.name(),
+    540 => PlusOffsetChoice::UTCPlus9.name(),
+    570 => PlusOffsetChoice::UTCPlus9_30.name(),
+    600 => PlusOffsetChoice::UTCPlus10.name(),
+    630 => PlusOffsetChoice::UTCPlus10_30.name(),
+    660 => PlusOffsetChoice::UTCPlus11.name(),
+    720 => PlusOffsetChoice::UTCPlus12.name(),
+    765 => PlusOffsetChoice::UTCPlus12_45.name(),
+    780 => PlusOffsetChoice::UTCPlus13.name(),
+    825 => PlusOffsetChoice::UTCPlus13_45.name(),
+    840 => PlusOffsetChoice::UTCPlus14.name(),
+    _ => return Err(anyhow!("Attempt to match invalid offset")),
+  };
+
+  let offset_name = name
+    .split_whitespace()
+    .next()
+    .with_context(|| "Failed to split offset name")?
+    .to_string();
+
+  Ok(offset_name)
 }
 
 #[derive(ChoiceParameter)]
@@ -245,7 +301,7 @@ mod tests {
       panic!("Expected Err, got Ok");
     };
     assert_eq!(
-      err,
+      err.to_string(),
       "Cannot have both minus and plus offsets. Please try again with only one offset."
     );
   }
