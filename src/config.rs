@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter, Result, Write};
 use poise::serenity_prelude::{CreateEmbed, Embed, GuildId, RoleId};
 
 pub const MEDITATION_MIND: GuildId = GuildId::new(244917432383176705);
+pub const SECRET_CATEGORY: &str = "Secret";
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
 pub const MIN_STARS: u64 = 5;
 
