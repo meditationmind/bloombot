@@ -2,7 +2,7 @@ use anyhow::Result;
 use poise::serenity_prelude::{builder::*, AutoArchiveDuration, ChannelId, ChannelType};
 use poise::CreateReply;
 
-use crate::config::{BloomBotEmbed, CHANNELS};
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::Context;
 
 /// Submit an anonymous server suggestion
@@ -28,8 +28,7 @@ pub async fn suggest(
     .footer(CreateEmbedFooter::new(format!(
       "Author ID: {}",
       &ctx.author().id
-    )))
-    .clone();
+    )));
 
   let log_channel = ChannelId::new(CHANNELS.logs);
 
@@ -70,14 +69,12 @@ pub async fn suggest(
     )
     .await?;
 
+  let msg = format!(
+    "{} Your suggestion has been added to <#{channel_id}>.",
+    EMOJI.mminfo
+  );
   ctx
-    .send(
-      CreateReply::default()
-        .content(format!(
-          "Your suggestion has been added to <#{channel_id}>."
-        ))
-        .ephemeral(true),
-    )
+    .send(CreateReply::default().content(msg).ephemeral(true))
     .await?;
 
   Ok(())

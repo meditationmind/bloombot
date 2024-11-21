@@ -163,8 +163,8 @@ impl PageRow for Quote {
   fn body(&self) -> String {
     format!(
       "{}\n― {}",
-      self.quote.clone(),
-      self.author.clone().unwrap_or("Anonymous".to_owned())
+      self.quote,
+      self.author.as_deref().unwrap_or("Anonymous")
     )
   }
 }

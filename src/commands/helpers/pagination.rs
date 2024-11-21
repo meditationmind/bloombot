@@ -101,11 +101,11 @@ impl<'a> Paginator<'a> {
   pub fn create_page_embed(&self, page: usize, page_type: PageType) -> CreateEmbed {
     match self.get_page(page) {
       Some(page) if page.is_empty() => BloomBotEmbed::new()
-        .title(self.title.clone())
+        .title(self.title.as_str())
         .description("No entries have been added yet."),
       Some(page) => page.to_embed(self.title.as_str(), page_type),
       None => BloomBotEmbed::new()
-        .title(self.title.clone())
+        .title(self.title.as_str())
         .description("This page does not exist."),
     }
   }

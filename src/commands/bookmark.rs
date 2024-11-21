@@ -185,7 +185,7 @@ async fn remove(
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
 
-  let bookmark_id = id.to_ascii_uppercase().clone();
+  let bookmark_id = id.to_ascii_uppercase();
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 

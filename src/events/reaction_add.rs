@@ -37,18 +37,18 @@ async fn check_report(ctx: &Context, reaction: &Reaction) -> Result<()> {
 
       let report_channel_id = ChannelId::new(CHANNELS.reportchannel);
       let message = reaction.message(&ctx).await?;
-      let message_link = message.link().clone();
+      let message_link = message.link();
       let message_user = message.author;
       let message_channel_name = message.channel_id.name(ctx).await?;
       let reporting_user = reaction.user(&ctx).await?;
 
       let message_content = if message.content.is_empty() {
         match message.attachments.first() {
-          Some(attachment) => format!("**Attachment**\n{}", attachment.url.clone()),
-          None => message.content.clone(),
+          Some(attachment) => format!("**Attachment**\n{}", attachment.url),
+          None => message.content,
         }
       } else {
-        message.content.clone()
+        message.content
       };
 
       report_channel_id

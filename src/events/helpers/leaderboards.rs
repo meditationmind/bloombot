@@ -159,7 +159,7 @@ pub async fn process_stats(
         let name = user
           .nick_in(&ctx, guild_id)
           .await
-          .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
+          .unwrap_or_else(|| user.global_name.unwrap_or(user.name));
         name
           .chars()
           .filter(|c| {

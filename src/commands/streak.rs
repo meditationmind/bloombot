@@ -55,7 +55,7 @@ pub async fn streak(
   let user_nick_or_name = user
     .nick_in(&ctx, guild_id)
     .await
-    .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
+    .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).to_owned());
 
   let staff = ctx.author().has_role(&ctx, guild_id, ROLES.staff).await?;
 

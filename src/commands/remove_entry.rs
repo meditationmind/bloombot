@@ -98,8 +98,7 @@ pub async fn remove_entry(
         ctx.author().id
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-    )
-    .clone();
+    );
 
   let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 

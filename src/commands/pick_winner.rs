@@ -84,10 +84,10 @@ async fn finalize_winner(
   let notif_msg = CreateMessage::new()
     .embed(notification_embed)
     .components(vec![CreateActionRow::Buttons(vec![
-      CreateButton::new(redeem_id.clone())
+      CreateButton::new(redeem_id.as_str())
         .label("Redeem")
         .style(ButtonStyle::Success),
-      CreateButton::new(cancel_id.clone())
+      CreateButton::new(cancel_id.as_str())
         .label("Cancel")
         .style(ButtonStyle::Danger),
     ])]);

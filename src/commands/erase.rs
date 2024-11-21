@@ -409,7 +409,7 @@ async fn list(
     let user_nick_or_name = user
       .nick_in(&ctx, guild_id)
       .await
-      .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
+      .unwrap_or_else(|| user.global_name.unwrap_or(user.name));
     format!("Erases for {user_nick_or_name}")
   };
 
@@ -528,19 +528,19 @@ async fn erase_and_log(
     .description(format!("**Reason**: {reason}"));
 
   if let Some(attachment) = message.attachments.first() {
-    log_embed = log_embed.field("Attachment", attachment.url.clone(), false);
-    dm_embed = dm_embed.field("Attachment", attachment.url.clone(), false);
+    log_embed = log_embed.field("Attachment", attachment.url.as_str(), false);
+    dm_embed = dm_embed.field("Attachment", attachment.url.as_str(), false);
   }
 
   if !message.content.is_empty() {
     // If longer than 1018 characters (1024 max - 6 for backticks), truncate to 1015 (-3 for "...").
     let content = if message.content.len() > 1018 {
-      format!(
+      &format!(
         "{}...",
         message.content.chars().take(1015).collect::<String>()
       )
     } else {
-      message.content.clone()
+      &message.content
     };
 
     log_embed = log_embed.field("Message Content", format!("```{content}```"), false);
@@ -618,7 +618,7 @@ async fn notify_user(ctx: Context<'_>, message: &Message, dm_embed: CreateEmbed)
       .edit_thread(ctx, EditThread::new().invitable(false).locked(true))
       .await?;
 
-    let mut thread_embed = dm_embed.clone();
+    let mut thread_embed = dm_embed;
 
     thread_embed = thread_embed.footer(CreateEmbedFooter::new(
       "If you have any questions or concerns regarding this action, please contact staff via ModMail.",

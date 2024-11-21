@@ -204,10 +204,10 @@ async fn large_add(
         ))
         .ephemeral(privacy)
         .components(vec![CreateActionRow::Buttons(vec![
-          CreateButton::new(confirm_id.clone())
+          CreateButton::new(confirm_id.as_str())
             .label("Yes")
             .style(ButtonStyle::Success),
-          CreateButton::new(cancel_id.clone())
+          CreateButton::new(cancel_id.as_str())
             .label("No")
             .style(ButtonStyle::Danger),
         ])]),
@@ -314,8 +314,7 @@ async fn large_add(
         ctx.author().id
       ))
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-    )
-    .clone();
+    );
 
   let log_channel = ChannelId::new(CHANNELS.bloomlogs);
 

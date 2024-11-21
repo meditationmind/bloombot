@@ -19,7 +19,7 @@ async fn create_star_message(
 
   let starred_message = reaction.message(&ctx).await?;
   let author_nick_or_name = match reaction.guild_id {
-    Some(guild_id) => starred_message
+    Some(guild_id) => &starred_message
       .author
       .nick_in(&ctx, guild_id)
       .await
@@ -27,11 +27,11 @@ async fn create_star_message(
         starred_message
           .author
           .global_name
-          .as_ref()
+          .as_deref()
           .unwrap_or(&starred_message.author.name)
-          .clone()
+          .to_string()
       }),
-    None => starred_message.author.name.clone(),
+    None => &starred_message.author.name,
   };
 
   let message_type = if starred_message
@@ -44,10 +44,13 @@ async fn create_star_message(
   };
 
   let mut embed = match starred_message.embeds.first() {
-    // If the starred message is embed-only, clone the embed.
+    // If the starred message is embed-only, just clone the embed.
     Some(embed) if starred_message.content.is_empty() => BloomBotEmbed::from(embed.clone()),
     // If there is user-created content, prioritize the content.
-    _ => BloomBotEmbed::new().description(starred_message.content.clone()),
+    Some(embed) => BloomBotEmbed::from(embed.clone())
+      .title("")
+      .description(&starred_message.content),
+    None => BloomBotEmbed::new().description(&starred_message.content),
   };
 
   embed = embed
@@ -67,7 +70,7 @@ async fn create_star_message(
 
   if let Some(sticker) = starred_message.sticker_items.first() {
     if let Some(sticker_url) = sticker.image_url() {
-      embed = embed.image(sticker_url.clone());
+      embed = embed.image(sticker_url);
     }
   }
 
@@ -95,7 +98,7 @@ async fn create_star_message(
           if image_count > 3 {
             break;
           }
-          embed = embed.image(attachment.url.clone());
+          embed = embed.image(attachment.url.as_str());
           msg = msg.add_embed(embed.clone());
           image_count += 1;
         }
@@ -110,7 +113,7 @@ async fn create_star_message(
         .as_ref()
         .is_some_and(|content_type| content_type.starts_with("image")) =>
     {
-      embed = embed.image(attachment.url.clone());
+      embed = embed.image(attachment.url.as_str());
 
       starboard_channel
         .send_message(ctx, CreateMessage::new().embed(embed))

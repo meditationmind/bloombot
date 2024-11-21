@@ -96,10 +96,13 @@ async fn user(
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   let user = user.as_ref().unwrap_or_else(|| ctx.author());
-  let user_nick_or_name = user
-    .nick_in(&ctx, guild_id)
-    .await
-    .unwrap_or_else(|| user.global_name.as_ref().unwrap_or(&user.name).clone());
+  let user_nick_or_name = user.nick_in(&ctx, guild_id).await.unwrap_or_else(|| {
+    user
+      .global_name
+      .as_deref()
+      .unwrap_or(user.name.as_str())
+      .to_string()
+  });
 
   let tracking_profile =
     DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user.id)
