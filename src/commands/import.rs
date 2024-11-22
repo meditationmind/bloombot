@@ -241,7 +241,7 @@ pub async fn import(
 
   tracking::post_guild_hours(&ctx, &guild_time_in_hours).await?;
 
-  if let Some(member) = if user_id == ctx.author().id {
+  if let Some(member) = if user_id == ctx.author().id && ctx.guild_id().is_some() {
     ctx.author_member().await
   } else {
     guild_id.member(ctx, user_id).await.ok().map(Cow::Owned)
