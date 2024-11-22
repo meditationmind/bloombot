@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use log::info;
 use pgvector::Vector;
@@ -7,6 +9,7 @@ use sqlx::{Postgres, Transaction};
 
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
+use crate::commands::helpers::terms;
 use crate::config::EMOJI;
 use crate::data::term::{Term, TermModal};
 use crate::database::DatabaseHandler;
@@ -62,17 +65,17 @@ async fn add(
     let term = Term::from_modal(guild_id, term_name, term_data, Some(vector));
 
     if let Err(e) = DatabaseHandler::add_term(&mut transaction, &term).await {
+      let msg = format!("{} Failed to add term. Please try again.", EMOJI.mmx);
       ctx
-        .send(
-          CreateReply::default()
-            .content(format!(
-              "{} Failed to add term. Please try again.",
-              EMOJI.mmx
-            ))
-            .ephemeral(true),
-        )
+        .send(CreateReply::default().content(msg).ephemeral(true))
         .await?;
       return Err(anyhow!("Failed to add term: {e}"));
+    }
+
+    // Update the term name list used for autocomplete.
+    if let Ok(term_list) = DatabaseHandler::get_term_list(&mut transaction, &guild_id).await {
+      let term_names = Arc::clone(&ctx.data().term_names);
+      tokio::spawn(terms::update_names(term_list, term_names));
     }
 
     database::commit_and_say(
@@ -138,15 +141,9 @@ async fn edit(
     let term = Term::from_modal(guild_id, term_name, term_data, vector);
 
     if let Err(e) = DatabaseHandler::update_term(&mut transaction, &term).await {
+      let msg = format!("{} Failed to edit term. Please try again.", EMOJI.mmx);
       ctx
-        .send(
-          CreateReply::default()
-            .content(format!(
-              "{} Failed to edit term. Please try again.",
-              EMOJI.mmx
-            ))
-            .ephemeral(true),
-        )
+        .send(CreateReply::default().content(msg).ephemeral(true))
         .await?;
       return Err(anyhow!("Failed to edit term: {e}"));
     }
@@ -179,12 +176,9 @@ async fn remove(
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   if !DatabaseHandler::term_exists(&mut transaction, &guild_id, term_name.as_str()).await? {
+    let msg = format!("{} Term does not exist.", EMOJI.mminfo);
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!("{} Term does not exist.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Ok(());
   }
@@ -192,17 +186,17 @@ async fn remove(
   if let Err(e) =
     DatabaseHandler::remove_term(&mut transaction, &guild_id, term_name.as_str()).await
   {
+    let msg = format!("{} Failed to remove term. Please try again.", EMOJI.mmx);
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} Failed to remove term. Please try again.",
-            EMOJI.mmx
-          ))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Err(anyhow!("Failed to remove term: {e}"));
+  }
+
+  // Update the term name list used for autocomplete.
+  if let Ok(term_list) = DatabaseHandler::get_term_list(&mut transaction, &guild_id).await {
+    let term_names = Arc::clone(&ctx.data().term_names);
+    tokio::spawn(terms::update_names(term_list, term_names));
   }
 
   database::commit_and_say(
@@ -285,39 +279,30 @@ async fn term_not_found(
     DatabaseHandler::get_possible_terms(transaction, &guild_id, term_name.as_str(), 0.8).await?;
 
   if possible_terms.len() > 1 {
+    let msg = format!(
+      "{} Term does not exist. Did you mean one of these?\n{}",
+      EMOJI.mminfo,
+      possible_terms
+        .iter()
+        .map(|term| format!("`{}`", term.name))
+        .collect::<Vec<String>>()
+        .join("\n")
+    );
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} Term does not exist. Did you mean one of these?\n{}",
-            EMOJI.mminfo,
-            possible_terms
-              .iter()
-              .map(|term| format!("`{}`", term.name))
-              .collect::<Vec<String>>()
-              .join("\n")
-          ))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
   } else if let Some(possible_term) = possible_terms.first() {
+    let msg = format!(
+      "{} Term does not exist. Did you mean `{}`?",
+      EMOJI.mminfo, possible_term.name
+    );
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} Term does not exist. Did you mean `{}`?",
-            EMOJI.mminfo, possible_term.name
-          ))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
   } else {
+    let msg = format!("{} Term does not exist.", EMOJI.mminfo);
     ctx
-      .send(
-        CreateReply::default()
-          .content(format!("{} Term does not exist.", EMOJI.mminfo))
-          .ephemeral(true),
-      )
+      .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
   }
 

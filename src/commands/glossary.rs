@@ -6,6 +6,7 @@ use pgvector::Vector;
 use poise::serenity_prelude::{builder::*, ChannelId, ComponentInteractionCollector};
 use poise::CreateReply;
 
+use crate::commands::helpers::terms;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::data::term::Term;
 use crate::database::DatabaseHandler;
@@ -195,7 +196,9 @@ async fn list(
 #[poise::command(slash_command)]
 async fn info(
   ctx: Context<'_>,
-  #[description = "The term to show information about"] term: String,
+  #[description = "The term to show information about"]
+  #[autocomplete = "terms::autocomplete"]
+  term: String,
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()

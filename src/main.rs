@@ -5,11 +5,12 @@
 extern crate sqlx;
 
 use std::env;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use anyhow::{anyhow, Context as ErrorContext, Error, Result};
-use config::EMOJI;
+use config::{EMOJI, MEDITATION_MIND};
+use data::term::Term;
 use dotenvy::dotenv;
 use log::{error, info};
 use poise::serenity_prelude::{ActivityData, Channel, Client, GatewayIntents, GuildId};
@@ -42,6 +43,7 @@ pub struct Data {
   pub rng: Arc<Mutex<SmallRng>>,
   pub embeddings: Arc<OpenAIHandler>,
   pub bloom_start_time: Instant,
+  pub term_names: Arc<RwLock<Vec<String>>>,
 }
 pub type Context<'a> = PoiseContext<'a, Data, Error>;
 
@@ -116,11 +118,24 @@ async fn main() -> Result<()> {
           info!("Registering commands globally");
           builtins::register_globally(ctx, &framework.options().commands).await?;
         }
+        let db = Arc::new(DatabaseHandler::new().await?);
+        let term_names = if let Ok(mut transaction) = db.start_transaction_with_retry(5).await {
+          DatabaseHandler::get_term_list(&mut transaction, &MEDITATION_MIND)
+            .await
+            .unwrap_or_else(|_| vec![Term::default()])
+            .iter()
+            .map(|term| term.name.to_string())
+            .rev()
+            .collect::<Vec<String>>()
+        } else {
+          vec![String::new()]
+        };
         Ok(Data {
-          db: Arc::new(DatabaseHandler::new().await?),
+          db,
           rng: Arc::new(Mutex::new(SmallRng::from_entropy())),
           embeddings: Arc::new(OpenAIHandler::new()?),
           bloom_start_time: Instant::now(),
+          term_names: Arc::new(RwLock::new(term_names)),
         })
       })
     })

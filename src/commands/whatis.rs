@@ -5,6 +5,7 @@ use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::CreateEmbedFooter;
 use poise::CreateReply;
 
+use crate::commands::helpers::terms;
 use crate::config::BloomBotEmbed;
 use crate::data::term::Term;
 use crate::database::DatabaseHandler;
@@ -16,7 +17,9 @@ use crate::Context;
 #[poise::command(slash_command, category = "Informational", guild_only)]
 pub async fn whatis(
   ctx: Context<'_>,
-  #[description = "The term to show information about"] term: String,
+  #[description = "The term to show information about"]
+  #[autocomplete = "terms::autocomplete"]
+  term: String,
 ) -> Result<()> {
   let guild_id = ctx
     .guild_id()
