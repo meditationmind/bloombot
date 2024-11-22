@@ -205,7 +205,7 @@ async fn info(
 
   if let Some(term) = DatabaseHandler::get_term(&mut transaction, &guild_id, term.as_str()).await? {
     ctx
-      .send(CreateReply::default().embed(term_embed(term)))
+      .send(CreateReply::default().embed(term_embed(&term)))
       .await?;
     return Ok(());
   }
@@ -368,90 +368,57 @@ async fn suggest(
   Ok(())
 }
 
-fn term_embed(term: Term) -> CreateEmbed {
+fn term_embed(term: &Term) -> CreateEmbed {
   let mut embed = BloomBotEmbed::new()
-    .title(term.name)
-    .description(term.meaning);
-  if let Some(usage) = term.usage {
+    .title(&term.name)
+    .description(&term.meaning);
+  if let Some(usage) = &term.usage {
     embed = embed.field("Example of Usage:", usage, false);
   }
-  if let Some(links) = term.links {
-    embed = embed.field(
-      "Related Resources:",
-      links
-        .iter()
-        .enumerate()
-        .fold(String::new(), |mut field, (count, link)| {
-          let _ = writeln!(field, "{count}. {link}");
-          field
-        }),
-      false,
-    );
-  }
-  if let Some(aliases) = term.aliases {
-    embed = embed.field(
-      "Aliases:",
-      {
-        let alias_count = aliases.len();
-        aliases
+  if let Some(links) = &term.links {
+    if !links.is_empty() {
+      embed = embed.field(
+        "Related Resources:",
+        links
           .iter()
           .enumerate()
-          .fold(String::new(), |mut field, (i, alias)| {
-            let _ = write!(field, "{alias}");
-            if i < (alias_count - 1) {
-              let _ = write!(field, ", ");
-            }
+          .fold(String::new(), |mut field, (count, link)| {
+            let _ = writeln!(field, "{count}. {link}");
             field
-          })
-      },
-      false,
-    );
+          }),
+        false,
+      );
+    }
   }
-  if let Some(category) = term.category {
+  if let Some(aliases) = &term.aliases {
+    if !aliases.is_empty() {
+      embed = embed.field(
+        "Aliases:",
+        {
+          let alias_count = aliases.len();
+          aliases
+            .iter()
+            .enumerate()
+            .fold(String::new(), |mut field, (i, alias)| {
+              let _ = write!(field, "{alias}");
+              if i < (alias_count - 1) {
+                let _ = write!(field, ", ");
+              }
+              field
+            })
+        },
+        false,
+      );
+    }
+  }
+  if let Some(category) = &term.category {
     embed = embed.footer(CreateEmbedFooter::new(format!("Categories: {category}")));
   }
   embed
 }
 
 fn possible_term_embed(term_name: &str, possible_term: &Term) -> CreateEmbed {
-  let mut embed = BloomBotEmbed::new()
-    .title(&possible_term.name)
-    .description(&possible_term.meaning);
-  if let Some(usage) = &possible_term.usage {
-    embed = embed.field("Example of Usage:", usage, false);
-  }
-  if let Some(links) = &possible_term.links {
-    embed = embed.field(
-      "Related Resources:",
-      links
-        .iter()
-        .enumerate()
-        .fold(String::new(), |mut field, (count, link)| {
-          let _ = writeln!(field, "{count}. {link}");
-          field
-        }),
-      false,
-    );
-  }
-  if let Some(aliases) = &possible_term.aliases {
-    embed = embed.field(
-      "Aliases:",
-      {
-        let alias_count = aliases.len();
-        aliases
-          .iter()
-          .enumerate()
-          .fold(String::new(), |mut field, (i, alias)| {
-            let _ = write!(field, "{alias}");
-            if i < (alias_count - 1) {
-              let _ = write!(field, ", ");
-            }
-            field
-          })
-      },
-      false,
-    );
-  }
+  let mut embed = term_embed(possible_term);
   if let Some(category) = &possible_term.category {
     embed = embed.footer(CreateEmbedFooter::new(format!(
       "Categories: {}\n\n*You searched for '{}'. The closest term available was '{}'.",
