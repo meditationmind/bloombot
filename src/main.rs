@@ -248,8 +248,8 @@ async fn event_handler(ctx: &SerenityContext, event: &Event, data: &Data) -> Res
   let database = &data.db;
 
   match event {
-    Event::GuildCreate { guild, .. } => {
-      events::guild_create(ctx, database, &guild.id).await?;
+    Event::GuildCreate { .. } => {
+      events::guild_create(database).await?;
     }
     Event::GuildMemberRemoval { user, .. } => {
       events::guild_member_removal(ctx, user).await?;

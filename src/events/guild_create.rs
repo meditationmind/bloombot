@@ -1,23 +1,11 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use poise::serenity_prelude::{Context, GuildId};
 
 use crate::database::DatabaseHandler;
-use crate::events::helpers::{chart_stats, leaderboards};
+use crate::events::helpers::chart_stats;
 
-pub async fn guild_create(
-  ctx: &Context,
-  database: &Arc<DatabaseHandler>,
-  guild_id: &GuildId,
-) -> Result<()> {
-  tokio::spawn(leaderboards::update(
-    "bloombot",
-    ctx.http.clone(),
-    database.clone(),
-    *guild_id,
-  ));
-
+pub async fn guild_create(database: &Arc<DatabaseHandler>) -> Result<()> {
   tokio::spawn(chart_stats::update("bloombot", database.clone()));
   Ok(())
 }
