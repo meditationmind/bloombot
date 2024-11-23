@@ -41,9 +41,22 @@ pub async fn update_names(term_list: Vec<Term>, term_names: Arc<RwLock<Vec<Strin
     }
   };
 
-  *term_names = term_list
+  let mut names = term_list
     .iter()
     .map(|term| term.name.to_string())
     .rev()
     .collect::<Vec<String>>();
+  let mut aliases = vec![];
+  for term in term_list {
+    if let Some(term_aliases) = term.aliases {
+      if !term_aliases.is_empty() {
+        for alias in term_aliases {
+          aliases.push(alias);
+        }
+      }
+    }
+  }
+  names.append(&mut aliases);
+  names.sort_by_key(|name| name.to_lowercase());
+  *term_names = names;
 }

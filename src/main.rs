@@ -120,13 +120,27 @@ async fn main() -> Result<()> {
         }
         let db = Arc::new(DatabaseHandler::new().await?);
         let term_names = if let Ok(mut transaction) = db.start_transaction_with_retry(5).await {
-          DatabaseHandler::get_term_list(&mut transaction, &MEDITATION_MIND)
+          let terms = DatabaseHandler::get_term_list(&mut transaction, &MEDITATION_MIND)
             .await
-            .unwrap_or_else(|_| vec![Term::default()])
+            .unwrap_or_else(|_| vec![Term::default()]);
+          let mut names = terms
             .iter()
             .map(|term| term.name.to_string())
             .rev()
-            .collect::<Vec<String>>()
+            .collect::<Vec<String>>();
+          let mut aliases = vec![];
+          for term in terms {
+            if let Some(term_aliases) = term.aliases {
+              if !term_aliases.is_empty() {
+                for alias in term_aliases {
+                  aliases.push(alias);
+                }
+              }
+            }
+          }
+          names.append(&mut aliases);
+          names.sort_by_key(|name| name.to_lowercase());
+          names
         } else {
           vec![String::new()]
         };
