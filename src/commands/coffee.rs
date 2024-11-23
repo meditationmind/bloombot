@@ -3,7 +3,10 @@ use std::sync::Arc;
 use anyhow::Result;
 use rand::Rng;
 
-use crate::Context;
+use crate::{config::EMOJI, Context};
+
+const BABYCOMEBACK: u64 = 762_671_692_430_180_363;
+const TEACUPS: u64 = 1_085_468_454_578_044_979;
 
 /// Are you feeling lucky?
 ///
@@ -17,10 +20,16 @@ pub async fn coffee(ctx: Context<'_>) -> Result<()> {
   let rng = Arc::clone(&data.rng);
   let mut rng = rng.lock().await;
 
+  let (one, two) = match ctx.author().id.get() {
+    BABYCOMEBACK => ("☕", &*EMOJI.derpman.to_string()),
+    TEACUPS => ("🍵", "⚰️"),
+    _ => ("☕", "⚰️"),
+  };
+
   if rng.gen() {
-    ctx.say("☕").await?;
+    ctx.say(one).await?;
   } else {
-    ctx.say("⚰️").await?;
+    ctx.say(two).await?;
   }
 
   Ok(())

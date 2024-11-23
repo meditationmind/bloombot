@@ -104,6 +104,7 @@ pub struct BloomEmoji<'a> {
   pub mminfo: SimpleEmoji<'a>,
   pub mmx: SimpleEmoji<'a>,
   pub mmcheck: SimpleEmoji<'a>,
+  pub derpman: SimpleEmoji<'a>,
 }
 
 pub const EMOJI: BloomEmoji = BloomEmoji {
@@ -136,6 +137,11 @@ pub const EMOJI: BloomEmoji = BloomEmoji {
     animated: false,
     id: 1279517233877483601,
     name: "mmcheck",
+  },
+  derpman: SimpleEmoji {
+    animated: false,
+    id: 1309907402958700615,
+    name: "derpman",
   },
 };
 
