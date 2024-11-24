@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use poise::serenity_prelude::builder::*;
 use poise::{Command, Context as PoiseContext, ContextMenuCommandAction, CreateReply};
 
-use crate::config::{ROLES, SECRET_CATEGORY};
+use crate::config::{EMOJI, ROLES, SECRET_CATEGORY};
 use crate::Context;
 
 struct Help<'a> {
@@ -15,6 +15,8 @@ struct Help<'a> {
   ephemeral: bool,
   /// Whether to include context menu commands.
   show_context_menu_commands: bool,
+  /// Whether the user should be able to see all commands.
+  elevated_permissions: bool,
   /// Optionally specify a secret category to exclude from help.
   secret_category: &'a str,
 }
@@ -29,41 +31,42 @@ pub async fn help(
   #[autocomplete = "autocomplete_command"]
   command: Option<String>,
 ) -> Result<()> {
-  // Determine who should see all available commands.
-  let staff = match ctx.guild_id() {
+  let is_staff = match ctx.guild_id() {
     Some(guild_id) => ctx.author().has_role(ctx, guild_id, ROLES.staff).await?,
     None => false,
   };
-
   let footer_text = "For more info about a command or its subcommands, use: /help command";
-  let help = Help::with_config(footer_text, true, true, SECRET_CATEGORY);
+  let help = Help::new(footer_text, true, true, is_staff, SECRET_CATEGORY);
 
   match command {
-    Some(command) => help.single_command(ctx, command.as_str(), staff).await,
-    None => help.all_commands(ctx, staff).await,
+    Some(command) => help.single_command(ctx, command.as_str()).await,
+    None => help.all_commands(ctx).await,
   }
 }
 
 impl<'a> Help<'a> {
-  fn with_config(
+  /// Initializes the help menu configuration.
+  fn new(
     footer_text: &'a str,
     ephemeral: bool,
     show_context_menu_commands: bool,
+    elevated_permissions: bool,
     secret_category: &'a str,
   ) -> Self {
     Self {
       footer_text,
       ephemeral,
       show_context_menu_commands,
+      elevated_permissions,
       secret_category,
     }
   }
 
+  /// Displays the help menu for a single command and any subcommands it may have.
   async fn single_command<U, E>(
     &self,
     ctx: PoiseContext<'_, U, E>,
     command_name: &str,
-    elevated_permissions: bool,
   ) -> Result<()> {
     let command = ctx.framework().options().commands.iter().find(|command| {
       command.name.eq_ignore_ascii_case(command_name)
@@ -73,7 +76,7 @@ impl<'a> Help<'a> {
           .is_some_and(|name| name.eq_ignore_ascii_case(command_name))
     });
 
-    let command_not_found = format!("Command not found: `{command_name}`");
+    let command_not_found = format!("{} Command not found: `{command_name}`", EMOJI.mminfo);
 
     let Some(command) = command else {
       ctx
@@ -86,13 +89,16 @@ impl<'a> Help<'a> {
       return Ok(());
     };
 
-    if command
+    let is_secret = command
       .category
       .as_ref()
-      .is_some_and(|category| category == self.secret_category)
-      || (command.context_menu_action.is_some() && !self.show_context_menu_commands)
-      || (!elevated_permissions && !command.required_permissions.is_empty())
-    {
+      .is_some_and(|category| category == self.secret_category);
+    let missing_permissions =
+      !self.elevated_permissions && !command.required_permissions.is_empty();
+    let is_context_menu_command = command.context_menu_action.is_some();
+    let disabled_context_menu_command = is_context_menu_command && !self.show_context_menu_commands;
+
+    if is_secret || missing_permissions || disabled_context_menu_command {
       ctx
         .send(
           CreateReply::default()
@@ -103,7 +109,7 @@ impl<'a> Help<'a> {
       return Ok(());
     }
 
-    let (prefix, command_name) = if command.context_menu_action.is_some() {
+    let (prefix, command_name) = if is_context_menu_command {
       (
         String::new(),
         command
@@ -122,27 +128,23 @@ impl<'a> Help<'a> {
         .unwrap_or("No help available"),
     );
 
-    let mut subcommands = IndexMap::<&String, String>::new();
+    let mut subcommands = IndexMap::<&String, &str>::new();
 
     let help_text = if command.subcommands.is_empty() {
       help_text
     } else {
       for subcmd in &command.subcommands {
-        let subcmd_help = match subcmd.help_text.as_deref() {
-          Some(f) => f.to_owned(),
-          None => subcmd
-            .description
-            .as_deref()
-            .unwrap_or("No help available")
-            .to_owned(),
-        };
+        let subcmd_help = subcmd
+          .help_text
+          .as_deref()
+          .unwrap_or(subcmd.description.as_deref().unwrap_or("No help available"));
         subcommands.insert(&subcmd.name, subcmd_help);
       }
       &format!("{help_text}\n\nSubcommands:")
     };
 
     let fields = subcommands.into_iter().map(|(subcommand_name, help_text)| {
-      let field_name = format!("{prefix}{} {subcommand_name}", command.name);
+      let field_name = format!("{prefix}{command_name} {subcommand_name}");
       let field_text = format!("```{help_text}```");
       (field_name, field_text, false)
     });
@@ -163,21 +165,19 @@ impl<'a> Help<'a> {
     Ok(())
   }
 
-  async fn all_commands<U, E>(
-    &self,
-    ctx: PoiseContext<'_, U, E>,
-    elevated_permissions: bool,
-  ) -> Result<()> {
+  /// Displays the help menu for all commands.
+  async fn all_commands<U, E>(&self, ctx: PoiseContext<'_, U, E>) -> Result<()> {
     let mut categories = IndexMap::<Option<&str>, Vec<&Command<U, E>>>::new();
     for cmd in &ctx.framework().options().commands {
-      if !elevated_permissions && !cmd.required_permissions.is_empty()
-        || cmd.context_menu_action.is_some()
-        || cmd
-          .category
-          .as_ref()
-          .is_some_and(|category| category == self.secret_category)
-        || ctx.guild_id().is_none() && cmd.guild_only
-      {
+      let missing_permissions = !self.elevated_permissions && !cmd.required_permissions.is_empty();
+      let is_context_menu_command = cmd.context_menu_action.is_some();
+      let not_usable_here = ctx.guild_id().is_none() && cmd.guild_only;
+      let is_secret = cmd
+        .category
+        .as_ref()
+        .is_some_and(|category| category == self.secret_category);
+
+      if missing_permissions || is_context_menu_command || is_secret || not_usable_here {
         continue;
       }
       categories
@@ -211,13 +211,19 @@ impl<'a> Help<'a> {
         (category_name.unwrap_or("Other"), category_content, false)
       });
 
+    let mut embed = CreateEmbed::new()
+      .fields(fields)
+      .footer(CreateEmbedFooter::new(self.footer_text));
+
     if self.show_context_menu_commands {
       let mut context_categories = IndexMap::<Option<&str>, Vec<&Command<U, E>>>::new();
       for cmd in &ctx.framework().options().commands {
-        if cmd.context_menu_action.is_none()
-          || cmd.hide_in_help
-          || (ctx.guild_id().is_none() && cmd.guild_only)
-        {
+        let not_context_menu_command = cmd.context_menu_action.is_none();
+        let missing_permissions =
+          !self.elevated_permissions && !cmd.required_permissions.is_empty();
+        let not_usable_here = ctx.guild_id().is_none() && cmd.guild_only;
+
+        if not_context_menu_command || cmd.hide_in_help || missing_permissions || not_usable_here {
           continue;
         }
         context_categories
@@ -250,30 +256,14 @@ impl<'a> Help<'a> {
       category_content += "```";
 
       if category_content != "``````" {
-        ctx
-          .send(
-            CreateReply::default()
-              .embed(
-                CreateEmbed::new()
-                  .fields(fields)
-                  .field("Context Menu Commands", category_content, false)
-                  .footer(CreateEmbedFooter::new(self.footer_text)),
-              )
-              .ephemeral(self.ephemeral),
-          )
-          .await?;
-        return Ok(());
-      };
+        embed = embed.field("Context Menu Commands", category_content, false);
+      }
     }
 
     ctx
       .send(
         CreateReply::default()
-          .embed(
-            CreateEmbed::new()
-              .fields(fields)
-              .footer(CreateEmbedFooter::new(self.footer_text)),
-          )
+          .embed(embed)
           .ephemeral(self.ephemeral),
       )
       .await?;
@@ -301,14 +291,19 @@ pub async fn autocomplete_command<'a>(
     .commands
     .iter()
     .filter(move |cmd| {
-      (cmd.required_permissions.is_empty() || is_staff)
-        && cmd.context_menu_action.is_none()
-        && cmd
-          .category
-          .as_ref()
-          .is_some_and(|category| category != SECRET_CATEGORY)
-        && ((ctx.guild_id().is_some() && cmd.guild_only)
-          || (ctx.guild_id().is_none() && !cmd.guild_only))
+      let has_permissions = cmd.required_permissions.is_empty() || is_staff;
+      let not_secret = cmd
+        .category
+        .as_ref()
+        .is_some_and(|category| category != SECRET_CATEGORY);
+      let is_usable_here = (ctx.guild_id().is_some() && cmd.guild_only)
+        || (ctx.guild_id().is_none() && !cmd.guild_only);
+      let not_context_menu_command = cmd.context_menu_action.is_none();
+
+      has_permissions
+        && not_secret
+        && is_usable_here
+        && not_context_menu_command
         && cmd.name.starts_with(partial)
     })
     .take(25)
