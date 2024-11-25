@@ -50,16 +50,8 @@ pub struct ByInterval {
 }
 
 pub struct User {
-  pub all_minutes: i64,
-  pub all_count: u64,
-  pub timeframe_stats: Timeframe,
+  pub sessions: Timeframe,
   pub streak: Streak,
-}
-
-pub struct Guild {
-  pub all_minutes: i64,
-  pub all_count: u64,
-  pub timeframe_stats: Timeframe,
 }
 
 impl Streak {
@@ -340,36 +332,7 @@ impl ByInterval {
 }
 
 impl User {
-  pub fn new(
-    total_minutes: i64,
-    total_sessions: u64,
-    timeframe_stats: Timeframe,
-    streak: Streak,
-  ) -> Self {
-    Self {
-      all_minutes: total_minutes,
-      all_count: total_sessions,
-      timeframe_stats,
-      streak,
-    }
-  }
-
-  pub fn challenge_stats(sum_and_count: Timeframe, streak: Streak) -> Self {
-    Self {
-      all_minutes: 0,
-      all_count: 0,
-      timeframe_stats: sum_and_count,
-      streak,
-    }
-  }
-}
-
-impl Guild {
-  pub fn new(total_minutes: i64, total_sessions: u64, timeframe_stats: Timeframe) -> Self {
-    Self {
-      all_minutes: total_minutes,
-      all_count: total_sessions,
-      timeframe_stats,
-    }
+  pub fn new(sessions: Timeframe, streak: Streak) -> Self {
+    Self { sessions, streak }
   }
 }

@@ -300,6 +300,7 @@ async fn stats(
     )),
   };
 
+  let count = stats.sessions.count.unwrap_or(0);
   let mut embed = BloomBotEmbed::new()
     .title(title)
     .author(CreateEmbedAuthor::new(member_nick_or_name).icon_url(member.user.face()))
@@ -314,9 +315,8 @@ async fn stats(
     .field(
       "Sessions",
       format!(
-        "```yml\nChallenge Total: {}\nAverage Per Day: {:.2}```",
-        stats.timeframe_stats.count.unwrap_or(0),
-        ((stats.timeframe_stats.count.unwrap_or(0) as f64 / s.days as f64) * 100.0).round() / 100.0
+        "```yml\nChallenge Total: {count}\nAverage Per Day: {:.2}```",
+        ((count as f64 / s.days as f64) * 100.0).round() / 100.0
       ),
       false,
     )
@@ -371,7 +371,7 @@ fn process_stats(stats: &User, timeframe: &ChallengeTimeframe) -> Result<Process
     }
   };
 
-  let total_time = stats.timeframe_stats.sum.unwrap_or(0) as f64;
+  let total_time = stats.sessions.sum.unwrap_or(0) as f64;
   let total_hrs = (total_time.trunc() / 60.0).trunc();
   let total_min = (total_time.trunc() / 60.0).fract() * 60.0;
   let total_sec = total_time.fract() * 60.0;
@@ -392,7 +392,7 @@ fn process_stats(stats: &User, timeframe: &ChallengeTimeframe) -> Result<Process
     String::new()
   };
 
-  let avg_time = stats.timeframe_stats.sum.unwrap_or(0) as f64 / days as f64;
+  let avg_time = total_time / days as f64;
   let avg_hrs = (avg_time.trunc() / 60.0).trunc();
   let avg_min = (avg_time.trunc() / 60.0).fract() * 60.0;
   let avg_sec = avg_time.fract() * 60.0;

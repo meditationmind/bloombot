@@ -128,52 +128,17 @@ async fn user(
     return Ok(());
   }
 
+  let offset = tracking_profile.utc_offset;
+  let theme = theme.unwrap_or(Theme::DarkMode);
   let chart_style = style.unwrap_or(ChartStyle::Bar);
   let stats_type = stats_type.unwrap_or(StatsType::MeditationMinutes);
   let timeframe = timeframe.unwrap_or(Timeframe::Daily);
-
   let timeframe_header = match timeframe {
     Timeframe::Yearly => "Years",
     Timeframe::Monthly => "Months",
     Timeframe::Weekly => "Weeks",
     Timeframe::Daily => "Days",
   };
-
-  let stats =
-    DatabaseHandler::get_user_stats(&mut transaction, &guild_id, &user.id, &timeframe).await?;
-
-  let mut embed = BloomBotEmbed::new()
-    .title(format!("Stats for {user_nick_or_name}"))
-    .author(CreateEmbedAuthor::new(format!("{user_nick_or_name}'s Stats")).icon_url(user.face()));
-
-  match stats_type {
-    StatsType::MeditationMinutes => {
-      embed = embed
-        .field(
-          "All-Time Meditation Minutes",
-          format!("```{}```", stats.all_minutes),
-          true,
-        )
-        .field(
-          format!("Minutes The Past 12 {timeframe_header}"),
-          format!("```{}```", stats.timeframe_stats.sum.unwrap_or(0)),
-          true,
-        );
-    }
-    StatsType::MeditationCount => {
-      embed = embed
-        .field(
-          "All-Time Session Count",
-          format!("```{}```", stats.all_count),
-          true,
-        )
-        .field(
-          format!("Sessions The Past 12 {timeframe_header}"),
-          format!("```{}```", stats.timeframe_stats.count.unwrap_or(0)),
-          true,
-        );
-    }
-  }
 
   // Role-based bar color for donators; default otherwise.
   let donator = user.has_role(&ctx, guild_id, ROLES.patreon).await?
@@ -198,8 +163,7 @@ async fn user(
     (color.r(), color.g(), color.b(), 255)
   };
 
-  let theme = theme.unwrap_or(Theme::DarkMode);
-  let offset = tracking_profile.utc_offset;
+  let stats = DatabaseHandler::get_user_stats(&mut transaction, &guild_id, &user.id).await?;
 
   let chart_stats = DatabaseHandler::get_user_chart_stats(
     &mut transaction,
@@ -210,9 +174,51 @@ async fn user(
   )
   .await?;
 
+  let total_minutes = stats.sessions.sum.unwrap_or(0);
+  let total_count = stats.sessions.count.unwrap_or(0);
+  let timeframe_sum = chart_stats
+    .iter()
+    .fold(0, |total, session| total + session.sum.unwrap_or(0));
+  let timeframe_count = chart_stats
+    .iter()
+    .fold(0, |total, session| total + session.count.unwrap_or(0));
+
+  let mut embed = BloomBotEmbed::new()
+    .title(format!("Stats for {user_nick_or_name}"))
+    .author(CreateEmbedAuthor::new(format!("{user_nick_or_name}'s Stats")).icon_url(user.face()));
+
+  match stats_type {
+    StatsType::MeditationMinutes => {
+      embed = embed
+        .field(
+          "All-Time Meditation Minutes",
+          format!("```{total_minutes}```"),
+          true,
+        )
+        .field(
+          format!("Minutes The Past 12 {timeframe_header}"),
+          format!("```{timeframe_sum}```"),
+          true,
+        );
+    }
+    StatsType::MeditationCount => {
+      embed = embed
+        .field(
+          "All-Time Session Count",
+          format!("```{total_count}```"),
+          true,
+        )
+        .field(
+          format!("Sessions The Past 12 {timeframe_header}"),
+          format!("```{timeframe_count}```"),
+          true,
+        );
+    }
+  }
+
   let (average, label) = match stats_type {
-    StatsType::MeditationMinutes => (stats.timeframe_stats.sum.unwrap_or(0) / 12, "minutes"),
-    StatsType::MeditationCount => (stats.timeframe_stats.count.unwrap_or(0) / 12, "sessions"),
+    StatsType::MeditationMinutes => (timeframe_sum / 12, "minutes"),
+    StatsType::MeditationCount => (timeframe_count / 12, "sessions"),
   };
 
   // Hide streak in footer if streaks disabled.
@@ -295,8 +301,22 @@ async fn server(
     Timeframe::Daily => "Days",
   };
 
+  let bar_color = StatsOptions::default().bar_color;
+  let theme = theme.unwrap_or(Theme::DarkMode);
+
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-  let stats = DatabaseHandler::get_guild_stats(&mut transaction, &guild_id, &timeframe).await?;
+  let stats = DatabaseHandler::get_guild_stats(&mut transaction, &guild_id).await?;
+  let chart_stats =
+    DatabaseHandler::get_guild_chart_stats(&mut transaction, &guild_id, &timeframe).await?;
+
+  let total_minutes = stats.sum.unwrap_or(0);
+  let total_count = stats.count.unwrap_or(0);
+  let timeframe_sum = chart_stats
+    .iter()
+    .fold(0, |total, session| total + session.sum.unwrap_or(0));
+  let timeframe_count = chart_stats
+    .iter()
+    .fold(0, |total, session| total + session.count.unwrap_or(0));
 
   let mut embed = BloomBotEmbed::new()
     .title(format!("Stats for {guild_name}"))
@@ -307,12 +327,12 @@ async fn server(
       embed = embed
         .field(
           "All-Time Meditation Minutes",
-          format!("```{}```", stats.all_minutes),
+          format!("```{total_minutes}```"),
           true,
         )
         .field(
           format!("Minutes The Past 12 {timeframe_header}"),
-          format!("```{}```", stats.timeframe_stats.sum.unwrap_or(0)),
+          format!("```{timeframe_sum}```"),
           true,
         );
     }
@@ -320,22 +340,17 @@ async fn server(
       embed = embed
         .field(
           "All-Time Session Count",
-          format!("```{}```", stats.all_count),
+          format!("```{total_count}```"),
           true,
         )
         .field(
           format!("Sessions The Past 12 {timeframe_header}"),
-          format!("```{}```", stats.timeframe_stats.count.unwrap_or(0)),
+          format!("```{timeframe_count}```"),
           true,
         );
     }
   }
 
-  let bar_color = StatsOptions::default().bar_color;
-  let theme = theme.unwrap_or(Theme::DarkMode);
-
-  let chart_stats =
-    DatabaseHandler::get_guild_chart_stats(&mut transaction, &guild_id, &timeframe).await?;
   let options = StatsOptions::new(timeframe, 0, stats_type, chart_style, bar_color, theme);
   let chart = Chart::new().await?;
   let chart = chart.stats(&chart_stats, &options).await?;

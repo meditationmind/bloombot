@@ -3,8 +3,8 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Datelike, Duration as ChronoDuration, DurationRound, Months};
-use chrono::{TimeDelta, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration as ChronoDuration};
+use chrono::{Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use pgvector::Vector;
@@ -26,7 +26,7 @@ use crate::data::pick_winner;
 use crate::data::quote::Quote;
 use crate::data::star_message::StarMessage;
 use crate::data::stats::{ByInterval, Streak, Timeframe as TimeframeStats, User};
-use crate::data::stats::{Guild, LeaderboardUser, MeditationCountByDay};
+use crate::data::stats::{LeaderboardUser, MeditationCountByDay};
 use crate::data::steam_key::{Recipient, SteamKey};
 use crate::data::term::{Term, VectorSearch};
 use crate::data::tracking_profile::TrackingProfile;
@@ -1153,11 +1153,10 @@ impl DatabaseHandler {
       TimeframeStats::user_sum_and_count(*guild_id, *user_id, &start_time, &end_time)
         .fetch_one(&mut **transaction)
         .await?;
-
     let streak = DatabaseHandler::get_streak(transaction, guild_id, user_id).await?;
-    let user_stats = User::challenge_stats(sum_and_count, streak);
+    let challenge_stats = User::new(sum_and_count, streak);
 
-    Ok(user_stats)
+    Ok(challenge_stats)
   }
 
   pub async fn get_leaderboard_stats(
@@ -1178,51 +1177,12 @@ impl DatabaseHandler {
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
     user_id: &UserId,
-    timeframe: &Timeframe,
   ) -> Result<User> {
-    // Get total count, total sum, and count/sum for timeframe.
-    // If the user has set a custom time zone, we use that for our timeframe.
-    // Otherwise, we default to UTC.
-    let user_offset = DatabaseHandler::get_tracking_profile(transaction, guild_id, user_id)
-      .await?
-      .map_or(0, |profile| profile.utc_offset);
-    let end_time = Utc::now() + ChronoDuration::minutes(user_offset.into());
-    let end_trunc = end_time.duration_trunc(TimeDelta::days(1))?;
-    let start_time = match timeframe {
-      Timeframe::Daily => end_trunc - ChronoDuration::days(11),
-      Timeframe::Weekly => {
-        let target_week = end_trunc - ChronoDuration::weeks(11);
-        target_week - TimeDelta::days(target_week.weekday().number_from_monday().into())
-      }
-      Timeframe::Monthly => end_trunc
-        .checked_sub_months(Months::new(11))
-        .with_context(|| "Failed to subtract 11 months")?
-        .with_day(1)
-        .with_context(|| "Failed to set day to 1")?,
-      Timeframe::Yearly => end_trunc
-        .checked_sub_months(Months::new(12 * 11))
-        .with_context(|| "Failed to subtract 11 years")?
-        .with_month(1)
-        .with_context(|| "Failed to set month to 1")?
-        .with_day(1)
-        .with_context(|| "Failed to set day to 1")?,
-    };
-
-    let total_data = TimeframeStats::user_total_sum_and_count(*guild_id, *user_id)
+    let sessions = TimeframeStats::user_total_sum_and_count(*guild_id, *user_id)
       .fetch_one(&mut **transaction)
       .await?;
-
-    let timeframe_data =
-      TimeframeStats::user_sum_and_count(*guild_id, *user_id, &start_time, &end_time)
-        .fetch_one(&mut **transaction)
-        .await?;
-
-    let user_stats = User::new(
-      total_data.sum.unwrap_or(0),
-      total_data.count.unwrap_or(0).try_into()?,
-      timeframe_data,
-      DatabaseHandler::get_streak(transaction, guild_id, user_id).await?,
-    );
+    let streak = DatabaseHandler::get_streak(transaction, guild_id, user_id).await?;
+    let user_stats = User::new(sessions, streak);
 
     Ok(user_stats)
   }
@@ -1230,45 +1190,10 @@ impl DatabaseHandler {
   pub async fn get_guild_stats(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
-    timeframe: &Timeframe,
-  ) -> Result<Guild> {
-    // Get total count, total sum, and count/sum for timeframe.
-    // We use UTC for our timeframe, since it is the bot default.
-    let end_time = Utc::now();
-    let end_trunc = end_time.duration_trunc(TimeDelta::days(1))?;
-    let start_time = match timeframe {
-      Timeframe::Daily => end_trunc - ChronoDuration::days(11),
-      Timeframe::Weekly => {
-        let target_week = end_trunc - ChronoDuration::weeks(11);
-        target_week - TimeDelta::days(target_week.weekday().number_from_monday().into())
-      }
-      Timeframe::Monthly => end_trunc
-        .checked_sub_months(Months::new(11))
-        .with_context(|| "Failed to subtract 11 months")?
-        .with_day(1)
-        .with_context(|| "Failed to set day to 1")?,
-      Timeframe::Yearly => end_trunc
-        .checked_sub_months(Months::new(12 * 11))
-        .with_context(|| "Failed to subtract 11 years")?
-        .with_month(1)
-        .with_context(|| "Failed to set month to 1")?
-        .with_day(1)
-        .with_context(|| "Failed to set day to 1")?,
-    };
-
-    let total_data = TimeframeStats::guild_total_sum_and_count(*guild_id)
+  ) -> Result<TimeframeStats> {
+    let guild_stats = TimeframeStats::guild_total_sum_and_count(*guild_id)
       .fetch_one(&mut **transaction)
       .await?;
-
-    let timeframe_data = TimeframeStats::guild_sum_and_count(*guild_id, &start_time, &end_time)
-      .fetch_one(&mut **transaction)
-      .await?;
-
-    let guild_stats = Guild::new(
-      total_data.sum.unwrap_or(0),
-      total_data.count.unwrap_or(0).try_into()?,
-      timeframe_data,
-    );
 
     Ok(guild_stats)
   }
