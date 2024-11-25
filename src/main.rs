@@ -23,9 +23,9 @@ use tokio::sync::Mutex;
 
 use crate::commands::{
   add, add_bookmark, bookmark, challenge, coffee, community_sit, complete, course, courses,
-  customize, erase, erase_message, extract_text, glossary, hello, help, import, keys, manage,
-  pick_winner, ping, quote, quotes, recent, remove_entry, report_message, stats, streak, suggest,
-  terms, uptime, whatis,
+  customize, erase, erase_message, extract, extract_text, glossary, hello, help, import, keys,
+  manage, pick_winner, ping, quote, quotes, recent, remove_entry, report_message, stats, streak,
+  suggest, terms, uptime, whatis,
 };
 use crate::database::DatabaseHandler;
 use crate::embeddings::OpenAIHandler;
@@ -71,6 +71,7 @@ async fn main() -> Result<()> {
         courses(),
         pick_winner(),
         erase(),
+        extract(),
         manage(),
         quotes(),
         terms(),
