@@ -9,7 +9,7 @@ use poise::CreateReply;
 use crate::config::EMOJI;
 use crate::Context;
 
-/// Extract body text from an AutoMod report or embedded message
+/// Extract text from an AutoMod report or embed
 ///
 /// Extracts body text from an AutoMod report or embedded message, making it possible to copy and paste on mobile.
 ///
@@ -40,6 +40,9 @@ pub async fn extract_text(
   Ok(())
 }
 
+/// Commands for extracting message text
+///
+/// Commands for extracting body text from messages, making it possible to copy and paste on mobile.
 #[poise::command(
   ephemeral,
   slash_command,
@@ -54,6 +57,9 @@ pub async fn extract(_: Context<'_>) -> Result<()> {
   Ok(())
 }
 
+/// Extract body text from AutoMod reports
+///
+/// Cycles through AutoMod reports and extracts the body text for each report, making it possible to copy and paste on mobile.
 #[poise::command(slash_command)]
 async fn automod(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
@@ -115,7 +121,10 @@ async fn automod(ctx: Context<'_>) -> Result<()> {
               .await?;
             continue 'stream;
           } else if stop {
-            break 'stream;
+            initial_response
+              .edit(ctx, CreateReply::default().components(vec![]))
+              .await?;
+            return Ok(());
           }
         }
       }
