@@ -60,9 +60,8 @@ pub async fn extract(_: Context<'_>) -> Result<()> {
 /// Extract body text from AutoMod reports
 ///
 /// Cycles through AutoMod reports and extracts the body text for each report, making it possible to copy and paste on mobile.
-#[poise::command(slash_command)]
+#[poise::command(slash_command, ephemeral)]
 async fn automod(ctx: Context<'_>) -> Result<()> {
-  ctx.defer_ephemeral().await?;
   let initial_response = ctx
     .send(CreateReply::default().content("Fetching AutoMod messages..."))
     .await?;
@@ -121,12 +120,13 @@ async fn automod(ctx: Context<'_>) -> Result<()> {
               .await?;
             continue 'stream;
           } else if stop {
-            initial_response
-              .edit(ctx, CreateReply::default().components(vec![]))
-              .await?;
-            return Ok(());
+            break;
           }
         }
+        initial_response
+          .edit(ctx, CreateReply::default().components(vec![]))
+          .await?;
+        return Ok(());
       }
     }
   }
