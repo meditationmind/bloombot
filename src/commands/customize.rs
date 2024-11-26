@@ -1,6 +1,6 @@
 use anyhow::{Context as AnyhowContext, Result};
-use log::error;
 use poise::{serenity_prelude::builder::*, ChoiceParameter, CreateReply};
+use tracing::error;
 
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};

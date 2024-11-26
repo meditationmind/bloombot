@@ -1,9 +1,9 @@
 use anyhow::Result;
-use log::error;
 use poise::serenity_prelude::{ChannelId, CreateAllowedMentions, CreateMessage, GuildId};
 use poise::serenity_prelude::{Member, Mentionable, UserId};
 use poise::CreateReply;
 use sqlx::{Postgres, Transaction};
+use tracing::error;
 
 use crate::config::{StreakRoles, TimeSumRoles, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;

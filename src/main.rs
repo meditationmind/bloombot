@@ -12,7 +12,6 @@ use anyhow::{anyhow, Context as ErrorContext, Error, Result};
 use config::{EMOJI, MEDITATION_MIND};
 use data::term::Term;
 use dotenvy::dotenv;
-use log::{error, info};
 use poise::serenity_prelude::{ActivityData, Channel, Client, GatewayIntents, GuildId};
 use poise::serenity_prelude::{Context as SerenityContext, FullEvent as Event};
 use poise::Context as PoiseContext;
@@ -20,6 +19,7 @@ use poise::{builtins, CreateReply, Framework, FrameworkError, FrameworkOptions};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use tokio::sync::Mutex;
+use tracing::{error, info};
 
 use crate::commands::{
   add, add_bookmark, bookmark, challenge, coffee, community_sit, complete, course, courses,
@@ -51,7 +51,7 @@ pub type Context<'a> = PoiseContext<'a, Data, Error>;
 async fn main() -> Result<()> {
   dotenv().ok();
 
-  pretty_env_logger::init();
+  tracing_subscriber::fmt::init();
 
   let token =
     env::var("DISCORD_TOKEN").with_context(|| "Missing DISCORD_TOKEN environment variable")?;

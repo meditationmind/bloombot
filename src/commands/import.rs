@@ -2,10 +2,10 @@ use std::borrow::Cow;
 
 use anyhow::{anyhow, Result};
 use csv::ReaderBuilder;
-use log::info;
 use poise::serenity_prelude::{builder::*, ChannelId, Message, RoleId, User};
 use poise::{ChoiceParameter, CreateReply};
 use tokio::{fs, fs::File, io::AsyncWriteExt};
+use tracing::info;
 use ulid::Ulid;
 
 use crate::commands::helpers::common::Visibility;

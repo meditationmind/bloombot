@@ -6,7 +6,6 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration};
 use chrono::{Timelike, Utc};
 use futures::{stream::Stream, StreamExt, TryStreamExt};
-use log::{info, warn};
 use pgvector::Vector;
 use poise::serenity_prelude::{GuildId, MessageId, UserId};
 use sqlx::pool::PoolConnection;
@@ -14,6 +13,7 @@ use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
 use sqlx::{Error as SqlxError, FromRow, PgPool, Postgres, Transaction};
 use tokio::time;
+use tracing::{info, warn};
 
 use crate::commands::helpers::time::{ChallengeTimeframe, Timeframe};
 use crate::commands::stats::{LeaderboardType, SortBy};

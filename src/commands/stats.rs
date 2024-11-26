@@ -1,9 +1,9 @@
 #![allow(clippy::unused_async)]
 
 use anyhow::{Context as AnyhowContext, Result};
-use log::info;
 use poise::serenity_prelude::{builder::*, Colour, User};
 use poise::{ChoiceParameter, CreateReply};
+use tracing::info;
 
 use crate::charts::{Chart, LeaderboardOptions, StatsOptions};
 use crate::commands::helpers::time::Timeframe;

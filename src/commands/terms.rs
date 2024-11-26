@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context as AnyhowContext, Result};
-use log::info;
 use pgvector::Vector;
 use poise::serenity_prelude::GuildId;
 use poise::{ApplicationContext, Context as PoiseContext, CreateReply, Modal};
 use sqlx::{Postgres, Transaction};
+use tracing::info;
 
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};

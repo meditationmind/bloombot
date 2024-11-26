@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, RwLock};
 
-use log::info;
+use tracing::info;
 
 use crate::data::term::Term;
 use crate::Context;
