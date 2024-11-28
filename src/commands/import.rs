@@ -239,7 +239,7 @@ pub async fn import(
     )
     .await?;
 
-  tracking::post_guild_hours(&ctx, &guild_time_in_hours).await?;
+  tracking::post_guild_hours(&ctx, guild_time_in_hours).await?;
 
   if let Some(member) = if user_id == ctx.author().id && ctx.guild_id().is_some() {
     ctx.author_member().await

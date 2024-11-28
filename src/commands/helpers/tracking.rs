@@ -31,7 +31,7 @@ pub async fn get_guild_hours(
 /// the value returned by [`get_guild_hours`] as a trigger to announce every 10th session added.
 ///
 /// [tracking]: crate::config::CHANNELS
-pub async fn post_guild_hours(ctx: &Context<'_>, guild_hours: &Option<i64>) -> Result<()> {
+pub async fn post_guild_hours(ctx: &Context<'_>, guild_hours: Option<i64>) -> Result<()> {
   if let Some(guild_hours) = guild_hours {
     if ctx.channel_id() == CHANNELS.tracking {
       ctx

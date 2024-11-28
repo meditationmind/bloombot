@@ -19,7 +19,7 @@ pub async fn listen(ctx: &SerenityContext, event: &Event, data: &Data) -> Result
       new,
       ..
     } => {
-      events::guild_member_update(ctx, old_if_available, new).await?;
+      events::guild_member_update(ctx, old_if_available.as_ref(), new.as_ref()).await?;
     }
     Event::MessageDelete {
       deleted_message_id, ..

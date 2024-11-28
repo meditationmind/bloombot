@@ -160,7 +160,7 @@ pub async fn add(
     .await?;
   }
 
-  tracking::post_guild_hours(&ctx, &guild_hours).await?;
+  tracking::post_guild_hours(&ctx, guild_hours).await?;
 
   let member = guild_id.member(ctx, user_id).await?;
   tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;

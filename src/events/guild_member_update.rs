@@ -28,8 +28,8 @@ impl UpdateType {
 
 pub async fn guild_member_update(
   ctx: &Context,
-  old: &Option<Member>,
-  new: &Option<Member>,
+  old: Option<&Member>,
+  new: Option<&Member>,
 ) -> Result<()> {
   let Some(old) = old else { return Ok(()) };
   let Some(new) = new else { return Ok(()) };
