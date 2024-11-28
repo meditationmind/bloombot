@@ -36,10 +36,12 @@ impl Bookmark {
     }
   }
 
+  #[cfg(test)]
   pub fn id(&self) -> &str {
     &self.id
   }
 
+  #[cfg(test)]
   pub fn added(&self) -> Option<&DateTime<Utc>> {
     self.added.as_ref()
   }

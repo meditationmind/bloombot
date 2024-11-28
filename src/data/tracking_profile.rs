@@ -70,6 +70,7 @@ impl TrackingProfile {
   /// Assigns a [`UserID`][uid] to a [`TrackingProfile`].
   ///
   /// [uid]: poise::serenity_prelude::model::id::UserId
+  #[cfg(test)]
   pub fn with_user_id(mut self, user_id: impl Into<UserId>) -> Self {
     self.user_id = user_id.into();
     self
@@ -78,6 +79,7 @@ impl TrackingProfile {
   /// Assigns a [`GuildId`][gid] to a [`TrackingProfile`].
   ///
   /// [gid]: poise::serenity_prelude::model::id::GuildId
+  #[cfg(test)]
   pub fn with_guild_id(mut self, guild_id: impl Into<GuildId>) -> Self {
     self.guild_id = guild_id.into();
     self

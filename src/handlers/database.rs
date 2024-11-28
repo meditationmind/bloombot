@@ -61,6 +61,7 @@ pub(crate) trait ExistsQuery {
 }
 
 impl DatabaseHandler {
+  #[allow(dead_code)]
   pub fn from_pool(pool: PgPool) -> Self {
     Self { pool }
   }
@@ -527,6 +528,7 @@ impl DatabaseHandler {
     )
   }
 
+  #[allow(dead_code)]
   pub async fn get_user_meditation_count(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,
@@ -1110,6 +1112,7 @@ impl DatabaseHandler {
     )
   }
 
+  #[allow(dead_code)]
   pub async fn get_term_count(
     transaction: &mut Transaction<'_, Postgres>,
     guild_id: &GuildId,

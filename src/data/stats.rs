@@ -147,6 +147,7 @@ impl Timeframe {
     .bind(user_id.to_string())
   }
 
+  #[allow(dead_code)]
   pub fn guild_sum_and_count<'a>(
     guild_id: GuildId,
     start_time: &'a DateTime<Utc>,
