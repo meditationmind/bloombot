@@ -26,16 +26,13 @@ pub async fn extract_text(
   ctx: Context<'_>,
   #[description = "Message to extract text from"] message: Message,
 ) -> Result<()> {
-  let msg = if let Some(description) = &message.embeds[0].description {
-    description
-  } else if !message.content.is_empty() {
-    &message.content
-  } else {
-    &format!("{} No message body.", EMOJI.mminfo)
-  };
-  ctx
-    .send(CreateReply::default().content(msg).ephemeral(true))
-    .await?;
+  let (msg1, msg2) = extract_content(message);
+
+  ctx.send(CreateReply::default().content(msg1)).await?;
+
+  if !msg2.is_empty() {
+    ctx.send(CreateReply::default().content(msg2)).await?;
+  }
 
   Ok(())
 }
@@ -72,23 +69,17 @@ async fn automod(ctx: Context<'_>) -> Result<()> {
   'stream: while let Some(message_result) = messages.next().await {
     if let Ok(message) = message_result {
       if matches!(message.kind, MessageType::AutoModAction) {
-        let msg = if let Some(description) = &message.embeds[0].description {
-          description
-        } else if !message.content.is_empty() {
-          &message.content
-        } else {
-          &format!("{} No message body.", EMOJI.mminfo)
-        };
-
         let custom_id = ctx.id() + message.id.get();
         let next_id = format!("{custom_id}next");
         let stop_id = format!("{custom_id}stop");
+
+        let (msg1, msg2) = extract_content(message);
 
         initial_response
           .edit(
             ctx,
             CreateReply::default()
-              .content(msg)
+              .content(msg1)
               .components(vec![CreateActionRow::Buttons(vec![
                 CreateButton::new(next_id.as_str())
                   .label("Next")
@@ -99,6 +90,10 @@ async fn automod(ctx: Context<'_>) -> Result<()> {
               ])]),
           )
           .await?;
+
+        if !msg2.is_empty() {
+          ctx.send(CreateReply::default().content(msg2)).await?;
+        }
 
         while let Some(press) = ComponentInteractionCollector::new(ctx)
           .author_id(author_id)
@@ -137,4 +132,38 @@ async fn automod(ctx: Context<'_>) -> Result<()> {
     .await?;
 
   Ok(())
+}
+
+fn extract_content(message: Message) -> (String, String) {
+  let description = if message.embeds.is_empty() {
+    ""
+  } else {
+    message.embeds[0].description.as_deref().unwrap_or_default()
+  };
+
+  let content = if !description.is_empty() {
+    description.to_owned()
+  } else if !message.content.is_empty() {
+    message.content
+  } else {
+    format!("{} No message body.", EMOJI.mminfo)
+  };
+
+  if content.chars().count().le(&2000) {
+    (content, String::new())
+  } else {
+    let (msg1, msg2) = if let Some((split1, split2)) = content.split_at_checked(2000) {
+      (split1, split2)
+    } else {
+      (content.as_ref(), "")
+    };
+    (
+      format!("{}...", msg1.chars().take(1997).collect::<String>()),
+      if msg2.chars().count().le(&2000) {
+        msg2.to_owned()
+      } else {
+        format!("{}...", msg2.chars().take(1997).collect::<String>())
+      },
+    )
+  }
 }
