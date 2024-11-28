@@ -155,6 +155,33 @@ impl Term {
     }
   }
 
+  /// Takes a list of [`Term`]s as [`Vec<Term>`][Term] and generates an alphabetically
+  /// sorted list of term names and aliases only, returned as a [`Vec<String>`]. This is
+  /// used to generate the list of terms for term name autocompletion in glossary commands.
+  pub fn names_and_aliases(terms: Vec<Self>) -> Vec<String> {
+    if terms.is_empty() || terms[0].name.is_empty() {
+      return vec![String::new()];
+    }
+    let mut names = terms
+      .iter()
+      .map(|term| term.name.to_string())
+      .rev()
+      .collect::<Vec<String>>();
+    let mut aliases = vec![];
+    for term in terms {
+      if let Some(term_aliases) = term.aliases {
+        if !term_aliases.is_empty() {
+          for alias in term_aliases {
+            aliases.push(alias);
+          }
+        }
+      }
+    }
+    names.append(&mut aliases);
+    names.sort_by_key(|name| name.to_lowercase());
+    names
+  }
+
   /// Updates the vector embeddings for a [`Term`] in the database.
   pub fn update_embedding(
     guild_id: GuildId,

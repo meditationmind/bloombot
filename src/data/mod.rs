@@ -1,3 +1,4 @@
+pub mod bloom;
 pub mod bookmark;
 pub mod common;
 pub mod course;
