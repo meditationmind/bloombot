@@ -6,7 +6,6 @@ use poise::serenity_prelude::{builder::*, ChannelId, ChannelType, ComponentInter
 use poise::serenity_prelude::{ComponentInteractionDataKind, CreateQuickModal, InputTextStyle};
 use poise::serenity_prelude::{Message, User};
 use poise::{ApplicationContext, ChoiceParameter, Context as PoiseContext, CreateReply};
-use sqlx::{Postgres, Transaction};
 
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
@@ -168,6 +167,7 @@ pub async fn erase_message(
   #[description = "The message to delete"] message: Message,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
+  let forum_thread = message.id.get() == message.channel_id.get();
   let ctx_id = ctx.id();
 
   let reply = {
@@ -208,7 +208,7 @@ pub async fn erase_message(
   while let Some(mci) = ComponentInteractionCollector::new(ctx)
     .author_id(ctx.author().id)
     .channel_id(ctx.channel_id())
-    .timeout(Duration::from_secs(60))
+    .timeout(Duration::from_secs(300))
     .filter(move |mci| mci.data.custom_id == ctx_id.to_string())
     .await
   {
@@ -286,46 +286,32 @@ pub async fn erase_message(
       }
     };
 
-    let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+    let dm_embed = erase_and_log(PoiseContext::Application(ctx), &message, reason).await?;
 
-    let dm_embed = erase_and_log(
-      PoiseContext::Application(ctx),
-      &mut transaction,
-      &message,
-      reason,
-    )
-    .await?;
+    if !forum_thread {
+      let response = CreateInteractionResponse::UpdateMessage(
+        CreateInteractionResponseMessage::new()
+          .content(format!(
+            "{} Message deleted. User will be notified via DM or private thread.",
+            EMOJI.mmcheck
+          ))
+          .ephemeral(true)
+          .components(Vec::new()),
+      );
 
-    DatabaseHandler::commit_transaction(transaction).await?;
-
-    let response = CreateInteractionResponse::UpdateMessage(
-      CreateInteractionResponseMessage::new()
-        .content(format!(
-          "{} Message deleted. User will be notified via DM or private thread.",
-          EMOJI.mmcheck
-        ))
-        .ephemeral(true)
-        .components(Vec::new()),
-    );
-
-    if let Some(qmr) = erase_data {
-      qmr.interaction.create_response(ctx, response).await?;
-    } else {
-      mci.create_response(ctx, response).await?;
+      if let Some(qmr) = erase_data {
+        qmr.interaction.create_response(ctx, response).await?;
+      } else {
+        mci.create_response(ctx, response).await?;
+      }
     }
 
     notify_user(PoiseContext::Application(ctx), &message, dm_embed).await?;
   }
 
-  msg
-    .edit(
-      PoiseContext::Application(ctx),
-      CreateReply::default()
-        .content(format!("{} Erase cancelled.", EMOJI.mminfo))
-        .components(Vec::new())
-        .ephemeral(true),
-    )
-    .await?;
+  if !forum_thread {
+    msg.delete(PoiseContext::Application(ctx)).await?;
+  }
 
   Ok(())
 }
@@ -362,22 +348,19 @@ async fn message(
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
+  let forum_thread = message.id.get() == message.channel_id.get();
   let reason = reason.unwrap_or(default_reason.unwrap_or(DefaultReasons::None).response());
+  let dm_embed = erase_and_log(ctx, &message, &reason).await?;
 
-  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
-
-  let dm_embed = erase_and_log(ctx, &mut transaction, &message, &reason).await?;
-
-  database::commit_and_say(
-    ctx,
-    transaction,
-    MessageType::TextOnly(format!(
+  if !forum_thread {
+    let msg = format!(
       "{} Message deleted. User will be notified via DM or private thread.",
       EMOJI.mmcheck
-    )),
-    Visibility::Ephemeral,
-  )
-  .await?;
+    );
+    ctx
+      .send(CreateReply::default().content(msg).ephemeral(true))
+      .await?;
+  }
 
   notify_user(ctx, &message, dm_embed).await?;
 
@@ -479,14 +462,12 @@ async fn populate(
 }
 
 /// Erases a message, logs the erase in the [`CHANNELS.logs`][logs] channel, and returns
-/// an embed to be used for private notification. The `transaction` needs to be committed
-/// after this function is called or it will be rolled back and the erase will not be
-/// added to the database.
+/// an embed to be used for private notification. If the message is the top-level message
+/// of a forum thread, the whole thread will be deleted.
 ///
 /// [logs]: crate::config::CHANNELS
 async fn erase_and_log(
   ctx: Context<'_>,
-  transaction: &mut Transaction<'_, Postgres>,
   message: &Message,
   reason: &String,
 ) -> Result<CreateEmbed> {
@@ -494,10 +475,17 @@ async fn erase_and_log(
   let message_id = message.id;
   let audit_log_reason = Some(reason.as_str());
 
-  ctx
-    .http()
-    .delete_message(channel_id, message_id, audit_log_reason)
-    .await?;
+  if channel_id.get() == message_id.get() {
+    ctx
+      .http()
+      .delete_channel(channel_id, audit_log_reason)
+      .await?;
+  } else {
+    ctx
+      .http()
+      .delete_message(channel_id, message_id, audit_log_reason)
+      .await?;
+  }
 
   let occurred_at = Utc::now();
 
@@ -506,7 +494,9 @@ async fn erase_and_log(
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = message.author.id;
 
-  let erase_count = DatabaseHandler::get_erases(transaction, &guild_id, &user_id)
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+
+  let erase_count = DatabaseHandler::get_erases(&mut transaction, &guild_id, &user_id)
     .await?
     .len()
     + 1;
@@ -516,21 +506,7 @@ async fn erase_and_log(
     format!("{erase_count} erases recorded")
   };
 
-  let mut log_embed = BloomBotEmbed::new();
-  let mut dm_embed = BloomBotEmbed::new();
-
-  log_embed = log_embed.title("Message Deleted").description(format!(
-    "**Channel**: <#{}>\n**Author**: {} ({})\n**Reason**: {}",
-    message.channel_id, message.author, erase_count_message, reason,
-  ));
-  dm_embed = dm_embed
-    .title("A message you sent has been deleted.")
-    .description(format!("**Reason**: {reason}"));
-
-  if let Some(attachment) = message.attachments.first() {
-    log_embed = log_embed.field("Attachment", attachment.url.as_str(), false);
-    dm_embed = dm_embed.field("Attachment", attachment.url.as_str(), false);
-  }
+  let mut embed = BloomBotEmbed::new();
 
   if !message.content.is_empty() {
     // If longer than 1018 characters (1024 max - 6 for backticks), truncate to 1015 (-3 for "...").
@@ -542,33 +518,44 @@ async fn erase_and_log(
     } else {
       &message.content
     };
-
-    log_embed = log_embed.field("Message Content", format!("```{content}```"), false);
-    dm_embed = dm_embed.field("Message Content", format!("```{content}```"), false);
+    embed = embed.field("Message Content", format!("```{content}```"), false);
   }
 
-  log_embed = log_embed.footer(
-    CreateEmbedFooter::new(format!(
-      "Deleted by {} ({})",
-      ctx.author().name,
-      ctx.author().id
-    ))
-    .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-  );
+  if let Some(attachment) = message.attachments.first() {
+    embed = embed.field("Attachment", attachment.url.as_str(), false);
+  }
 
-  dm_embed = dm_embed.footer(CreateEmbedFooter::new(
-    "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff.",
-  ));
+  let log_embed = embed
+    .clone()
+    .title("Message Deleted")
+    .description(format!(
+      "**Channel**: <#{}>\n**Author**: {} ({})\n**Reason**: {}",
+      message.channel_id, message.author, erase_count_message, reason,
+    ))
+    .footer(
+      CreateEmbedFooter::new(format!(
+        "Deleted by {} ({})",
+        ctx.author().name,
+        ctx.author().id
+      ))
+      .icon_url(ctx.author().avatar_url().unwrap_or_default()),
+    );
+
+  let dm_embed = embed
+    .title("A message you sent has been deleted.")
+    .description(format!("**Reason**: {reason}"))
+    .footer(CreateEmbedFooter::new(
+      "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff.",
+    ));
 
   let log_channel = ChannelId::new(CHANNELS.logs);
-
   let log_message = log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;
 
   let erase = Erase::new(guild_id, user_id, log_message.link(), reason, &occurred_at);
-
-  DatabaseHandler::add_erase(transaction, &erase).await?;
+  DatabaseHandler::add_erase(&mut transaction, &erase).await?;
+  DatabaseHandler::commit_transaction(transaction).await?;
 
   Ok(dm_embed)
 }
