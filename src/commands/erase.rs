@@ -254,14 +254,21 @@ pub async fn erase_message(
     // The modal closes, but we have no way of knowing until it times out.
     // Once it times out, we edit the ephemeral response appropriately.
     if choice == "custom" && erase_data.is_none() {
-      mci
+      if let Err(e) = mci
         .edit_response(
           ctx,
           EditInteractionResponse::new()
             .content(format!("{} Erase cancelled.", EMOJI.mminfo))
             .components(Vec::new()),
         )
-        .await?;
+        .await
+      {
+        // If the ephemeral response no longer exists, we get an Unknown
+        // Message error, which we can safely ignore.
+        if e.to_string() != "Unknown Message" {
+          return Err(e.into());
+        }
+      }
       return Ok(());
     }
 
@@ -288,7 +295,14 @@ pub async fn erase_message(
 
     let dm_embed = erase_and_log(PoiseContext::Application(ctx), &message, reason).await?;
 
-    if !forum_thread {
+    if forum_thread {
+      let ack = CreateInteractionResponse::Acknowledge;
+      if let Some(qmr) = erase_data {
+        qmr.interaction.create_response(ctx, ack).await?;
+      } else {
+        mci.create_response(ctx, ack).await?;
+      }
+    } else {
       let response = CreateInteractionResponse::UpdateMessage(
         CreateInteractionResponseMessage::new()
           .content(format!(
