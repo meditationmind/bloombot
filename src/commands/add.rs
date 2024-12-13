@@ -165,6 +165,7 @@ pub async fn add(
   let member = guild_id.member(ctx, user_id).await?;
   tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
   if tracking_profile.streak.status == Status::Enabled {
+    let privacy = privacy!(tracking_profile.streak.privacy);
     tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
   }
 
