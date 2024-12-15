@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use anyhow::{Context as AnyhowContext, Result};
+use poise::serenity_prelude::{ButtonStyle, ComponentInteractionCollector};
 use poise::{serenity_prelude::builder::*, ChoiceParameter, CreateReply};
 use tracing::error;
 
@@ -178,17 +181,31 @@ async fn tracking(
       return Ok(());
     }
 
-    DatabaseHandler::update_tracking_profile(
-      &mut transaction,
-      &existing_profile.with_tracking_privacy(tracking_privacy),
-    )
-    .await?;
+    let change_all_privacy = change_all_privacy(ctx, &anonymous).await.unwrap_or(true);
+
+    let tracking_profile = if change_all_privacy {
+      &existing_profile
+        .with_tracking_privacy(tracking_privacy)
+        .with_stats_privacy(tracking_privacy)
+        .with_streak_privacy(tracking_privacy)
+    } else {
+      &existing_profile.with_tracking_privacy(tracking_privacy)
+    };
+
+    DatabaseHandler::update_tracking_profile(&mut transaction, tracking_profile).await?;
   } else {
-    DatabaseHandler::add_tracking_profile(
-      &mut transaction,
-      &TrackingProfile::new(guild_id, user_id).with_tracking_privacy(tracking_privacy),
-    )
-    .await?;
+    let change_all_privacy = change_all_privacy(ctx, &anonymous).await.unwrap_or(true);
+
+    let tracking_profile = if change_all_privacy {
+      &TrackingProfile::new(guild_id, user_id)
+        .with_tracking_privacy(tracking_privacy)
+        .with_stats_privacy(tracking_privacy)
+        .with_streak_privacy(tracking_privacy)
+    } else {
+      &TrackingProfile::new(guild_id, user_id).with_tracking_privacy(tracking_privacy)
+    };
+
+    DatabaseHandler::add_tracking_profile(&mut transaction, tracking_profile).await?;
   }
 
   database::commit_and_say(
@@ -396,4 +413,84 @@ async fn stats(
   .await?;
 
   Ok(())
+}
+
+async fn change_all_privacy(ctx: Context<'_>, anonymous: &OnOff) -> Result<bool> {
+  let ctx_id = ctx.id();
+  let confirm_id = format!("{ctx_id}confirm");
+  let cancel_id = format!("{ctx_id}cancel");
+
+  let check = ctx
+    .send(
+      CreateReply::default()
+        .content(format!(
+          "You are about to {} anonymous tracking. \
+          Would you like to set your stats and streak to {} as well?",
+          match anonymous {
+            OnOff::On => "enable",
+            OnOff::Off => "disable",
+          },
+          match anonymous {
+            OnOff::On => "private",
+            OnOff::Off => "public",
+          }
+        ))
+        .ephemeral(true)
+        .components(vec![CreateActionRow::Buttons(vec![
+          CreateButton::new(confirm_id.as_str())
+            .label("Yes")
+            .style(ButtonStyle::Success),
+          CreateButton::new(cancel_id.as_str())
+            .label("No")
+            .style(ButtonStyle::Danger),
+        ])]),
+    )
+    .await?;
+
+  while let Some(press) = ComponentInteractionCollector::new(ctx)
+    .filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
+    .timeout(Duration::from_secs(60))
+    .await
+  {
+    if press.data.custom_id != confirm_id && press.data.custom_id != cancel_id {
+      // This is an unrelated button interaction.
+      continue;
+    }
+
+    if press.data.custom_id == confirm_id {
+      let msg = CreateInteractionResponseMessage::new()
+        .content(format!(
+          "{} Updating stats and streak privacy.",
+          EMOJI.mmcheck
+        ))
+        .components(Vec::new());
+      press
+        .create_response(ctx, CreateInteractionResponse::UpdateMessage(msg))
+        .await?;
+      return Ok(true);
+    }
+
+    if press.data.custom_id == cancel_id {
+      let msg = CreateInteractionResponseMessage::new()
+        .content(format!(
+          "{} Stats and streak privacy will remain unchanged.",
+          EMOJI.mmcheck
+        ))
+        .components(Vec::new());
+      press
+        .create_response(ctx, CreateInteractionResponse::UpdateMessage(msg))
+        .await?;
+      return Ok(false);
+    }
+  }
+
+  let reply = CreateReply::default()
+    .content(format!(
+      "{} No response received. Updating stats and streak privacy.",
+      EMOJI.mminfo
+    ))
+    .components(Vec::new());
+  check.edit(ctx, reply).await?;
+
+  Ok(true)
 }
