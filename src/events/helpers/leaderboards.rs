@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use log::{error, info};
 use poise::serenity_prelude::{GuildId, Http, UserId};
+use sqlx::{Connection, PgConnection};
 use tokio::time;
 
 use crate::charts::{Chart, LeaderboardOptions};
@@ -126,8 +127,32 @@ pub const LEADERBOARDS: Leaderboards = Leaderboards {
 async fn refresh(db: &DatabaseHandler) -> Result<()> {
   let mut transaction = db.start_transaction().await?;
   DatabaseHandler::refresh_leaderboard(&mut transaction, &Timeframe::Daily).await?;
+
+  let mut transaction = if PgConnection::ping(&mut *transaction).await.is_ok() {
+    transaction
+  } else {
+    info!(target: "bloombot::database","Connection closed. Reconnecting.");
+    db.start_transaction().await?
+  };
+
   DatabaseHandler::refresh_leaderboard(&mut transaction, &Timeframe::Weekly).await?;
+
+  let mut transaction = if PgConnection::ping(&mut *transaction).await.is_ok() {
+    transaction
+  } else {
+    info!(target: "bloombot::database","Connection closed. Reconnecting.");
+    db.start_transaction().await?
+  };
+
   DatabaseHandler::refresh_leaderboard(&mut transaction, &Timeframe::Monthly).await?;
+
+  let mut transaction = if PgConnection::ping(&mut *transaction).await.is_ok() {
+    transaction
+  } else {
+    info!(target: "bloombot::database","Connection closed. Reconnecting.");
+    db.start_transaction().await?
+  };
+
   DatabaseHandler::refresh_leaderboard(&mut transaction, &Timeframe::Yearly).await?;
   transaction.commit().await?;
 
