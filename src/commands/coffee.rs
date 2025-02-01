@@ -26,7 +26,7 @@ pub async fn coffee(ctx: Context<'_>) -> Result<()> {
     _ => ("☕", "⚰️"),
   };
 
-  if rng.gen() {
+  if rng.random() {
     ctx.say(one).await?;
   } else {
     ctx.say(two).await?;

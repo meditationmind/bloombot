@@ -23,7 +23,7 @@ impl Data {
   pub fn new(db: DatabaseHandler, term_names: Vec<String>) -> Result<Self> {
     Ok(Self {
       db: Arc::new(db),
-      rng: Arc::new(Mutex::new(SmallRng::from_entropy())),
+      rng: Arc::new(Mutex::new(SmallRng::from_os_rng())),
       embeddings: Arc::new(OpenAIHandler::new()?),
       bloom_start_time: Instant::now(),
       term_names: Arc::new(RwLock::new(term_names)),
