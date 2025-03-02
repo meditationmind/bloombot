@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use anyhow::{Error, Result};
 use poise::Context as PoiseContext;
-use rand::{rngs::SmallRng, SeedableRng};
+use rand::{SeedableRng, rngs::SmallRng};
 use tokio::sync::Mutex;
 
 use crate::database::DatabaseHandler;

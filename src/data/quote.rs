@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Result};
-use poise::serenity_prelude::GuildId;
+use anyhow::{Result, anyhow};
 use poise::Modal;
+use poise::serenity_prelude::GuildId;
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::QueryAs;
 use sqlx::{FromRow, Postgres};

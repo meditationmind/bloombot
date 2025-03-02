@@ -1,12 +1,12 @@
-use anyhow::{anyhow, Result};
-use poise::serenity_prelude::CreateEmbed;
+use anyhow::{Result, anyhow};
 use poise::CreateReply;
+use poise::serenity_prelude::CreateEmbed;
 use sqlx::{Postgres, Transaction};
 
+use crate::Context;
 use crate::commands::helpers::common::Visibility;
 use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 pub enum MessageType {
   TextOnly(String),

@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration};
 use chrono::{Timelike, Utc};
-use futures::{stream::Stream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, stream::Stream};
 use pgvector::Vector;
 use poise::serenity_prelude::{GuildId, MessageId, UserId};
 use sqlx::pool::PoolConnection;

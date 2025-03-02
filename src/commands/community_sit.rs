@@ -1,14 +1,14 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, anyhow};
 use chrono::{Duration as ChronoDuration, Utc};
-use poise::serenity_prelude::{builder::*, ButtonStyle, ChannelId, ComponentInteractionCollector};
+use poise::CreateReply;
+use poise::serenity_prelude::{ButtonStyle, ChannelId, ComponentInteractionCollector, builder::*};
 use poise::serenity_prelude::{FormattedTimestamp, FormattedTimestampStyle};
 use poise::serenity_prelude::{Mentionable, RoleId, ScheduledEventStatus};
-use poise::CreateReply;
 
-use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 use crate::Context;
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 
 async fn is_helper(ctx: Context<'_>) -> Result<bool> {
   let community_sit_helper = RoleId::from(ROLES.community_sit_helper);
@@ -202,9 +202,9 @@ async fn start(ctx: Context<'_>) -> Result<()> {
   }
 
   let msg = format!(
-          "{} No eligible community sit event found. Please try again within 15 minutes of starting time.",
-          EMOJI.mminfo
-        );
+    "{} No eligible community sit event found. Please try again within 15 minutes of starting time.",
+    EMOJI.mminfo
+  );
   ctx
     .send(CreateReply::default().content(msg).ephemeral(true))
     .await?;

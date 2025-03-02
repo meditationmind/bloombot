@@ -1,11 +1,11 @@
 use anyhow::Result;
-use poise::serenity_prelude::GuildId;
 use poise::CreateReply;
+use poise::serenity_prelude::GuildId;
 use sqlx::{Postgres, Transaction};
 
+use crate::Context;
 use crate::config::EMOJI;
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 /// Checks the database for courses with names that meet a similarity threshold of 0.8
 /// (high similarity) and returns either the course with the highest similarity or `None`.

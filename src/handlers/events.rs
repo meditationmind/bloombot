@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use poise::serenity_prelude::{ActivityData, Context as SerenityContext, FullEvent as Event};
 use tracing::info;
 
-use crate::{events, Data};
+use crate::{Data, events};
 
 pub async fn listen(ctx: &SerenityContext, event: &Event, data: &Data) -> Result<(), Error> {
   let database = &data.db;

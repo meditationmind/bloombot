@@ -1,3 +1,4 @@
+#![warn(tail_expr_drop_order)]
 #![warn(clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
 #![allow(clippy::too_many_lines)]
 
@@ -9,7 +10,7 @@ use std::env;
 use anyhow::{Context as ErrorContext, Error, Result};
 use dotenvy::dotenv;
 use poise::serenity_prelude::{Client, GatewayIntents, GuildId};
-use poise::{builtins, Framework, FrameworkOptions};
+use poise::{Framework, FrameworkOptions, builtins};
 use tracing::info;
 
 use crate::commands::{

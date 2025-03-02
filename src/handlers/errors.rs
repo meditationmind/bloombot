@@ -1,8 +1,8 @@
 use anyhow::Error;
-use poise::{builtins, serenity_prelude::Channel, CreateReply, FrameworkError};
+use poise::{CreateReply, FrameworkError, builtins, serenity_prelude::Channel};
 use tracing::error;
 
-use crate::{config::EMOJI, Data};
+use crate::{Data, config::EMOJI};
 
 pub async fn handle(error: FrameworkError<'_, Data, Error>) {
   match error {

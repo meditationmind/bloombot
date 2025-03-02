@@ -2,11 +2,11 @@
 
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
 use csv::{Reader, WriterBuilder};
-use poise::serenity_prelude::{GuildId, UserId};
 use poise::ChoiceParameter;
+use poise::serenity_prelude::{GuildId, UserId};
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 

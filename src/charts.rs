@@ -7,7 +7,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use charts_rs::{self, Align, BarChart, Box, LegendCategory};
 use charts_rs::{Series, SeriesCategory, TableCellStyle, TableChart};
 use chrono::{Datelike, Duration, NaiveDate, Utc, Weekday};

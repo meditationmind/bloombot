@@ -1,13 +1,13 @@
 use std::time::Duration;
 
 use anyhow::Result;
+use poise::CreateReply;
 use poise::serenity_prelude::futures::StreamExt;
 use poise::serenity_prelude::{ButtonStyle, ComponentInteractionCollector, CreateActionRow};
 use poise::serenity_prelude::{CreateButton, CreateInteractionResponse, Message, MessageType};
-use poise::CreateReply;
 
-use crate::config::EMOJI;
 use crate::Context;
+use crate::config::EMOJI;
 
 /// Extract text from an AutoMod report or embed
 ///

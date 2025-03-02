@@ -1,7 +1,7 @@
 use anyhow::Result;
 use poise::serenity_prelude::RoleId;
 
-use crate::{config::ROLES, data::tracking_profile::Privacy, Context};
+use crate::{Context, config::ROLES, data::tracking_profile::Privacy};
 
 pub enum Visibility {
   Public,

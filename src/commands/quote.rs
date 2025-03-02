@@ -1,10 +1,10 @@
 use anyhow::{Context as AnyhowContext, Result};
 use poise::CreateReply;
 
+use crate::Context;
 use crate::commands::helpers::common;
 use crate::config::{BloomBotEmbed, EMOJI};
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 /// Get a meditation/mindfulness quote
 ///

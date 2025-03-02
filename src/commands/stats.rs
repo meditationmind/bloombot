@@ -1,17 +1,17 @@
 #![allow(clippy::unused_async)]
 
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{builder::*, Colour, User};
+use poise::serenity_prelude::{Colour, User, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 use tracing::info;
 
+use crate::Context;
 use crate::charts::{Chart, LeaderboardOptions, StatsOptions};
 use crate::commands::helpers::time::Timeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
-use crate::data::tracking_profile::{privacy, Privacy, Status};
+use crate::data::tracking_profile::{Privacy, Status, privacy};
 use crate::database::DatabaseHandler;
 use crate::events::leaderboards::{self, LEADERBOARDS};
-use crate::Context;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(ChoiceParameter)]

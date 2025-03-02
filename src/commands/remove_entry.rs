@@ -1,12 +1,12 @@
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{ChannelId, CreateEmbedFooter, CreateMessage};
 use poise::CreateReply;
+use poise::serenity_prelude::{ChannelId, CreateEmbedFooter, CreateMessage};
 
+use crate::Context;
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 /// Remove one of your meditation entries
 ///

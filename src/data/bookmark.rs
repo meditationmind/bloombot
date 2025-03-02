@@ -126,9 +126,7 @@ impl PageRow for Bookmark {
     };
     format!(
       "{desc}> -# Added: <t:{}:f>\n> -# ID: [{}](discord://{} \"For copying a bookmark ID on mobile. Not a working link.\")\n** **",
-      ts,
-      self.id,
-      self.id,
+      ts, self.id, self.id,
     )
   }
 }

@@ -2,16 +2,16 @@ use std::time::Duration;
 
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{ButtonStyle, ComponentInteractionCollector};
-use poise::{serenity_prelude::builder::*, ChoiceParameter, CreateReply};
+use poise::{ChoiceParameter, CreateReply, serenity_prelude::builder::*};
 use tracing::error;
 
+use crate::Context;
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
-use crate::config::{BloomBotEmbed, StreakRoles, EMOJI};
+use crate::config::{BloomBotEmbed, EMOJI, StreakRoles};
 use crate::data::tracking_profile::{Privacy, Status, TrackingProfile};
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 #[derive(ChoiceParameter)]
 enum OnOff {

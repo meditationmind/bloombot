@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use rand::Rng;
 
-use crate::{config::EMOJI, Context};
+use crate::{Context, config::EMOJI};
 
 const BABYCOMEBACK: u64 = 762_671_692_430_180_363;
 const TEACUPS: u64 = 1_085_468_454_578_044_979;

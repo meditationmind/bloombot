@@ -1,22 +1,22 @@
 use std::borrow::Cow;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use csv::ReaderBuilder;
-use poise::serenity_prelude::{builder::*, ChannelId, Message, RoleId, User};
+use poise::serenity_prelude::{ChannelId, Message, RoleId, User, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 use tokio::{fs, fs::File, io::AsyncWriteExt};
 use tracing::info;
 use ulid::Ulid;
 
+use crate::Context;
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::import::{FinchBreathingSession, FinchTimerSession};
 use crate::commands::helpers::import::{Source, SqlQueries};
 use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, MEDITATION_MIND, ROLES};
-use crate::data::tracking_profile::{privacy, Privacy, Status};
+use crate::data::tracking_profile::{Privacy, Status, privacy};
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 #[derive(ChoiceParameter)]
 pub enum Type {
@@ -59,11 +59,7 @@ pub async fn import(
     .is_some_and(|member| member.roles.contains(&RoleId::from(ROLES.staff)));
 
   let user_id = user.map_or(message.author.id, |user| {
-    if staff {
-      user.id
-    } else {
-      message.author.id
-    }
+    if staff { user.id } else { message.author.id }
   });
 
   // Can only import own attachments, unless staff.

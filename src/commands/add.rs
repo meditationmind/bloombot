@@ -1,20 +1,20 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, anyhow};
 use chrono::{Duration as ChronoDuration, Utc};
-use poise::serenity_prelude::{builder::*, ButtonStyle, ChannelId, ComponentInteractionCollector};
 use poise::CreateReply;
+use poise::serenity_prelude::{ButtonStyle, ChannelId, ComponentInteractionCollector, builder::*};
 
+use crate::Context;
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::commands::helpers::tracking;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::data::meditation::Meditation;
-use crate::data::tracking_profile::{privacy, Privacy, Status};
+use crate::data::tracking_profile::{Privacy, Status, privacy};
 use crate::database::DatabaseHandler;
 use crate::events;
-use crate::Context;
 
 enum LargeAdd {
   Confirmed,

@@ -1,7 +1,7 @@
 use std::env;
 
-use anyhow::{anyhow, Context, Result};
-use async_openai::{config::OpenAIConfig, types::CreateEmbeddingRequestArgs, Client};
+use anyhow::{Context, Result, anyhow};
+use async_openai::{Client, config::OpenAIConfig, types::CreateEmbeddingRequestArgs};
 use poise::serenity_prelude::UserId;
 
 pub struct OpenAIHandler {
@@ -44,7 +44,7 @@ impl OpenAIHandler {
         return Err(anyhow!(
           "Expected 1 embedding, got {}",
           embeddings.data.len()
-        ))
+        ));
       }
     };
 

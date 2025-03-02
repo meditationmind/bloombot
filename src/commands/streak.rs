@@ -5,7 +5,7 @@ use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::data::tracking_profile::Privacy;
 use crate::database::DatabaseHandler;
-use crate::{config::ROLES, Context};
+use crate::{Context, config::ROLES};
 
 /// See your current meditation streak
 ///

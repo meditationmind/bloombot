@@ -1,6 +1,6 @@
 use pgvector::Vector;
-use poise::serenity_prelude::GuildId;
 use poise::Modal;
+use poise::serenity_prelude::GuildId;
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
 use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};

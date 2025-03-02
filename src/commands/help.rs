@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use poise::serenity_prelude::builder::*;
 use poise::{Command, Context as PoiseContext, ContextMenuCommandAction, CreateReply};
 
-use crate::config::{EMOJI, ROLES, SECRET_CATEGORY};
 use crate::Context;
+use crate::config::{EMOJI, ROLES, SECRET_CATEGORY};
 
 struct Help<'a> {
   /// Extra text displayed in the footer of your main help menu.

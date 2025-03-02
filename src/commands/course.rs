@@ -1,11 +1,11 @@
-use anyhow::{anyhow, Context as AnyhowContext, Result};
-use poise::serenity_prelude::{builder::*, ChannelId};
+use anyhow::{Context as AnyhowContext, Result, anyhow};
 use poise::CreateReply;
+use poise::serenity_prelude::{ChannelId, builder::*};
 
+use crate::Context;
 use crate::commands::helpers::courses;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 /// Manage your course enrollments
 ///

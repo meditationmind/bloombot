@@ -2,14 +2,14 @@ use std::cmp::Ordering;
 use std::fmt::Write;
 
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::CreateEmbedFooter;
 use poise::CreateReply;
+use poise::serenity_prelude::CreateEmbedFooter;
 
+use crate::Context;
 use crate::commands::helpers::terms;
 use crate::config::BloomBotEmbed;
 use crate::data::term::Term;
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 /// See information about a term
 ///

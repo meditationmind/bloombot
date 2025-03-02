@@ -2,14 +2,14 @@ use std::fmt::Display;
 use std::time::Duration;
 
 use anyhow::Result;
+use poise::CreateReply;
 use poise::serenity_prelude::ComponentInteractionCollector;
 use poise::serenity_prelude::{CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter};
 use poise::serenity_prelude::{CreateInteractionResponse, CreateInteractionResponseMessage};
-use poise::CreateReply;
 
+use crate::Context;
 use crate::commands::helpers::common::Visibility;
 use crate::config::{BloomBotEmbed, ENTRIES_PER_PAGE};
-use crate::Context;
 
 #[derive(Debug, Copy, Clone)]
 pub enum PageType {

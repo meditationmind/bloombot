@@ -4,8 +4,8 @@ use std::sync::{Arc, RwLock};
 
 use tracing::info;
 
-use crate::data::term::Term;
 use crate::Context;
+use crate::data::term::Term;
 
 /// An autocomplete callback function used for commands that require selection of a term
 /// from the glossary.

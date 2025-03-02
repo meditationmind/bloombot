@@ -1,9 +1,9 @@
 use anyhow::Result;
-use poise::serenity_prelude::{builder::*, AutoArchiveDuration, ChannelId, ChannelType};
 use poise::CreateReply;
+use poise::serenity_prelude::{AutoArchiveDuration, ChannelId, ChannelType, builder::*};
 
-use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::Context;
+use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 
 /// Submit an anonymous server suggestion
 ///

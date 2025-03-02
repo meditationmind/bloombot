@@ -1,9 +1,9 @@
 use anyhow::Result;
 use poise::serenity_prelude::{ChannelId, CreateMessage};
 
+use crate::Context;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 /// Indicate that you have completed a course
 ///

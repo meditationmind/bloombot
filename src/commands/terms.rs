@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, anyhow};
 use pgvector::Vector;
 use poise::serenity_prelude::GuildId;
 use poise::{ApplicationContext, Context as PoiseContext, CreateReply, Modal};

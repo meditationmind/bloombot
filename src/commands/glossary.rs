@@ -3,14 +3,14 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context as AnyhowContext, Result};
 use pgvector::Vector;
-use poise::serenity_prelude::{builder::*, ChannelId, ComponentInteractionCollector};
 use poise::CreateReply;
+use poise::serenity_prelude::{ChannelId, ComponentInteractionCollector, builder::*};
 
+use crate::Context;
 use crate::commands::helpers::terms;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::data::term::Term;
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 /// Glossary commands
 ///
@@ -227,15 +227,15 @@ async fn info(
     possible_term_embed(&term, possible_term)
   } else {
     let suggestions = format!(
-          "{}\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search.*",
-          possible_terms
-            .iter()
-            .take(5)
-            .fold(String::new(), |mut field, term| {
-              let _ = writeln!(field, "`{}`", term.name);
-              field
-            })
-        );
+      "{}\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search.*",
+      possible_terms
+        .iter()
+        .take(5)
+        .fold(String::new(), |mut field, term| {
+          let _ = writeln!(field, "`{}`", term.name);
+          field
+        })
+    );
     BloomBotEmbed::new()
       .title("Term not found")
       .description(format!("The term `{term}` was not found in the glossary."))

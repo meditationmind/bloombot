@@ -1,13 +1,13 @@
 use anyhow::Result;
+use poise::CreateReply;
 use poise::serenity_prelude::{ChannelId, CreateAllowedMentions, CreateMessage, GuildId};
 use poise::serenity_prelude::{Member, Mentionable, UserId};
-use poise::CreateReply;
 use sqlx::{Postgres, Transaction};
 use tracing::error;
 
-use crate::config::{StreakRoles, TimeSumRoles, CHANNELS, EMOJI};
-use crate::database::DatabaseHandler;
 use crate::Context;
+use crate::config::{CHANNELS, EMOJI, StreakRoles, TimeSumRoles};
+use crate::database::DatabaseHandler;
 
 /// Queries the database for the total count of guild sessions and divides by 10. If there is no
 /// remainder, the function queries the database for the guild total of minutes meditated, divides

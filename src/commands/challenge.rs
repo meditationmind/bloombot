@@ -2,15 +2,15 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{Datelike, Timelike, Utc};
-use poise::serenity_prelude::{builder::*, RoleId};
+use poise::serenity_prelude::{RoleId, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 
+use crate::Context;
 use crate::commands::helpers::time::ChallengeTimeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::stats::User;
 use crate::data::tracking_profile::{Privacy, Status};
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 #[derive(ChoiceParameter)]
 enum ChallengeChoices {
@@ -364,11 +364,7 @@ fn process_stats(stats: &User, timeframe: &ChallengeTimeframe) -> Result<Process
         .with_context(|| "Failed to set minute to 0")?,
     };
     let days = (end_time - start_time).num_days();
-    if days == 0 {
-      1
-    } else {
-      days
-    }
+    if days == 0 { 1 } else { days }
   };
 
   let total_time = stats.sessions.sum.unwrap_or(0) as f64;

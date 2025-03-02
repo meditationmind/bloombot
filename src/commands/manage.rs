@@ -2,12 +2,13 @@
 
 use std::time::Duration;
 
-use anyhow::{anyhow, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, anyhow};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
-use poise::serenity_prelude::{builder::*, ButtonStyle};
+use poise::serenity_prelude::{ButtonStyle, builder::*};
 use poise::serenity_prelude::{ChannelId, ComponentInteractionCollector, Mentionable, User};
 use poise::{ChoiceParameter, CreateReply};
 
+use crate::Context;
 use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::pagination::{PageRowRef, PageType, Paginator};
@@ -15,7 +16,6 @@ use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::data::common::{Migration, MigrationType};
 use crate::data::meditation::Meditation;
 use crate::database::DatabaseHandler;
-use crate::Context;
 
 #[derive(ChoiceParameter)]
 enum DataType {
