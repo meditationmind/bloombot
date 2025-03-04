@@ -6,7 +6,7 @@ use poise::serenity_prelude::{CreateEmbed, Embed, GuildId, RoleId};
 pub const MEDITATION_MIND: GuildId = GuildId::new(244917432383176705);
 pub const SECRET_CATEGORY: &str = "Secret";
 pub const EMBED_COLOR: u32 = 0xFDAC2E;
-pub const MIN_STARS: u64 = 5;
+pub const MIN_STARS: u64 = 4;
 
 /// Sensible defaults for use within our application.
 pub struct BloomBotEmbed {}
