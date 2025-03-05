@@ -33,16 +33,16 @@ enum DefaultReasons {
   Rule3AllAges,
   #[name = "Rule 4: Respect boundaries"]
   Rule4RespectBoundaries,
-  #[name = "Rule 8: Self-promo"]
-  Rule8SelfPromo,
-  #[name = "Rule 9: Respect IP rights"]
-  Rule9IPRights,
-  #[name = "Rule 10: Drug chat"]
-  Rule10Drugs,
-  #[name = "Rule 10: Politics"]
-  Rule10Politics,
-  #[name = "Rule 10: Disinformation"]
-  Rule10Disinformation,
+  #[name = "Rule 7: Self-promo"]
+  Rule7SelfPromo,
+  #[name = "Rule 8: Respect IP rights"]
+  Rule8IPRights,
+  #[name = "Rule 9: Drug chat"]
+  Rule9Drugs,
+  #[name = "Rule 9: Politics"]
+  Rule9Politics,
+  #[name = "Rule 9: Disinformation"]
+  Rule9Disinformation,
   #[name = "Mental health guidelines"]
   MentalHealth,
   #[name = "Non-discussion channel"]
@@ -84,7 +84,7 @@ impl DefaultReasons {
         their wishes, even if you were engaging with good intentions."
           .to_string()
       }
-      DefaultReasons::Rule8SelfPromo => {
+      DefaultReasons::Rule7SelfPromo => {
         "Advertising, recruitment, solicitation, and self-promo require approval. This server is \
         meant to be a safe space, where community members can feel confident they're interacting \
         with fellow members who care about the community, and self-promo can violate that sense \
@@ -92,26 +92,26 @@ impl DefaultReasons {
         authorization."
           .to_string()
       }
-      DefaultReasons::Rule9IPRights => {
+      DefaultReasons::Rule8IPRights => {
         "Sharing content that violates intellectual property rights is prohibited by the Discord \
         Community Guidelines."
           .to_string()
       }
-      DefaultReasons::Rule10Drugs => {
+      DefaultReasons::Rule9Drugs => {
         "As an all-ages Discord Partner community accessible via Server Discovery, \
         discussion of drugs/controlled substances is prohibited by Discord's Discovery \
         guidelines. Please help us cultivate and maintain an environment that is appropriate \
         for all of our diverse membership. Thank you!"
           .to_string()
       }
-      DefaultReasons::Rule10Politics => {
+      DefaultReasons::Rule9Politics => {
         "Due to the strong tendency for political discussions to become highly charged and \
         promote polarized views, we ask that members choose a different outlet. As long as they \
         are relevant to server themes and remain civil, discussions may include political \
         elements, but discussing politics directly is outside of the server scope."
           .to_string()
       }
-      DefaultReasons::Rule10Disinformation => {
+      DefaultReasons::Rule9Disinformation => {
         "Sharing potentially harmful misinformation, such as conspiracy theories or fake news, \
         is prohibited by the Discord Community Guidelines. Even seemingly harmless conspiracy \
         theories serve to spread misinformation and are rarely relevant to server themes, \
@@ -178,11 +178,11 @@ pub async fn erase_message(
       CreateSelectMenuOption::new(DefaultReasons::Rule2BeRespectful.name(), "Rule2BeRespectful"),
       CreateSelectMenuOption::new(DefaultReasons::Rule3AllAges.name(), "Rule3AllAges"),
       CreateSelectMenuOption::new(DefaultReasons::Rule4RespectBoundaries.name(), "Rule4RespectBoundaries"),
-      CreateSelectMenuOption::new(DefaultReasons::Rule8SelfPromo.name(), "Rule8SelfPromo"),
-      CreateSelectMenuOption::new(DefaultReasons::Rule9IPRights.name(), "Rule9IPRights"),
-      CreateSelectMenuOption::new(DefaultReasons::Rule10Drugs.name(), "Rule10Drugs"),
-      CreateSelectMenuOption::new(DefaultReasons::Rule10Politics.name(), "Rule10Politics"),
-      CreateSelectMenuOption::new(DefaultReasons::Rule10Disinformation.name(), "Rule10Disinformation"),
+      CreateSelectMenuOption::new(DefaultReasons::Rule7SelfPromo.name(), "Rule7SelfPromo"),
+      CreateSelectMenuOption::new(DefaultReasons::Rule8IPRights.name(), "Rule8IPRights"),
+      CreateSelectMenuOption::new(DefaultReasons::Rule9Drugs.name(), "Rule9Drugs"),
+      CreateSelectMenuOption::new(DefaultReasons::Rule9Politics.name(), "Rule9Politics"),
+      CreateSelectMenuOption::new(DefaultReasons::Rule9Disinformation.name(), "Rule9Disinformation"),
       CreateSelectMenuOption::new(DefaultReasons::MentalHealth.name(), "MentalHealth"),
       CreateSelectMenuOption::new(DefaultReasons::NonDiscussionChannel.name(), "NonDiscussionChannel"),
       CreateSelectMenuOption::new(DefaultReasons::UnwholesomeMeme.name(), "UnwholesomeMeme"),
@@ -280,11 +280,11 @@ pub async fn erase_message(
         "Rule2BeRespectful" => &DefaultReasons::Rule2BeRespectful.response(),
         "Rule3AllAges" => &DefaultReasons::Rule3AllAges.response(),
         "Rule4RespectBoundaries" => &DefaultReasons::Rule4RespectBoundaries.response(),
-        "Rule8SelfPromo" => &DefaultReasons::Rule8SelfPromo.response(),
-        "Rule9IPRights" => &DefaultReasons::Rule9IPRights.response(),
-        "Rule10Drugs" => &DefaultReasons::Rule10Drugs.response(),
-        "Rule10Politics" => &DefaultReasons::Rule10Politics.response(),
-        "Rule10Disinformation" => &DefaultReasons::Rule10Disinformation.response(),
+        "Rule7SelfPromo" => &DefaultReasons::Rule7SelfPromo.response(),
+        "Rule8IPRights" => &DefaultReasons::Rule8IPRights.response(),
+        "Rule9Drugs" => &DefaultReasons::Rule9Drugs.response(),
+        "Rule9Politics" => &DefaultReasons::Rule9Politics.response(),
+        "Rule9Disinformation" => &DefaultReasons::Rule9Disinformation.response(),
         "MentalHealth" => &DefaultReasons::MentalHealth.response(),
         "NonDiscussionChannel" => &DefaultReasons::NonDiscussionChannel.response(),
         "UnwholesomeMeme" => &DefaultReasons::UnwholesomeMeme.response(),
