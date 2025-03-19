@@ -88,8 +88,7 @@ impl DefaultReasons {
         "Advertising, recruitment, solicitation, and self-promo require approval. This server is \
         meant to be a safe space, where community members can feel confident they're interacting \
         with fellow members who care about the community, and self-promo can violate that sense \
-        of safety. While exceptions are rare, you may contact <@575252669443211264> to request \
-        authorization."
+        of safety. While exceptions are rare, you may submit a ticket to request authorization."
           .to_string()
       }
       DefaultReasons::Rule8IPRights => {

@@ -206,8 +206,8 @@ async fn leave(
         .content(format!(
           "You have successfully opted out of the **{course_name}** course-specific channels.\
           \n\n\
-          If you also enrolled on Thinkific and would like to be unenrolled there, please send \
-          a DM to <@575252669443211264> or email us at `info@meditationmind.org` and let us know \
+          If you also enrolled on Thinkific and would like to be unenrolled there, please submit \
+          a ticket (`/new`) or email us at `info@meditationmind.org` and let us know \
           your Thinkific username or the email address you used to sign up.\
           \n\n\
           We wish you all the best on your journey!"
