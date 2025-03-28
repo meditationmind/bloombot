@@ -10,12 +10,12 @@ use poise::serenity_prelude::{Mentionable, RoleId, ScheduledEventStatus};
 use crate::Context;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 
-async fn is_helper(ctx: Context<'_>) -> Result<bool> {
-  let community_sit_helper = RoleId::from(ROLES.community_sit_helper);
+async fn is_host(ctx: Context<'_>) -> Result<bool> {
+  let community_book_club_host = RoleId::from(ROLES.community_book_club_host);
   let has_role = ctx
     .author_member()
     .await
-    .is_some_and(|member| member.roles.contains(&community_sit_helper));
+    .is_some_and(|member| member.roles.contains(&community_book_club_host));
 
   if !has_role {
     ctx
@@ -24,7 +24,7 @@ async fn is_helper(ctx: Context<'_>) -> Result<bool> {
           .content(format!(
             "{} This command requires the {} role.",
             EMOJI.mminfo,
-            community_sit_helper.mention()
+            community_book_club_host.mention()
           ))
           .allowed_mentions(CreateAllowedMentions::new().empty_roles())
           .ephemeral(true),
@@ -35,27 +35,26 @@ async fn is_helper(ctx: Context<'_>) -> Result<bool> {
   Ok(has_role)
 }
 
-/// Manage community sit events
+/// Manage community book club events
 ///
-/// Commands for managing community sit events. Requires Community Sit Helper role.
+/// Commands for managing community book club events. Requires Community Book Club Host role.
 #[poise::command(
   slash_command,
-  check = "is_helper",
+  check = "is_host",
   category = "Secret",
-  rename = "communitysit",
   subcommands("start", "end"),
   subcommand_required,
   hide_in_help,
   guild_only
 )]
 #[allow(clippy::unused_async)]
-pub async fn community_sit(_: Context<'_>) -> Result<()> {
+pub async fn mahabharata(_: Context<'_>) -> Result<()> {
   Ok(())
 }
 
-/// Start a community sit event
+/// Start a community book club event
 ///
-/// Starts a scheduled community sit event.
+/// Starts a scheduled community book club event.
 #[poise::command(slash_command)]
 async fn start(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
@@ -66,9 +65,9 @@ async fn start(ctx: Context<'_>) -> Result<()> {
 
   let events = guild_id.scheduled_events(ctx, false).await?;
   for event in events {
-    if event.name.as_str().ends_with("Silent Sit")
+    if event.name.as_str().ends_with("Mahabharata")
       && event.status == ScheduledEventStatus::Scheduled
-      && (event.start_time.to_utc() - Utc::now()).abs() < ChronoDuration::minutes(15)
+      && (event.start_time.to_utc() - Utc::now()).abs() < ChronoDuration::hours(24)
     {
       let mut embed = BloomBotEmbed::new().description(format!(
         "Starting Event:\n## {}\n{}\n-# Scheduled to begin {}.",
@@ -127,7 +126,7 @@ async fn start(ctx: Context<'_>) -> Result<()> {
               ctx,
               CreateInteractionResponse::UpdateMessage(
                 CreateInteractionResponseMessage::new()
-                  .content(format!("{} Event started. Enjoy your sit!", EMOJI.mminfo))
+                  .content(format!("{} Event started. Enjoy!", EMOJI.mminfo))
                   .ephemeral(true)
                   .embeds(Vec::new())
                   .components(Vec::new()),
@@ -202,7 +201,7 @@ async fn start(ctx: Context<'_>) -> Result<()> {
   }
 
   let msg = format!(
-    "{} No eligible community sit event found. Please try again within 15 minutes of starting time.",
+    "{} No eligible community book club event found. Please try again on the day of the event.",
     EMOJI.mminfo
   );
   ctx
@@ -212,9 +211,9 @@ async fn start(ctx: Context<'_>) -> Result<()> {
   Ok(())
 }
 
-/// End a community sit event
+/// End a community book club event
 ///
-/// Ends an active community sit event.
+/// Ends an active community book club event.
 #[poise::command(slash_command)]
 async fn end(ctx: Context<'_>) -> Result<()> {
   ctx.defer_ephemeral().await?;
@@ -225,7 +224,8 @@ async fn end(ctx: Context<'_>) -> Result<()> {
 
   let events = guild_id.scheduled_events(ctx, false).await?;
   for event in events {
-    if event.name.as_str().ends_with("Silent Sit") && event.status == ScheduledEventStatus::Active {
+    if event.name.as_str().ends_with("Mahabharata") && event.status == ScheduledEventStatus::Active
+    {
       let ctx_id = ctx.id();
       let confirm_id = format!("{ctx_id}confirm");
       let cancel_id = format!("{ctx_id}cancel");
@@ -284,7 +284,7 @@ async fn end(ctx: Context<'_>) -> Result<()> {
               CreateInteractionResponse::UpdateMessage(
                 CreateInteractionResponseMessage::new()
                   .content(format!(
-                    "{} Event ended. Thank you for your assistance!",
+                    "{} Event ended. Thank you for hosting!",
                     EMOJI.mminfo
                   ))
                   .ephemeral(true)
@@ -360,7 +360,10 @@ async fn end(ctx: Context<'_>) -> Result<()> {
     }
   }
 
-  let msg = format!("{} No active community sit event found.", EMOJI.mminfo);
+  let msg = format!(
+    "{} No active community book club event found.",
+    EMOJI.mminfo
+  );
   ctx
     .send(CreateReply::default().content(msg).ephemeral(true))
     .await?;

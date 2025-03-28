@@ -42,6 +42,7 @@ pub struct Roles {
   pub kofi: u64,
   pub staff: u64,
   pub community_sit_helper: u64,
+  pub community_book_club_host: u64,
 }
 
 pub const ROLES: Roles = Roles {
@@ -52,6 +53,7 @@ pub const ROLES: Roles = Roles {
   kofi: 1083219974509826048,
   staff: 788760128010059786,
   community_sit_helper: 1285275266549158050,
+  community_book_club_host: 1355086929229647990,
 };
 
 pub struct Channels {

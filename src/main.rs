@@ -1,4 +1,3 @@
-#![warn(tail_expr_drop_order)]
 #![warn(clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
 #![allow(clippy::too_many_lines)]
 
@@ -16,8 +15,8 @@ use tracing::info;
 use crate::commands::{
   add, add_bookmark, bookmark, challenge, coffee, community_sit, complete, course, courses,
   customize, erase, erase_message, extract, extract_text, glossary, hello, help, import, keys,
-  manage, pick_winner, ping, quote, quotes, recent, remove_entry, report_message, stats, streak,
-  suggest, terms, uptime, whatis,
+  mahabharata, manage, pick_winner, ping, quote, quotes, recent, remove_entry, report_message,
+  stats, streak, suggest, terms, uptime, whatis,
 };
 use crate::config::MEDITATION_MIND;
 use crate::data::bloom::{Context, Data};
@@ -85,6 +84,7 @@ async fn main() -> Result<()> {
         extract_text(),
         report_message(),
         community_sit(),
+        mahabharata(),
       ],
       event_handler: |ctx, event, _framework, data| Box::pin(Events::listen(ctx, event, data)),
       on_error: |error| Box::pin(async move { errors::handle(error).await }),
