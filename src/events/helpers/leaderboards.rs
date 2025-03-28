@@ -642,7 +642,7 @@ pub async fn update(
   info!(target: source, "Leaderboard: Refreshing views");
   let refresh_start = Instant::now();
   if let Err(err) = refresh(&task_conn).await {
-    error!(target: source, "Leaderboard: Error refreshing views: {:?}", err);
+    error!(target: source, "Leaderboard: Error refreshing views: {err:?}");
   }
   info!(
     target: source,
@@ -655,7 +655,7 @@ pub async fn update(
   info!(target: source, "Leaderboard: Generating images");
   let generation_start = Instant::now();
   if let Err(err) = generate(&task_http, &task_conn, &guild_id).await {
-    error!(target: source, "Leaderboard: Error generating images: {:?}", err);
+    error!(target: source, "Leaderboard: Error generating images: {err:?}");
   }
   info!(
     target: source,

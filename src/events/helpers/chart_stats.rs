@@ -90,7 +90,7 @@ pub async fn update(source: &str, task_conn: Arc<DatabaseHandler>) {
     info!(target: source, "Chart stats: Refreshing views");
     let refresh_start = Instant::now();
     if let Err(err) = refresh(&task_conn).await {
-      error!(target: source, "Chart stats: Error refreshing views: {:?}", err);
+      error!(target: source, "Chart stats: Error refreshing views: {err:?}");
     }
     info!(
       target: source,
