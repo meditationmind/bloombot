@@ -83,7 +83,7 @@ pub async fn commit_and_say(
 
       return Err(anyhow!("Could not send message: {e}"));
     }
-  };
+  }
 
   Ok(())
 }

@@ -144,7 +144,7 @@ async fn use_key(ctx: Context<'_>) -> Result<()> {
       .send(CreateReply::default().content(msg).ephemeral(true))
       .await?;
     return Ok(());
-  };
+  }
 
   let key = DatabaseHandler::get_key_and_mark_used(&mut transaction, &guild_id)
     .await?

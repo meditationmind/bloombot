@@ -270,7 +270,7 @@ impl<'a> Chart<'a> {
     match options.leaderboard_type {
       LeaderboardType::Top5 => data.truncate(6),
       LeaderboardType::Top10 => data.truncate(11),
-    };
+    }
     let title = match options.leaderboard_type {
       LeaderboardType::Top5 => String::from("Leaderboard (Top 5)"),
       LeaderboardType::Top10 => String::from("Leaderboard (Top 10)"),

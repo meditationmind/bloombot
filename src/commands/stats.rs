@@ -418,7 +418,7 @@ async fn leaderboard(
       Err(e) => {
         info!("Failed to open pre-generated leaderboard file: {e:?}");
       }
-    };
+    }
   }
 
   let guild_id = ctx

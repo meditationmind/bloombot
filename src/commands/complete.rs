@@ -85,7 +85,7 @@ pub async fn complete(
     );
     ctx.say(msg).await?;
     return Ok(());
-  };
+  }
 
   if let Ok(()) = member.remove_role(ctx, participant_role).await {
     let msg = format!(":tada: Congrats! You are now a graduate of the course: **{course_name}**!");
@@ -96,7 +96,7 @@ pub async fn complete(
       EMOJI.mminfo
     );
     ctx.say(msg).await?;
-  };
+  }
 
   // Log completion in staff logs.
   let log_embed = BloomBotEmbed::new()

@@ -29,7 +29,7 @@ pub async fn handle(error: FrameworkError<'_, Data, Error>) {
           .await
         {
           error!("While handling error, could not send message: {e}");
-        };
+        }
       }
 
       let command_name = ctx.command().qualified_name.as_str();
