@@ -203,9 +203,6 @@ async fn finalize_winner(
 
       return Ok(());
     }
-
-    // This is an unrelated button interaction.
-    continue;
   }
 
   let timeout_embed = BloomBotEmbed::new()
