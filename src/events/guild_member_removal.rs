@@ -5,6 +5,17 @@ use crate::config::{BloomBotEmbed, CHANNELS};
 
 pub async fn guild_member_removal(ctx: &Context, user: &User) -> Result<()> {
   let welcome_channel = ChannelId::new(CHANNELS.welcome);
+  let username = user
+    .name
+    .chars()
+    .map(|c| {
+      if matches!(c, '_') {
+        c.to_string()
+      } else {
+        format!("\\{c}")
+      }
+    })
+    .collect::<String>();
 
   welcome_channel
     .send_message(
@@ -13,8 +24,7 @@ pub async fn guild_member_removal(ctx: &Context, user: &User) -> Result<()> {
         BloomBotEmbed::new()
           .title("Member Left")
           .description(format!(
-            "We wish you well on your future endeavors, {} :pray:",
-            user.name
+            "We wish you well on your future endeavors, {username} :pray:"
           )),
       ),
     )
