@@ -10,9 +10,9 @@ pub async fn guild_member_removal(ctx: &Context, user: &User) -> Result<()> {
     .chars()
     .map(|c| {
       if matches!(c, '_') {
-        c.to_string()
-      } else {
         format!("\\{c}")
+      } else {
+        c.to_string()
       }
     })
     .collect::<String>();
