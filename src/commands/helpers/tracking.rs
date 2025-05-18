@@ -273,8 +273,7 @@ pub async fn update_streak_roles(
   streak: i32,
   privacy: bool,
 ) -> Result<()> {
-  #[allow(clippy::cast_sign_loss)]
-  let Some(updated_streak_role) = StreakRoles::from_streak(streak as u64) else {
+  let Some(updated_streak_role) = StreakRoles::from_streak(streak.cast_unsigned().into()) else {
     return Ok(());
   };
 
