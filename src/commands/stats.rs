@@ -3,7 +3,6 @@
 use anyhow::{Context as AnyhowContext, Result};
 use poise::serenity_prelude::{Colour, User, builder::*};
 use poise::{ChoiceParameter, CreateReply};
-use tracing::info;
 
 use crate::Context;
 use crate::charts::{Chart, LeaderboardOptions, StatsOptions};
@@ -11,7 +10,7 @@ use crate::commands::helpers::time::Timeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::tracking_profile::{Privacy, Status, privacy};
 use crate::database::DatabaseHandler;
-use crate::events::leaderboards::{self, LEADERBOARDS};
+use crate::events::leaderboards;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(ChoiceParameter)]
@@ -391,36 +390,6 @@ async fn leaderboard(
   let leaderboard_type = leaderboard_type.unwrap_or(LeaderboardType::Top5);
   let theme = theme.unwrap_or(Theme::DarkMode);
 
-  if matches!(theme, Theme::DarkMode) {
-    match open_leaderboard_file(&timeframe, &sort_by, &leaderboard_type).await {
-      Ok(pregen_chart) => {
-        let chart = pregen_chart;
-        let embed = BloomBotEmbed::new().image(chart.url());
-        let attachment = CreateAttachment::path(chart.path()).await?;
-
-        if let Err(err) = ctx
-          .send(
-            CreateReply::default()
-              .embed(embed)
-              .ephemeral(false)
-              .attachment(attachment),
-          )
-          .await
-        {
-          info!("Failed to send pre-generated leaderboard file: {err:?}");
-          let msg = format!("{} Sorry, no leaderboard data available.", EMOJI.mminfo);
-          ctx
-            .send(CreateReply::default().content(msg).ephemeral(true))
-            .await?;
-        }
-        return Ok(());
-      }
-      Err(e) => {
-        info!("Failed to open pre-generated leaderboard file: {e:?}");
-      }
-    }
-  }
-
   let guild_id = ctx
     .guild_id()
     .with_context(|| "Failed to retrieve guild ID from context")?;
@@ -463,69 +432,4 @@ async fn leaderboard(
   chart.remove().await?;
 
   Ok(())
-}
-
-async fn open_leaderboard_file<'a>(
-  timeframe: &'a Timeframe,
-  sort_by: &'a SortBy,
-  leaderboard_type: &'a LeaderboardType,
-) -> Result<Chart<'a>> {
-  match timeframe {
-    Timeframe::Yearly => match sort_by {
-      SortBy::Minutes => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.year_min_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.year_min_top10_dark).await?),
-      },
-      SortBy::Sessions => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.year_ses_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.year_ses_top10_dark).await?),
-      },
-      SortBy::Streak => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.year_str_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.year_str_top10_dark).await?),
-      },
-    },
-    Timeframe::Monthly => match sort_by {
-      SortBy::Minutes => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.month_min_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.month_min_top10_dark).await?),
-      },
-      SortBy::Sessions => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.month_ses_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.month_ses_top10_dark).await?),
-      },
-      SortBy::Streak => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.month_str_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.month_str_top10_dark).await?),
-      },
-    },
-    Timeframe::Weekly => match sort_by {
-      SortBy::Minutes => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.week_min_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.week_min_top10_dark).await?),
-      },
-      SortBy::Sessions => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.week_ses_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.week_ses_top10_dark).await?),
-      },
-      SortBy::Streak => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.week_str_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.week_str_top10_dark).await?),
-      },
-    },
-    Timeframe::Daily => match sort_by {
-      SortBy::Minutes => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.day_min_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.day_min_top10_dark).await?),
-      },
-      SortBy::Sessions => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.day_ses_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.day_ses_top10_dark).await?),
-      },
-      SortBy::Streak => match leaderboard_type {
-        LeaderboardType::Top5 => Ok(Chart::open(LEADERBOARDS.day_str_top5_dark).await?),
-        LeaderboardType::Top10 => Ok(Chart::open(LEADERBOARDS.day_str_top10_dark).await?),
-      },
-    },
-  }
 }

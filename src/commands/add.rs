@@ -173,9 +173,7 @@ pub async fn add(
   if guild_hours.is_some() {
     tokio::spawn(events::leaderboards::update(
       module_path!(),
-      ctx.serenity_context().http.clone(),
       ctx.data().db.clone(),
-      guild_id,
     ));
   }
 
