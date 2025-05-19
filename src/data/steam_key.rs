@@ -128,7 +128,7 @@ impl ExistsQuery for SteamKey {
 
 impl PageRow for SteamKey {
   fn title(&self, _page_type: PageType) -> String {
-    self.key.clone()
+    format!("`{}`", self.key.clone())
   }
 
   fn body(&self) -> String {

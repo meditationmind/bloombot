@@ -130,7 +130,7 @@ impl ExistsQuery for Course {
 
 impl PageRow for Course {
   fn title(&self, _page_type: PageType) -> String {
-    self.name.clone()
+    format!("`{}`", self.name.clone())
   }
 
   fn body(&self) -> String {

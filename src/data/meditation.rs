@@ -210,7 +210,7 @@ impl PageRow for Meditation {
 
   fn body(&self) -> String {
     format!(
-      "Date: `{}`\nID: `{}`",
+      "Date: {}\nID: `{}`",
       self.occurred_at.format("%Y-%m-%d %H:%M"),
       self.id
     )

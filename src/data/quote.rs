@@ -157,7 +157,7 @@ impl ExistsQuery for Quote {
 
 impl PageRow for Quote {
   fn title(&self, _page_type: PageType) -> String {
-    format!("`ID: {}`", self.id)
+    format!("ID: `{}`", self.id)
   }
 
   fn body(&self) -> String {
