@@ -184,6 +184,8 @@ pub async fn import(
     return Ok(());
   }
 
+  let time = tracking::format_time(import.minutes, import.seconds);
+
   let user_sum =
     DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, &user_id).await?;
 
@@ -192,7 +194,7 @@ pub async fn import(
     &mut transaction,
     &guild_id,
     &user_id,
-    &(import.minutes + (import.seconds / 60)),
+    time.as_str(),
     &user_sum,
     privacy,
   )
@@ -207,12 +209,8 @@ pub async fn import(
 
   let guild_time_in_hours = tracking::get_guild_hours(&mut transaction, &guild_id).await?;
 
-  let h = (import.minutes + (import.seconds / 60)) / 60;
-  let m = (import.minutes + (import.seconds / 60)) % 60;
-  let s = import.seconds % 60;
-
   let success_response = format!(
-    "{} Successfully added a total of {h}h {m}m {s}s from {result} {} imported from {}.",
+    "{} Successfully added a total of {time}from {result} {} imported from {}.",
     EMOJI.mmcheck,
     if result == 1 { "entry" } else { "entries" },
     import.source

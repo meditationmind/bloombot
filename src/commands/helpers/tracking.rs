@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use anyhow::Result;
 use poise::CreateReply;
 use poise::serenity_prelude::{ChannelId, CreateAllowedMentions, CreateMessage, GuildId};
@@ -83,6 +85,33 @@ pub fn minimize_markdown(text: &str) -> String {
     .collect::<String>()
 }
 
+/// Takes `minutes` and `seconds` as input and outputs a [`String`] that displays hours,
+/// minutes, and seconds in a user-friendly format, omitting zero-value units and pluralizing
+/// as appropriate. Note that output includes a trailing space.
+pub fn format_time(minutes: i32, seconds: i32) -> String {
+  let h = (minutes + (seconds / 60)) / 60;
+  let m = (minutes + (seconds / 60)) % 60;
+  let s = seconds % 60;
+
+  let hours = match h.cmp(&1) {
+    Ordering::Less => String::new(),
+    Ordering::Equal => format!("{h} hour "),
+    Ordering::Greater => format!("{h} hours "),
+  };
+  let minutes = match m.cmp(&1) {
+    Ordering::Less => String::new(),
+    Ordering::Equal => format!("{m} minute "),
+    Ordering::Greater => format!("{m} minutes "),
+  };
+  let seconds = match s.cmp(&1) {
+    Ordering::Less => String::new(),
+    Ordering::Equal => format!("{s} second "),
+    Ordering::Greater => format!("{s} seconds "),
+  };
+
+  format!("{hours}{minutes}{seconds}")
+}
+
 /// Displays confirmation of time added via [`add`][add] or [`import`][import] and attempts to
 /// include a random quote from the database. If a quote could not be fetched, the notification
 /// is posted with the quote omitted.
@@ -100,7 +129,7 @@ pub async fn show_add_with_quote(
   transaction: &mut Transaction<'_, Postgres>,
   guild_id: &GuildId,
   user_id: &UserId,
-  minutes: &i32,
+  time: &str,
   user_sum: &i64,
   privacy: bool,
 ) -> Result<String> {
@@ -111,28 +140,28 @@ pub async fn show_add_with_quote(
 
     if privacy {
       Ok(format!(
-        "Someone just added **{minutes} minutes** to their meditation time! :tada:\n*{quote}*"
+        "Someone just added **{time}**to their meditation time! :tada:\n*{quote}*"
       ))
     } else if ctx.command().name == "add" {
       Ok(format!(
-        "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
+        "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
       ))
     } else {
       Ok(format!(
-        "<@{user_id}> added **{minutes} minutes** to their meditation time! Their total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
+        "<@{user_id}> added **{time}**to their meditation time! Their total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
       ))
     }
   } else if privacy {
     Ok(format!(
-      "Someone just added **{minutes} minutes** to their meditation time! :tada:"
+      "Someone just added **{time}**to their meditation time! :tada:"
     ))
   } else if ctx.command().name == "add" {
     Ok(format!(
-      "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+      "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
     ))
   } else {
     Ok(format!(
-      "<@{user_id}> added **{minutes} minutes** to their meditation time! Their total meditation time is now {user_sum} minutes :tada:"
+      "<@{user_id}> added **{time}**to their meditation time! Their total meditation time is now {user_sum} minutes :tada:"
     ))
   }
 }

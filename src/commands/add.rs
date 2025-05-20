@@ -89,6 +89,7 @@ pub async fn add(
 
   let seconds = seconds.unwrap_or(0);
   let (minutes, seconds) = (minutes + (seconds / 60), seconds % 60);
+  let time = tracking::format_time(minutes, seconds);
 
   let meditation = Meditation::new(guild_id, user_id, minutes, seconds, &datetime);
 
@@ -102,7 +103,7 @@ pub async fn add(
     &mut transaction,
     &guild_id,
     &user_id,
-    &minutes,
+    time.as_str(),
     &user_sum,
     privacy,
   )
@@ -136,7 +137,7 @@ pub async fn add(
     }
   } else if privacy {
     let private_response = format!(
-      "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+      "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
     );
     database::commit_and_say(
       ctx,
@@ -195,11 +196,14 @@ async fn large_add(
   let confirm_id = format!("{ctx_id}confirm");
   let cancel_id = format!("{ctx_id}cancel");
 
+  let time = tracking::format_time(minutes, seconds);
+
   let check = ctx
     .send(
       CreateReply::default()
         .content(format!(
-          "Are you sure you want to add **{minutes}** minutes to your meditation time?"
+          "Are you sure you want to add **{}**to your meditation time?",
+          time.as_str()
         ))
         .ephemeral(privacy)
         .components(vec![CreateActionRow::Buttons(vec![
@@ -235,7 +239,7 @@ async fn large_add(
             if privacy {
               CreateInteractionResponseMessage::new()
                 .content(format!(
-                  "Added **{minutes} minutes** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+                  "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
                 ))
                 .ephemeral(privacy)
                 .components(Vec::new())
