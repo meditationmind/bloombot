@@ -377,13 +377,13 @@ fn process_stats(stats: &User, timeframe: &ChallengeTimeframe) -> Result<Process
   } else {
     String::new()
   };
-  let total_m = if total_min > 0.0 {
-    format!("{total_min:.0}m ")
+  let total_s = if total_sec > 0.0 {
+    format!("{total_sec:.0}s")
   } else {
     String::new()
   };
-  let total_s = if total_sec > 0.0 {
-    format!("{total_sec:.0}s")
+  let total_m = if (total_min > 0.0) || (total_h.is_empty() && total_s.is_empty()) {
+    format!("{total_min:.0}m ")
   } else {
     String::new()
   };
@@ -398,13 +398,13 @@ fn process_stats(stats: &User, timeframe: &ChallengeTimeframe) -> Result<Process
   } else {
     String::new()
   };
-  let avg_m = if avg_min > 0.0 {
-    format!("{avg_min:.0}m ")
+  let avg_s = if avg_sec > 0.0 {
+    format!("{avg_sec:.0}s")
   } else {
     String::new()
   };
-  let avg_s = if avg_sec > 0.0 {
-    format!("{avg_sec:.0}s")
+  let avg_m = if (avg_min > 0.0) || (avg_h.is_empty() && avg_s.is_empty()) {
+    format!("{avg_min:.0}m ")
   } else {
     String::new()
   };
