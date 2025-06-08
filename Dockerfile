@@ -18,4 +18,5 @@ FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y ca-certificates libssl-dev libfontconfig1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/target/release/bloombot /usr/local/bin
+COPY assets /usr/local/assets/
 ENTRYPOINT ["/usr/local/bin/bloombot"]
