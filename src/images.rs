@@ -95,8 +95,6 @@ impl<'a> Image<'a> {
   }
 
   pub fn bests(self, bests_data: &Bests) -> Result<Self> {
-    // For debug build
-    // let mut background = image::open("./assets/bests-template.png")?;
     let mut background = image::open("/app/assets/bests-template.png")?;
 
     // Prepare font
