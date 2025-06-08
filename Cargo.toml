@@ -27,6 +27,9 @@ serde_json = "1.0"
 resvg = "0.45.0"
 charts-rs = { version = "0.3", features = ["image-encoder"] }
 # charts-rs = { git = "https://github.com/vicanso/charts-rs", branch = "main", features = ["image-encoder"] }
+text_on_image = "0.1.0"
+image = "0.24.8"
+rusttype = "0.9.3"
 
 [patch.crates-io]
 serenity = { git = "https://github.com/serenity-rs/serenity", branch = "current" }
