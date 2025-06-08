@@ -2,7 +2,7 @@ use std::env;
 use std::pin::Pin;
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration};
 use chrono::{Timelike, Utc};
 use futures::{StreamExt, TryStreamExt, stream::Stream};
@@ -16,7 +16,7 @@ use tokio::time;
 use tracing::{info, warn};
 
 use crate::commands::helpers::time::{ChallengeTimeframe, Timeframe};
-use crate::commands::stats::{LeaderboardType, SortBy};
+use crate::commands::stats::{BestsType, LeaderboardType, SortBy};
 use crate::data::bookmark::Bookmark;
 use crate::data::common::{Aggregate, Exists, MaterializedView, Migration, ViewType};
 use crate::data::course::Course;
@@ -25,8 +25,8 @@ use crate::data::meditation::Meditation;
 use crate::data::pick_winner;
 use crate::data::quote::Quote;
 use crate::data::star_message::StarMessage;
-use crate::data::stats::{ByInterval, Streak, Timeframe as TimeframeStats, User};
-use crate::data::stats::{LeaderboardUser, MeditationCountByDay};
+use crate::data::stats::{BestData, Bests, BestsOptions, BestsPeriod, ByInterval, Streak, User};
+use crate::data::stats::{LeaderboardUser, MeditationCountByDay, Timeframe as TimeframeStats};
 use crate::data::steam_key::{Recipient, SteamKey};
 use crate::data::term::{Term, VectorSearch};
 use crate::data::tracking_profile::TrackingProfile;
@@ -1174,6 +1174,70 @@ impl DatabaseHandler {
         .fetch_all(&mut **transaction)
         .await?,
     )
+  }
+
+  pub async fn get_user_bests_overall(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+  ) -> Result<Bests> {
+    let times_day = BestData::user_times(*guild_id, *user_id, &Timeframe::Daily, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+    let times_week = BestData::user_times(*guild_id, *user_id, &Timeframe::Weekly, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+    let times_month = BestData::user_times(*guild_id, *user_id, &Timeframe::Monthly, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+    let times_year = BestData::user_times(*guild_id, *user_id, &Timeframe::Yearly, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+    let sessions_day = BestData::user_sessions(*guild_id, *user_id, &Timeframe::Daily, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+    let sessions_week = BestData::user_sessions(*guild_id, *user_id, &Timeframe::Weekly, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+    let sessions_month = BestData::user_sessions(*guild_id, *user_id, &Timeframe::Monthly, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+    let sessions_year = BestData::user_sessions(*guild_id, *user_id, &Timeframe::Yearly, 1)
+      .fetch_optional(&mut **transaction)
+      .await?;
+
+    let times = BestsPeriod::new(times_day, times_week, times_month, times_year);
+    let sessions = BestsPeriod::new(sessions_day, sessions_week, sessions_month, sessions_year);
+    let bests = Bests::new(times, sessions);
+
+    Ok(bests)
+  }
+
+  pub async fn get_user_bests(
+    transaction: &mut Transaction<'_, Postgres>,
+    guild_id: &GuildId,
+    user_id: &UserId,
+    options: &BestsOptions,
+  ) -> Result<Vec<BestData>> {
+    let limit = match options.number {
+      LeaderboardType::Top5 => 5,
+      LeaderboardType::Top10 => 10,
+    };
+    let bests = match options.category {
+      BestsType::Times => {
+        BestData::user_times(*guild_id, *user_id, &options.timeframe, limit)
+          .fetch_all(&mut **transaction)
+          .await?
+      }
+      BestsType::Sessions => {
+        BestData::user_sessions(*guild_id, *user_id, &options.timeframe, limit)
+          .fetch_all(&mut **transaction)
+          .await?
+      }
+      BestsType::Overall => return Err(anyhow!("Overall bests should return an image")),
+    };
+
+    Ok(bests)
   }
 
   pub async fn get_user_stats(

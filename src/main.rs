@@ -30,6 +30,7 @@ mod config;
 mod data;
 mod events;
 mod handlers;
+mod images;
 
 #[tokio::main]
 async fn main() -> Result<()> {

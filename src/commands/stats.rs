@@ -1,6 +1,8 @@
 #![allow(clippy::unused_async)]
 
-use anyhow::{Context as AnyhowContext, Result};
+use std::fmt::Write as _;
+
+use anyhow::{Context as AnyhowContext, Result, anyhow};
 use poise::serenity_prelude::{Colour, User, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 
@@ -8,16 +10,18 @@ use crate::Context;
 use crate::charts::{Chart, LeaderboardOptions, StatsOptions};
 use crate::commands::helpers::time::Timeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
+use crate::data::stats::BestsOptions;
 use crate::data::tracking_profile::{Privacy, Status, privacy};
 use crate::database::DatabaseHandler;
 use crate::events::leaderboards;
+use crate::images::Image;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(ChoiceParameter)]
 pub enum StatsType {
   #[name = "minutes"]
   MeditationMinutes,
-  #[name = "count"]
+  #[name = "sessions"]
   MeditationCount,
 }
 
@@ -50,6 +54,16 @@ pub enum LeaderboardType {
 }
 
 #[derive(ChoiceParameter)]
+pub enum BestsType {
+  #[name = "overall"]
+  Overall,
+  #[name = "times"]
+  Times,
+  #[name = "sessions"]
+  Sessions,
+}
+
+#[derive(ChoiceParameter)]
 pub enum Theme {
   #[name = "light mode"]
   LightMode,
@@ -63,7 +77,7 @@ pub enum Theme {
 #[poise::command(
   slash_command,
   category = "Meditation Tracking",
-  subcommands("user", "server", "leaderboard"),
+  subcommands("user", "server", "leaderboard", "bests"),
   subcommand_required,
   guild_only
 )]
@@ -430,6 +444,147 @@ async fn leaderboard(
     .await?;
 
   chart.remove().await?;
+
+  Ok(())
+}
+
+/// Show tracking personal bests
+///
+/// Shows meditation tracking personal bests.
+///
+/// Defaults to overall bests, producing an image featuring the top time and session count for each period. For overall bests, visibility honors the user's tracking privacy settings by default, but can be optionally specified.
+///
+/// Time and session categories are displayed via private message, defaulting to Top 5 daily bests. Optionally specify the timeframe (daily, weekly, monthly, or yearly) and number of bests (Top 5 or Top 10).
+#[poise::command(slash_command)]
+async fn bests(
+  ctx: Context<'_>,
+  #[description = "User to see bests for (Defaults to you)"] user: Option<User>,
+  #[description = "Bests category (Defaults to overall)"] category: Option<BestsType>,
+  #[description = "Bests timeframe (Defaults to daily)"] timeframe: Option<Timeframe>,
+  #[description = "Number of bests (Defaults to Top 5)"] number: Option<LeaderboardType>,
+  #[description = "Visibility of the response (Defaults to public)"] privacy: Option<Privacy>,
+) -> Result<()> {
+  let guild_id = ctx
+    .guild_id()
+    .with_context(|| "Failed to retrieve guild ID from context")?;
+
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+
+  let user = user.as_ref().unwrap_or_else(|| ctx.author());
+  let user_nick_or_name = user.nick_in(&ctx, guild_id).await.unwrap_or_else(|| {
+    user
+      .global_name
+      .as_deref()
+      .unwrap_or(user.name.as_str())
+      .to_string()
+  });
+
+  let tracking_profile =
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user.id)
+      .await?
+      .unwrap_or_default();
+
+  let privacy = privacy!(privacy, tracking_profile.stats.privacy);
+  let category = category.unwrap_or(BestsType::Overall);
+
+  if privacy || !matches!(category, BestsType::Overall) {
+    ctx.defer_ephemeral().await?;
+  } else {
+    ctx.defer().await?;
+  }
+
+  if ctx.author().id != user.id
+    && tracking_profile.stats.privacy == Privacy::Private
+    && !ctx.author().has_role(&ctx, guild_id, ROLES.staff).await?
+  {
+    let msg = format!("Sorry, {user_nick_or_name}'s stats are set to private.");
+    ctx
+      .send(CreateReply::default().content(msg).ephemeral(true))
+      .await?;
+    return Ok(());
+  }
+
+  if matches!(category, BestsType::Overall) {
+    let bests_data =
+      DatabaseHandler::get_user_bests_overall(&mut transaction, &guild_id, &user.id).await?;
+    let image = Image::new();
+    let image = match image.bests(&bests_data) {
+      Ok(image) => image,
+      Err(e) => {
+        if e.to_string() == "No tracking data found" {
+          let msg = format!(
+            "{} No tracking data found. To start tracking, just use </add:1135659962031415376>.\n-# Learn more about [tracking features](<https://meditationmind.org/bloom/>), including [time zone and privacy](<https://meditationmind.org/bloom/#customize>) settings, [importing data](<https://meditationmind.org/bloom/#import>) from Insight Timer and other apps, and more.",
+            EMOJI.mminfo
+          );
+          ctx
+            .send(CreateReply::default().content(msg).ephemeral(true))
+            .await?;
+          return Ok(());
+        }
+        return Err(e);
+      }
+    };
+
+    let attachment = CreateAttachment::path(image.path()).await?;
+    let content = format!("**Meditation Tracking Personal Bests**\n-# for {user_nick_or_name}");
+
+    ctx
+      .send(
+        CreateReply::default()
+          .content(content)
+          .attachment(attachment),
+      )
+      .await?;
+
+    image.remove().await?;
+    return Ok(());
+  }
+
+  let timeframe = timeframe.unwrap_or(Timeframe::Daily);
+  let number = number.unwrap_or(LeaderboardType::Top5);
+  let options = BestsOptions::new(category, timeframe, number);
+  let bests =
+    DatabaseHandler::get_user_bests(&mut transaction, &guild_id, &user.id, &options).await?;
+
+  if bests.is_empty() {
+    let msg = format!("{} No valid tracking data found.", EMOJI.mminfo);
+    ctx.send(CreateReply::default().content(msg)).await?;
+    return Ok(());
+  }
+
+  let mut content = String::new();
+  for (i, best) in bests.iter().enumerate() {
+    let _ = writeln!(
+      content,
+      "{}. **{}** \n -# {}",
+      i + 1,
+      match options.category {
+        BestsType::Times => best.total_to_hms_full(),
+        BestsType::Sessions => best.total_to_sessions(),
+        BestsType::Overall => return Err(anyhow!("Overall bests should return an image")),
+      },
+      match options.timeframe {
+        Timeframe::Yearly => best.date_to_year(),
+        Timeframe::Monthly => best.date_to_month(),
+        Timeframe::Weekly => best.date_to_week(),
+        Timeframe::Daily => best.date_to_day(),
+      }
+    );
+  }
+
+  let author = CreateEmbedAuthor::new(format!(
+    "{} {} for {}",
+    options.timeframe.name(),
+    match options.category {
+      BestsType::Times => "Time Bests",
+      BestsType::Sessions => "Session Bests",
+      BestsType::Overall => return Err(anyhow!("Overall bests should return an image")),
+    },
+    user_nick_or_name
+  ))
+  .icon_url(user.avatar_url().unwrap_or_default());
+  let embed = BloomBotEmbed::new().author(author).description(content);
+  ctx.send(CreateReply::default().embed(embed)).await?;
 
   Ok(())
 }

@@ -1,4 +1,6 @@
-use chrono::{DateTime, Utc};
+use std::cmp::Ordering;
+
+use chrono::{DateTime, Datelike, Duration, Utc};
 use poise::serenity_prelude::{GuildId, UserId};
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
@@ -6,7 +8,7 @@ use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};
 use ulid::Ulid;
 
 use crate::commands::helpers::time::Timeframe as StatsTimeframe;
-use crate::commands::stats::{LeaderboardType, SortBy};
+use crate::commands::stats::{BestsType, LeaderboardType, SortBy};
 use crate::data::common;
 use crate::handlers::database::UpdateQuery;
 
@@ -52,6 +54,32 @@ pub struct ByInterval {
 pub struct User {
   pub sessions: Timeframe,
   pub streak: Streak,
+}
+
+#[derive(Default, FromRow)]
+pub struct BestData {
+  pub date: DateTime<Utc>,
+  pub total: i64,
+}
+
+#[derive(Default)]
+pub struct BestsPeriod {
+  pub day: Option<BestData>,
+  pub week: Option<BestData>,
+  pub month: Option<BestData>,
+  pub year: Option<BestData>,
+}
+
+#[derive(Default)]
+pub struct Bests {
+  pub times: BestsPeriod,
+  pub sessions: BestsPeriod,
+}
+
+pub struct BestsOptions {
+  pub category: BestsType,
+  pub timeframe: StatsTimeframe,
+  pub number: LeaderboardType,
 }
 
 impl Streak {
@@ -335,5 +363,199 @@ impl ByInterval {
 impl User {
   pub fn new(sessions: Timeframe, streak: Streak) -> Self {
     Self { sessions, streak }
+  }
+}
+
+impl BestData {
+  pub fn user_times<'a>(
+    guild_id: GuildId,
+    user_id: UserId,
+    timeframe: &StatsTimeframe,
+    limit: i32,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    let query = match timeframe {
+      StatsTimeframe::Yearly => {
+        "SELECT DATE_TRUNC('year', occurred_at) AS date, (SUM(meditation_minutes) * 60 + SUM(meditation_seconds)) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+      StatsTimeframe::Monthly => {
+        "SELECT DATE_TRUNC('month', occurred_at) AS date, (SUM(meditation_minutes) * 60 + SUM(meditation_seconds)) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+      StatsTimeframe::Weekly => {
+        "SELECT DATE_TRUNC('week', occurred_at) AS date, (SUM(meditation_minutes) * 60 + SUM(meditation_seconds)) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+      StatsTimeframe::Daily => {
+        "SELECT DATE_TRUNC('day', occurred_at) AS date, (SUM(meditation_minutes) * 60 + SUM(meditation_seconds)) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+    };
+
+    sqlx::query_as(query)
+      .bind(guild_id.to_string())
+      .bind(user_id.to_string())
+      .bind(limit)
+  }
+
+  pub fn user_sessions<'a>(
+    guild_id: GuildId,
+    user_id: UserId,
+    timeframe: &StatsTimeframe,
+    limit: i32,
+  ) -> QueryAs<'a, Postgres, Self, PgArguments> {
+    let query = match timeframe {
+      StatsTimeframe::Yearly => {
+        "SELECT DATE_TRUNC('year', occurred_at) AS date, COUNT(record_id) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+      StatsTimeframe::Monthly => {
+        "SELECT DATE_TRUNC('month', occurred_at) AS date, COUNT(record_id) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+      StatsTimeframe::Weekly => {
+        "SELECT DATE_TRUNC('week', occurred_at) AS date, COUNT(record_id) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+      StatsTimeframe::Daily => {
+        "SELECT DATE_TRUNC('day', occurred_at) AS date, COUNT(record_id) AS total FROM meditation WHERE guild_id = $1 AND user_id = $2 GROUP BY date ORDER BY total DESC LIMIT $3"
+      }
+    };
+
+    sqlx::query_as(query)
+      .bind(guild_id.to_string())
+      .bind(user_id.to_string())
+      .bind(limit)
+  }
+
+  /// Converts a [`BestData::total`] value to a [`String`] in the format: `00 h 00 m 00 s`.
+  /// Zero-value units are omitted. Used to display time bests.
+  pub fn total_to_hms(&self) -> String {
+    let h = (self.total / 60) / 60;
+    let m = (self.total / 60) % 60;
+    let s = self.total % 60;
+
+    let hours = if h < 1 {
+      String::new()
+    } else {
+      format!("{h} h ")
+    };
+    let minutes = if m < 1 {
+      String::new()
+    } else {
+      format!("{m} m ")
+    };
+    let seconds = if s < 1 {
+      String::new()
+    } else {
+      format!("{s} s ")
+    };
+
+    format!("{hours}{minutes}{seconds}")
+  }
+
+  /// Converts a [`BestData::total`] value to a [`String`] in the format:
+  /// `00 hours 00 minutes 00 seconds`. Units are pluralized when appropriate and
+  /// zero-value units are omitted. Used to display time bests.
+  pub fn total_to_hms_full(&self) -> String {
+    let h = (self.total / 60) / 60;
+    let m = (self.total / 60) % 60;
+    let s = self.total % 60;
+
+    let hours = match h.cmp(&1) {
+      Ordering::Less => String::new(),
+      Ordering::Equal => format!("{h} hour "),
+      Ordering::Greater => format!("{h} hours "),
+    };
+    let minutes = match m.cmp(&1) {
+      Ordering::Less => String::new(),
+      Ordering::Equal => format!("{m} minute "),
+      Ordering::Greater => format!("{m} minutes "),
+    };
+    let seconds = match s.cmp(&1) {
+      Ordering::Less => String::new(),
+      Ordering::Equal => format!("{s} second "),
+      Ordering::Greater => format!("{s} seconds "),
+    };
+
+    format!("{hours}{minutes}{seconds}")
+  }
+
+  /// Converts a [`BestData::total`] value to a [`String`] in the format: `00 sessions`.
+  /// Unit is pluralized when appropriate. Used to display session bests.
+  pub fn total_to_sessions(&self) -> String {
+    if self.total == 1 {
+      format!("{} session", self.total)
+    } else {
+      format!("{} sessions", self.total)
+    }
+  }
+
+  /// Converts a [`BestData::date`] value to a [`String`] in the format: `Month DD, YYYY`.
+  /// Used to display dates for daily bests.
+  pub fn date_to_day(&self) -> String {
+    format!("{}", self.date.format("%B %d, %Y"))
+  }
+
+  /// Converts a [`BestData::date`] value to a [`String`] in the format: `Month DD-DD, YYYY`
+  /// or `Month DD-Month DD, YYYY`. Used to display dates for weekly bests.
+  pub fn date_to_week(&self) -> String {
+    let start = self.date.format("%B %d");
+    let end = {
+      let end_date = self.date + Duration::days(6);
+      if self.date.month() == end_date.month() {
+        end_date.format("%d")
+      } else {
+        end_date.format("%B %d")
+      }
+    };
+    format!("{start}-{end}, {}", self.date.year())
+  }
+
+  /// Converts a [`BestData::date`] value to a [`String`] in the format: `Month YYYY`.
+  /// Used to display dates for monthly bests.
+  pub fn date_to_month(&self) -> String {
+    format!("{}", self.date.format("%B %Y"))
+  }
+
+  /// Converts a [`BestData::date`] value to a [`String`] in the format: `YYYY`.
+  /// Used to display dates for yearly bests.
+  pub fn date_to_year(&self) -> String {
+    format!("{}", self.date.year())
+  }
+}
+
+impl BestsPeriod {
+  pub fn new(
+    day: Option<BestData>,
+    week: Option<BestData>,
+    month: Option<BestData>,
+    year: Option<BestData>,
+  ) -> Self {
+    Self {
+      day,
+      week,
+      month,
+      year,
+    }
+  }
+}
+
+impl Bests {
+  pub fn new(times: BestsPeriod, sessions: BestsPeriod) -> Self {
+    Self { times, sessions }
+  }
+}
+
+impl BestsOptions {
+  pub fn new(category: BestsType, timeframe: StatsTimeframe, number: LeaderboardType) -> Self {
+    Self {
+      category,
+      timeframe,
+      number,
+    }
+  }
+}
+
+impl Default for BestsOptions {
+  fn default() -> Self {
+    Self {
+      category: BestsType::Overall,
+      timeframe: StatsTimeframe::Daily,
+      number: LeaderboardType::Top5,
+    }
   }
 }
