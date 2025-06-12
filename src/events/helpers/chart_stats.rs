@@ -4,7 +4,6 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use chrono::{Duration as ChronoDuration, Utc};
 use log::{error, info};
-use sqlx::{Connection, PgConnection};
 use tokio::time;
 
 use crate::commands::helpers::time::Timeframe;
@@ -16,27 +15,19 @@ use crate::database::DatabaseHandler;
 ///
 /// [stats]: crate::commands::stats::stats
 async fn refresh(db: &DatabaseHandler) -> Result<()> {
-  let mut transaction = db.start_transaction().await?;
+  let mut transaction = db.start_transaction_with_retry(5).await?;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Weekly).await?;
+  transaction.commit().await?;
+
   time::sleep(Duration::from_secs(60 * 2)).await;
 
-  let mut transaction = if PgConnection::ping(&mut *transaction).await.is_ok() {
-    transaction
-  } else {
-    info!(target: "bloombot::database","Connection closed. Reconnecting.");
-    db.start_transaction().await?
-  };
-
+  let mut transaction = db.start_transaction_with_retry(5).await?;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Monthly).await?;
+  transaction.commit().await?;
+
   time::sleep(Duration::from_secs(60 * 2)).await;
 
-  let mut transaction = if PgConnection::ping(&mut *transaction).await.is_ok() {
-    transaction
-  } else {
-    info!(target: "bloombot::database","Connection closed. Reconnecting.");
-    db.start_transaction().await?
-  };
-
+  let mut transaction = db.start_transaction_with_retry(5).await?;
   DatabaseHandler::refresh_chart_stats(&mut transaction, &Timeframe::Yearly).await?;
   transaction.commit().await?;
 
@@ -89,15 +80,15 @@ pub async fn update(source: &str, task_conn: Arc<DatabaseHandler>) {
 
     info!(target: source, "Chart stats: Refreshing views");
     let refresh_start = Instant::now();
-    if let Err(err) = refresh(&task_conn).await {
-      error!(target: source, "Chart stats: Error refreshing views: {err:?}");
+    match refresh(&task_conn).await {
+      Ok(()) => info!(
+        target: source,
+        "Chart stats: Refresh completed in {:#?}",
+        refresh_start
+          .elapsed()
+          .saturating_sub(Duration::from_secs(60 * 4))
+      ),
+      Err(err) => error!(target: source, "Chart stats: Error refreshing views: {err:?}"),
     }
-    info!(
-      target: source,
-      "Chart stats: Refresh completed in {:#?}",
-      refresh_start
-        .elapsed()
-        .saturating_sub(Duration::from_secs(60 * 4))
-    );
   }
 }
