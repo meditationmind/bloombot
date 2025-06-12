@@ -504,6 +504,18 @@ async fn bests(
     return Ok(());
   }
 
+  let no_data_msg = if user.id == ctx.author().id {
+    format!(
+      "{} No tracking data found. To start tracking, just use </add:1135659962031415376>.\n-# Learn more about [tracking features](<https://meditationmind.org/bloom/>), including [time zone and privacy](<https://meditationmind.org/bloom/#customize>) settings, [importing data](<https://meditationmind.org/bloom/#import>) from Insight Timer and other apps, and more.",
+      EMOJI.mminfo
+    )
+  } else {
+    format!(
+      "{} No tracking data found for {user_nick_or_name}.",
+      EMOJI.mminfo
+    )
+  };
+
   if matches!(category, BestsType::Overall) {
     let bests_data =
       DatabaseHandler::get_user_bests_overall(&mut transaction, &guild_id, &user.id).await?;
@@ -512,18 +524,9 @@ async fn bests(
       Ok(image) => image,
       Err(e) => {
         if e.to_string() == "No tracking data found" {
-          let msg = if user.id == ctx.author().id {
-            format!(
-              "{} No tracking data found. To start tracking, just use </add:1135659962031415376>.\n-# Learn more about [tracking features](<https://meditationmind.org/bloom/>), including [time zone and privacy](<https://meditationmind.org/bloom/#customize>) settings, [importing data](<https://meditationmind.org/bloom/#import>) from Insight Timer and other apps, and more.",
-              EMOJI.mminfo
-            )
-          } else {
-            format!(
-              "{} No tracking data found for {user_nick_or_name}.",
-              EMOJI.mminfo
-            )
-          };
-          ctx.send(CreateReply::default().content(msg)).await?;
+          ctx
+            .send(CreateReply::default().content(no_data_msg))
+            .await?;
           return Ok(());
         }
         return Err(e);
@@ -558,18 +561,9 @@ async fn bests(
     DatabaseHandler::get_user_bests(&mut transaction, &guild_id, &user.id, &options).await?;
 
   if bests.is_empty() {
-    let msg = if user.id == ctx.author().id {
-      format!(
-        "{} No tracking data found. To start tracking, just use </add:1135659962031415376>.\n-# Learn more about [tracking features](<https://meditationmind.org/bloom/>), including [time zone and privacy](<https://meditationmind.org/bloom/#customize>) settings, [importing data](<https://meditationmind.org/bloom/#import>) from Insight Timer and other apps, and more.",
-        EMOJI.mminfo
-      )
-    } else {
-      format!(
-        "{} No tracking data found for {user_nick_or_name}.",
-        EMOJI.mminfo
-      )
-    };
-    ctx.send(CreateReply::default().content(msg)).await?;
+    ctx
+      .send(CreateReply::default().content(no_data_msg))
+      .await?;
     return Ok(());
   }
 
