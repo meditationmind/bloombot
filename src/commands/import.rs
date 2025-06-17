@@ -2,10 +2,10 @@ use std::borrow::Cow;
 
 use anyhow::{Result, anyhow};
 use csv::ReaderBuilder;
-use poise::serenity_prelude::{ChannelId, Message, RoleId, User, builder::*};
+use poise::serenity_prelude::{Attachment, ChannelId, Message, RoleId, User, UserId, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 use tokio::{fs, fs::File, io::AsyncWriteExt};
-use tracing::info;
+use tracing::{error, warn};
 use ulid::Ulid;
 
 use crate::Context;
@@ -29,10 +29,78 @@ pub enum Type {
 /// Import meditation entries from an app
 ///
 /// Imports meditation entries from a CSV or JSON file uploaded by the user.
+#[poise::command(
+  slash_command,
+  category = "Meditation Tracking",
+  subcommands("file_upload", "message")
+)]
+#[allow(clippy::unused_async)]
+pub async fn import(_: Context<'_>) -> Result<()> {
+  Ok(())
+}
+
+/// Import meditation entries by uploading a log file directly
+///
+/// Imports meditation entries from a CSV or JSON file uploaded directly via the command.
+///
+/// Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser).
+#[poise::command(slash_command, category = "Meditation Tracking", rename = "file")]
+pub async fn file_upload(
+  ctx: Context<'_>,
+  #[description = "Select a CSV/JSON file to upload"]
+  #[rename = "file"]
+  attachment: Attachment,
+  #[description = "The type of import (Defaults to new entries)"]
+  #[rename = "type"]
+  import_type: Option<Type>,
+) -> Result<()> {
+  ctx.defer_ephemeral().await?;
+
+  let staff = ctx
+    .author_member()
+    .await
+    .is_some_and(|member| member.roles.contains(&RoleId::from(ROLES.staff)));
+
+  // Limit filesize to 256KiB, unless staff.
+  if attachment.size > 262_144 && !staff {
+    let msg = format!(
+      "{} File exceeds size limit. Please contact staff for assistance with importing large files.",
+      EMOJI.mminfo
+    );
+    ctx
+      .send(CreateReply::default().content(msg).ephemeral(true))
+      .await?;
+    return Ok(());
+  }
+
+  let user_id = ctx.author().id;
+  if let Err(e) = process_import(ctx, &attachment, import_type, user_id).await {
+    error!(
+      "\x1B[1m/{}\x1B[0m failed with error: {e}",
+      ctx.command().qualified_name
+    );
+    error!(
+      "\tSource: {} ({})",
+      ctx
+        .channel_id()
+        .name(ctx)
+        .await
+        .unwrap_or("unknown".to_string()),
+      ctx.channel_id()
+    );
+    error!("\tUser: {} ({})", ctx.author().name, ctx.author().id);
+  }
+
+  Ok(())
+}
+
+/// Import meditation entries from a message that contains a log file attachment
+///
+/// Imports meditation entries from a CSV or JSON file uploaded as a message attachment within Discord.
 ///
 /// Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing with Bloom Parser).
 #[poise::command(slash_command, category = "Meditation Tracking")]
-pub async fn import(
+pub async fn message(
   ctx: Context<'_>,
   #[description = "The message with the CSV/JSON file"] message: Message,
   #[description = "The type of import (Defaults to new entries)"]
@@ -49,9 +117,6 @@ pub async fn import(
       .await?;
     return Ok(());
   };
-
-  let dm = ctx.guild_id().is_none();
-  let guild_id = ctx.guild_id().unwrap_or(MEDITATION_MIND);
 
   let staff = ctx
     .author_member()
@@ -86,6 +151,46 @@ pub async fn import(
     return Ok(());
   }
 
+  if let Err(e) = process_import(ctx, attachment, import_type, user_id).await {
+    error!(
+      "\x1B[1m/{}\x1B[0m failed with error: {e}",
+      ctx.command().qualified_name
+    );
+    error!(
+      "\tSource: {} ({})",
+      ctx
+        .channel_id()
+        .name(ctx)
+        .await
+        .unwrap_or("unknown".to_string()),
+      ctx.channel_id()
+    );
+    error!("\tUser: {} ({})", ctx.author().name, ctx.author().id);
+
+    if message.author.id == ctx.author().id
+      && message.channel_id == ChannelId::new(CHANNELS.tracking)
+    {
+      message.delete(ctx).await?;
+    }
+    return Ok(());
+  }
+
+  // Don't delete if in DM.
+  if ctx.guild_id().is_some() {
+    message.delete(ctx).await?;
+  }
+
+  Ok(())
+}
+
+pub async fn process_import(
+  ctx: Context<'_>,
+  attachment: &Attachment,
+  import_type: Option<Type>,
+  user_id: UserId,
+) -> Result<()> {
+  let guild_id = ctx.guild_id().unwrap_or(MEDITATION_MIND);
+
   let content = match attachment.download().await {
     Ok(content) => {
       if attachment.filename == *"TimerSession.json" {
@@ -97,7 +202,7 @@ pub async fn import(
       }
     }
     Err(e) => {
-      info!("Error downloading attachment: {e}");
+      warn!("Error downloading attachment: {e}");
       let msg = format!("{} Unable to download attachment.", EMOJI.mminfo);
       ctx
         .send(CreateReply::default().content(msg).ephemeral(true))
@@ -133,7 +238,6 @@ pub async fn import(
   let source = match Source::autodetect(&mut rdr) {
     Ok(source) => source,
     Err(e) => {
-      info!("Failed to autodetect CSV source: {e}");
       let msg = format!(
         "{} **Unrecognized file format.**\n-# Please use an unaltered data export. \
         Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, \
@@ -144,20 +248,11 @@ pub async fn import(
       ctx
         .send(CreateReply::default().content(msg).ephemeral(true))
         .await?;
-      if message.author.id == ctx.author().id
-        && message.channel_id == ChannelId::new(CHANNELS.tracking)
-      {
-        message.delete(ctx).await?;
-      }
-      return Ok(());
+      return Err(anyhow!("Failed to autodetect CSV source: {e}"));
     }
   };
 
   let import = source.import(&mut rdr, &current_data, latest_time, &import_type)?;
-
-  if !dm {
-    message.delete(ctx).await?;
-  }
 
   drop(content);
   drop(current_data);
@@ -246,7 +341,7 @@ pub async fn import(
       tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
     }
   } else {
-    info!("Unable to update roles for user: {user_id}");
+    warn!("Unable to update roles for user: {user_id}");
   }
 
   let filename = format!("import_{}_{}.txt", user_id, Ulid::new().to_string());
@@ -277,7 +372,7 @@ pub async fn import(
     .await?;
 
   if let Err(e) = fs::remove_file(filename).await {
-    return Err(anyhow!("Error removing file: {e:?}"));
+    warn!("Error removing file: {e:?}");
   }
 
   Ok(())
