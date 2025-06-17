@@ -4,9 +4,8 @@ use std::env;
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use image::Rgba;
-use rusttype::{Font, Scale};
 use text_on_image::{FontBundle, TextJustify, VerticalAnchor, WrapBehavior};
+use text_on_image::{FontRef, PxScale as Scale, Rgba};
 use tokio::fs;
 
 use crate::data::stats::Bests;
@@ -95,11 +94,10 @@ impl<'a> Image<'a> {
   }
 
   pub fn bests(self, bests_data: &Bests) -> Result<Self> {
-    let mut background = image::open("/app/assets/bests-template.png")?;
+    let mut background = text_on_image::open("/app/assets/bests-template.png")?;
 
     // Prepare font
-    let font = Vec::from(FONT);
-    let Some(font) = Font::try_from_vec(font) else {
+    let Ok(font) = FontRef::try_from_slice(FONT) else {
       return Err(anyhow!("Failed to initialize font"));
     };
     let stat_font = FontBundle::new(&font, Scale { x: 32., y: 32. }, Rgba([217, 217, 217, 255]));
@@ -113,9 +111,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.times.day.total.x,
         BESTS.times.day.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -123,9 +121,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.times.day.date.x,
         BESTS.times.day.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     } else {
       return Err(anyhow!("No tracking data found"));
@@ -139,9 +137,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.times.week.total.x,
         BESTS.times.week.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -149,9 +147,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.times.week.date.x,
         BESTS.times.week.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     }
 
@@ -163,9 +161,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.times.month.total.x,
         BESTS.times.month.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -173,9 +171,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.times.month.date.x,
         BESTS.times.month.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     }
 
@@ -187,9 +185,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.times.year.total.x,
         BESTS.times.year.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -197,9 +195,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.times.year.date.x,
         BESTS.times.year.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     }
 
@@ -211,9 +209,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.sessions.day.total.x,
         BESTS.sessions.day.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -221,9 +219,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.sessions.day.date.x,
         BESTS.sessions.day.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     }
 
@@ -235,9 +233,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.sessions.week.total.x,
         BESTS.sessions.week.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -245,9 +243,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.sessions.week.date.x,
         BESTS.sessions.week.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     }
 
@@ -259,9 +257,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.sessions.month.total.x,
         BESTS.sessions.month.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -269,9 +267,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.sessions.month.date.x,
         BESTS.sessions.month.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     }
 
@@ -283,9 +281,9 @@ impl<'a> Image<'a> {
         &stat_font,
         BESTS.sessions.year.total.x,
         BESTS.sessions.year.total.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
       text_on_image::text_on_image(
         &mut background,
@@ -293,9 +291,9 @@ impl<'a> Image<'a> {
         &date_font,
         BESTS.sessions.year.date.x,
         BESTS.sessions.year.date.y,
-        TextJustify::Center,
-        VerticalAnchor::Center,
-        WrapBehavior::NoWrap,
+        &TextJustify::Center,
+        &VerticalAnchor::Center,
+        &WrapBehavior::NoWrap,
       );
     }
 
