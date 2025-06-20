@@ -11,8 +11,8 @@ enum UpdateType {
 
 impl UpdateType {
   fn get_type(old: &Member, new: &Member) -> Option<Self> {
-    let patreon_role = RoleId::new(ROLES.patreon);
-    let kofi_role = RoleId::new(ROLES.kofi);
+    let patreon_role = RoleId::from(ROLES.patreon);
+    let kofi_role = RoleId::from(ROLES.kofi);
 
     if old.pending && !new.pending {
       Some(Self::StoppedPending)

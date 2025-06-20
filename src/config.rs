@@ -34,26 +34,41 @@ pub const ENTRIES_PER_PAGE: EntriesPerPage = EntriesPerPage {
   glossary: 15,
 };
 
+#[derive(Debug, Copy, Clone)]
+pub struct Role(u64);
+
+impl From<Role> for RoleId {
+  fn from(val: Role) -> Self {
+    RoleId::new(val.0)
+  }
+}
+
+impl Display for Role {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    write!(f, "<@&{}>", self.0)
+  }
+}
+
 pub struct Roles {
-  pub welcome_team: u64,
-  pub meditation_challenger: u64,
-  pub meditation_challenger_365: u64,
-  pub patreon: u64,
-  pub kofi: u64,
-  pub staff: u64,
-  pub community_sit_helper: u64,
-  pub community_book_club_host: u64,
+  pub welcome_team: Role,
+  pub meditation_challenger: Role,
+  pub meditation_challenger_365: Role,
+  pub patreon: Role,
+  pub kofi: Role,
+  pub staff: Role,
+  pub community_sit_helper: Role,
+  pub community_book_club_host: Role,
 }
 
 pub const ROLES: Roles = Roles {
-  welcome_team: 828291690917265418,
-  meditation_challenger: 796821826369617970,
-  meditation_challenger_365: 516750476268666880,
-  patreon: 543900027928444935,
-  kofi: 1083219974509826048,
-  staff: 788760128010059786,
-  community_sit_helper: 1285275266549158050,
-  community_book_club_host: 1355086929229647990,
+  welcome_team: Role(828291690917265418),
+  meditation_challenger: Role(796821826369617970),
+  meditation_challenger_365: Role(516750476268666880),
+  patreon: Role(543900027928444935),
+  kofi: Role(1083219974509826048),
+  staff: Role(788760128010059786),
+  community_sit_helper: Role(1285275266549158050),
+  community_book_club_host: Role(1355086929229647990),
 };
 
 pub struct Channels {

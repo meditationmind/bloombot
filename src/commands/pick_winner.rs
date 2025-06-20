@@ -319,7 +319,7 @@ pub async fn pick_winner(
   // Since the stream is async, we can't use the same connection for the transaction.
   let mut conn = ctx.data().db.get_connection_with_retry(5).await?;
   let mut candidates = DatabaseHandler::get_candidates(&mut conn, &start, &end, &guild_id);
-  let challenger_role = RoleId::new(ROLES.meditation_challenger);
+  let challenger_role = RoleId::from(ROLES.meditation_challenger);
 
   // The database randomizes the order, so we use the first candidate that meets all requirements.
   while let Some(winner) = candidates.next().await {
