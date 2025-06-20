@@ -77,6 +77,14 @@ pub async fn handle(error: FrameworkError<'_, Data, Error>) {
         error!("While handling error, could not send message: {e}");
       }
     }
+    FrameworkError::CommandCheckFailed { error, ctx, .. } => {
+      error!(
+        "A command check failed in command \x1B[1m/{}\x1B[0m for user {}: {}",
+        ctx.command().qualified_name,
+        ctx.author().name,
+        error.map_or(String::from("Conditions not met"), |e| e.to_string()),
+      );
+    }
     error => {
       if let Err(e) = builtins::on_error(error).await {
         error!("Error while handling error: {e}");
