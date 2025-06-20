@@ -5,34 +5,14 @@ use chrono::{Duration as ChronoDuration, Utc};
 use poise::CreateReply;
 use poise::serenity_prelude::{ButtonStyle, ChannelId, ComponentInteractionCollector, builder::*};
 use poise::serenity_prelude::{FormattedTimestamp, FormattedTimestampStyle};
-use poise::serenity_prelude::{Mentionable, RoleId, ScheduledEventStatus};
+use poise::serenity_prelude::{Mentionable, ScheduledEventStatus};
 
 use crate::Context;
+use crate::commands::helpers::common;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 
 async fn is_host(ctx: Context<'_>) -> Result<bool> {
-  let community_book_club_host = RoleId::from(ROLES.community_book_club_host);
-  let has_role = ctx
-    .author_member()
-    .await
-    .is_some_and(|member| member.roles.contains(&community_book_club_host));
-
-  if !has_role {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} This command requires the {} role.",
-            EMOJI.mminfo,
-            community_book_club_host.mention()
-          ))
-          .allowed_mentions(CreateAllowedMentions::new().empty_roles())
-          .ephemeral(true),
-      )
-      .await?;
-  }
-
-  Ok(has_role)
+  common::role_check(ctx, ROLES.community_book_club_host).await
 }
 
 /// Manage community book club events

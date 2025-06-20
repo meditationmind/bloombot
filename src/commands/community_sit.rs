@@ -5,34 +5,14 @@ use chrono::{Duration as ChronoDuration, Utc};
 use poise::CreateReply;
 use poise::serenity_prelude::{ButtonStyle, ChannelId, ComponentInteractionCollector, builder::*};
 use poise::serenity_prelude::{FormattedTimestamp, FormattedTimestampStyle};
-use poise::serenity_prelude::{Mentionable, RoleId, ScheduledEventStatus};
+use poise::serenity_prelude::{Mentionable, ScheduledEventStatus};
 
 use crate::Context;
+use crate::commands::helpers::common;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 
 async fn is_helper(ctx: Context<'_>) -> Result<bool> {
-  let community_sit_helper = RoleId::from(ROLES.community_sit_helper);
-  let has_role = ctx
-    .author_member()
-    .await
-    .is_some_and(|member| member.roles.contains(&community_sit_helper));
-
-  if !has_role {
-    ctx
-      .send(
-        CreateReply::default()
-          .content(format!(
-            "{} This command requires the {} role.",
-            EMOJI.mminfo,
-            community_sit_helper.mention()
-          ))
-          .allowed_mentions(CreateAllowedMentions::new().empty_roles())
-          .ephemeral(true),
-      )
-      .await?;
-  }
-
-  Ok(has_role)
+  common::role_check(ctx, ROLES.community_sit_helper).await
 }
 
 /// Manage community sit events

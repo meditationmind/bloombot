@@ -40,7 +40,7 @@ pub async fn add_bookmark(
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let supporter = common::is_supporter(PoiseContext::Application(ctx)).await?;
+  let supporter = common::is_supporter(PoiseContext::Application(ctx)).await;
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let bookmark_count =
@@ -138,7 +138,7 @@ async fn add(
     .with_context(|| "Failed to retrieve guild ID from context")?;
   let user_id = ctx.author().id;
 
-  let supporter = common::is_supporter(ctx).await?;
+  let supporter = common::is_supporter(ctx).await;
 
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
   let bookmark_count =

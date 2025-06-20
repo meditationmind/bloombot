@@ -1,7 +1,10 @@
 use anyhow::Result;
-use poise::serenity_prelude::RoleId;
+use poise::CreateReply;
+use poise::serenity_prelude::CreateAllowedMentions;
 
-use crate::{Context, config::ROLES, data::tracking_profile::Privacy};
+use crate::Context;
+use crate::config::{EMOJI, ROLES, Role};
+use crate::data::tracking_profile::Privacy;
 
 pub enum Visibility {
   Public,
@@ -31,13 +34,44 @@ impl From<Privacy> for Visibility {
 ///
 /// [am]: poise::structs::Context::author_member()
 /// [roles]: crate::config::ROLES
-pub async fn is_supporter(ctx: Context<'_>) -> Result<bool> {
-  let supporter = if let Some(member) = ctx.author_member().await {
-    member.roles.contains(&RoleId::from(ROLES.patreon))
-      || member.roles.contains(&RoleId::from(ROLES.kofi))
-      || member.roles.contains(&RoleId::from(ROLES.staff))
-  } else {
-    false
-  };
-  Ok(supporter)
+pub async fn is_supporter(ctx: Context<'_>) -> bool {
+  ctx.author_member().await.is_some_and(|member| {
+    member.roles.contains(&ROLES.patreon.into())
+      || member.roles.contains(&ROLES.kofi.into())
+      || member.roles.contains(&ROLES.staff.into())
+  })
+}
+
+/// Attempts to retrieve the author of the invoking interaction as a [`serenity::Member`]
+/// via [`author_member()`][am]. If successful, checks the member's roles and returns `true`
+/// if they include the specified [`Role`] from [`ROLES`]. Returns `false` if retrieval is
+/// unsuccessful or member does not have the role.
+///
+/// [am]: poise::structs::Context::author_member()
+pub async fn has_role(ctx: Context<'_>, role: Role) -> bool {
+  ctx
+    .author_member()
+    .await
+    .is_some_and(|member| member.roles.contains(&role.into()))
+}
+
+/// For use in command checks. Calls [`has_role`] to check if the invoking user has the
+/// specified [`Role`] from [`ROLES`]. If [`has_role`] returns `false`, notifies user that
+/// they do not have the required role and returns `false` to abort the command.
+pub async fn role_check(ctx: Context<'_>, role: Role) -> Result<bool> {
+  let has_role = has_role(ctx, role).await;
+  if !has_role {
+    ctx
+      .send(
+        CreateReply::default()
+          .content(format!(
+            "{} This command requires the {role} role.",
+            EMOJI.mminfo
+          ))
+          .allowed_mentions(CreateAllowedMentions::new().empty_roles())
+          .ephemeral(true),
+      )
+      .await?;
+  }
+  Ok(has_role)
 }

@@ -27,7 +27,7 @@ pub async fn quote(
   let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
 
   if let Some(keyword) = keyword {
-    if common::is_supporter(ctx).await? {
+    if common::is_supporter(ctx).await {
       if let Some(quote) =
         DatabaseHandler::get_random_quote_with_keyword(&mut transaction, &guild_id, &keyword)
           .await?
