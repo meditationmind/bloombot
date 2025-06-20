@@ -2,14 +2,14 @@ use std::borrow::Cow;
 
 use anyhow::{Result, anyhow};
 use csv::ReaderBuilder;
-use poise::serenity_prelude::{Attachment, ChannelId, Message, RoleId, User, UserId, builder::*};
+use poise::serenity_prelude::{Attachment, ChannelId, Message, User, UserId, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 use tokio::{fs, fs::File, io::AsyncWriteExt};
 use tracing::{error, warn};
 use ulid::Ulid;
 
 use crate::Context;
-use crate::commands::helpers::common::Visibility;
+use crate::commands::helpers::common::{self, Visibility};
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::import::{FinchBreathingSession, FinchTimerSession};
 use crate::commands::helpers::import::{Source, SqlQueries};
@@ -18,12 +18,25 @@ use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, MEDITATION_MIND, ROLES};
 use crate::data::tracking_profile::{Privacy, Status, privacy};
 use crate::database::DatabaseHandler;
 
+// 256KiB
+const MAX_SIZE: u32 = 262_144;
+
 #[derive(ChoiceParameter)]
 pub enum Type {
   #[name = "new entries"]
   NewEntries,
   #[name = "all entries"]
   AllEntries,
+}
+
+enum ImportError {
+  AttachmentMissing,
+  ImportOtherUser,
+  FilesizeExceedsLimit,
+  DownloadFailed,
+  UnrecognizedFormat,
+  NoQualifyingEntries,
+  ZeroEntriesAdded,
 }
 
 /// Import meditation entries from an app
@@ -50,45 +63,22 @@ pub async fn file_upload(
   #[description = "Select a CSV/JSON file to upload"]
   #[rename = "file"]
   attachment: Attachment,
-  #[description = "The type of import (Defaults to new entries)"]
+  #[description = "The type of import (defaults to new entries)"]
   #[rename = "type"]
   import_type: Option<Type>,
 ) -> Result<()> {
   ctx.defer_ephemeral().await?;
 
-  let staff = ctx
-    .author_member()
-    .await
-    .is_some_and(|member| member.roles.contains(&RoleId::from(ROLES.staff)));
-
-  // Limit filesize to 256KiB, unless staff.
-  if attachment.size > 262_144 && !staff {
-    let msg = format!(
-      "{} File exceeds size limit. Please contact staff for assistance with importing large files.",
-      EMOJI.mminfo
-    );
-    ctx
-      .send(CreateReply::default().content(msg).ephemeral(true))
-      .await?;
+  if !common::has_role(ctx, ROLES.staff).await && attachment.size > MAX_SIZE {
+    notify_error(ctx, ImportError::FilesizeExceedsLimit).await?;
     return Ok(());
   }
 
-  let user_id = ctx.author().id;
-  if let Err(e) = process_import(ctx, &attachment, import_type, user_id).await {
-    error!(
-      "\x1B[1m/{}\x1B[0m failed with error: {e}",
-      ctx.command().qualified_name
-    );
-    error!(
-      "\tSource: {} ({})",
-      ctx
-        .channel_id()
-        .name(ctx)
-        .await
-        .unwrap_or("unknown".to_string()),
-      ctx.channel_id()
-    );
-    error!("\tUser: {} ({})", ctx.author().name, ctx.author().id);
+  if let Err(e) = process_import(ctx, &attachment, import_type, ctx.author().id).await {
+    // If error is not from autodetect, bubble up to error handler.
+    if e.to_string().ne("autodetect") {
+      return Err(e);
+    }
   }
 
   Ok(())
@@ -103,7 +93,7 @@ pub async fn file_upload(
 pub async fn message(
   ctx: Context<'_>,
   #[description = "The message with the CSV/JSON file"] message: Message,
-  #[description = "The type of import (Defaults to new entries)"]
+  #[description = "The type of import (defaults to new entries)"]
   #[rename = "type"]
   import_type: Option<Type>,
   #[description = "The user to import for (staff only)"] user: Option<User>,
@@ -111,66 +101,37 @@ pub async fn message(
   ctx.defer_ephemeral().await?;
 
   let Some(attachment) = message.attachments.first() else {
-    let msg = format!("{} No attachment found.", EMOJI.mminfo);
-    ctx
-      .send(CreateReply::default().content(msg).ephemeral(true))
-      .await?;
+    notify_error(ctx, ImportError::AttachmentMissing).await?;
     return Ok(());
   };
 
-  let staff = ctx
-    .author_member()
-    .await
-    .is_some_and(|member| member.roles.contains(&RoleId::from(ROLES.staff)));
+  let staff = common::has_role(ctx, ROLES.staff).await;
+
+  if !staff {
+    // Can only import own attachments, unless staff.
+    if message.author.id != ctx.author().id {
+      notify_error(ctx, ImportError::ImportOtherUser).await?;
+      return Ok(());
+    }
+    if attachment.size > MAX_SIZE {
+      notify_error(ctx, ImportError::FilesizeExceedsLimit).await?;
+      return Ok(());
+    }
+  }
 
   let user_id = user.map_or(message.author.id, |user| {
     if staff { user.id } else { message.author.id }
   });
 
-  // Can only import own attachments, unless staff.
-  if message.author.id != ctx.author().id && !staff {
-    let msg = format!(
-      "{} You cannot import files uploaded by other users.",
-      EMOJI.mminfo
-    );
-    ctx
-      .send(CreateReply::default().content(msg).ephemeral(true))
-      .await?;
-    return Ok(());
-  }
-
-  // Limit filesize to 256KiB, unless staff.
-  if attachment.size > 262_144 && !staff {
-    let msg = format!(
-      "{} File exceeds size limit. Please contact staff for assistance with importing large files.",
-      EMOJI.mminfo
-    );
-    ctx
-      .send(CreateReply::default().content(msg).ephemeral(true))
-      .await?;
-    return Ok(());
-  }
-
   if let Err(e) = process_import(ctx, attachment, import_type, user_id).await {
-    error!(
-      "\x1B[1m/{}\x1B[0m failed with error: {e}",
-      ctx.command().qualified_name
-    );
-    error!(
-      "\tSource: {} ({})",
-      ctx
-        .channel_id()
-        .name(ctx)
-        .await
-        .unwrap_or("unknown".to_string()),
-      ctx.channel_id()
-    );
-    error!("\tUser: {} ({})", ctx.author().name, ctx.author().id);
-
-    if message.author.id == ctx.author().id
-      && message.channel_id == ChannelId::new(CHANNELS.tracking)
-    {
+    // If own message, clean up following error. Otherwise, leave message
+    // and let staff choose whether to troubleshoot or delete.
+    if message.author.id == ctx.author().id {
       message.delete(ctx).await?;
+    }
+    // If error is not from autodetect, bubble up to error handler.
+    if e.to_string().ne("autodetect") {
+      return Err(e);
     }
     return Ok(());
   }
@@ -183,7 +144,7 @@ pub async fn message(
   Ok(())
 }
 
-pub async fn process_import(
+async fn process_import(
   ctx: Context<'_>,
   attachment: &Attachment,
   import_type: Option<Type>,
@@ -203,10 +164,7 @@ pub async fn process_import(
     }
     Err(e) => {
       warn!("Error downloading attachment: {e}");
-      let msg = format!("{} Unable to download attachment.", EMOJI.mminfo);
-      ctx
-        .send(CreateReply::default().content(msg).ephemeral(true))
-        .await?;
+      notify_error(ctx, ImportError::DownloadFailed).await?;
       return Ok(());
     }
   };
@@ -238,17 +196,22 @@ pub async fn process_import(
   let source = match Source::autodetect(&mut rdr) {
     Ok(source) => source,
     Err(e) => {
-      let msg = format!(
-        "{} **Unrecognized file format.**\n-# Please use an unaltered data export. \
-        Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, \
-        Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing \
-        with Bloom Parser). If you would like support for another format, please contact staff.",
-        EMOJI.mminfo
+      notify_error(ctx, ImportError::UnrecognizedFormat).await?;
+      error!(
+        "\x1B[1m/{}\x1B[0m failed with error: Failed to autodetect CSV source: {e}",
+        ctx.command().qualified_name
       );
-      ctx
-        .send(CreateReply::default().content(msg).ephemeral(true))
-        .await?;
-      return Err(anyhow!("Failed to autodetect CSV source: {e}"));
+      error!(
+        "\tSource: {} ({})",
+        ctx
+          .channel_id()
+          .name(ctx)
+          .await
+          .unwrap_or("unknown".to_string()),
+        ctx.channel_id()
+      );
+      error!("\tUser: {} ({})", ctx.author().name, ctx.author().id);
+      return Err(anyhow!("autodetect"));
     }
   };
 
@@ -258,10 +221,7 @@ pub async fn process_import(
   drop(current_data);
 
   if import.data.is_empty() {
-    let msg = format!("{} No qualifying entries found.", EMOJI.mminfo);
-    ctx
-      .send(CreateReply::default().content(msg).ephemeral(true))
-      .await?;
+    notify_error(ctx, ImportError::NoQualifyingEntries).await?;
     return Ok(());
   }
 
@@ -269,13 +229,7 @@ pub async fn process_import(
 
   let result = DatabaseHandler::add_meditation_entry_batch(&mut transaction, &sql.insert).await?;
   if result < 1 {
-    let msg = format!(
-      "{} No entries added. Please try again or contact staff for assistance.",
-      EMOJI.mminfo
-    );
-    ctx
-      .send(CreateReply::default().content(msg).ephemeral(true))
-      .await?;
+    notify_error(ctx, ImportError::ZeroEntriesAdded).await?;
     return Ok(());
   }
 
@@ -375,5 +329,30 @@ pub async fn process_import(
     warn!("Error removing file: {e:?}");
   }
 
+  Ok(())
+}
+
+async fn notify_error(ctx: Context<'_>, error: ImportError) -> Result<()> {
+  let error_message = match error {
+    ImportError::AttachmentMissing => "No attachment found.",
+    ImportError::ImportOtherUser => "You cannot import files uploaded by other users.",
+    ImportError::FilesizeExceedsLimit => {
+      "File exceeds size limit. Please contact staff for assistance with importing large files."
+    }
+    ImportError::DownloadFailed => "Failed to download attachment. Please try again.",
+    ImportError::UnrecognizedFormat => {
+      "**Unrecognized file format.**\n-# Please use an unaltered data export. \
+        Supported sources include Insight Timer, VA Mindfulness Coach, Waking Up, \
+        Finch Breathing and Meditation Sessions, and Apple Health (requires pre-processing \
+        with [Bloom Parser](<https://meditationmind.org/bloom/#bloom-parser>)). \
+        If you would like support for another format, please contact staff."
+    }
+    ImportError::NoQualifyingEntries => "No qualifying entries found.",
+    ImportError::ZeroEntriesAdded => {
+      "No entries added. Please try again or contact staff for assistance."
+    }
+  };
+  let msg = format!("{} {error_message}", EMOJI.mminfo);
+  ctx.send(CreateReply::default().content(msg)).await?;
   Ok(())
 }
