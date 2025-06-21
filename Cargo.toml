@@ -28,6 +28,7 @@ resvg = "0.45.0"
 charts-rs = { version = "0.3", features = ["image-encoder"] }
 # charts-rs = { git = "https://github.com/vicanso/charts-rs", branch = "main", features = ["image-encoder"] }
 text_on_image = { git = "https://github.com/meditationmind/text_on_image/", branch = "migrate-to-ab-glyph" }
+reqwest = { version = "0.12", features = ["json"] }
 
 [patch.crates-io]
 serenity = { git = "https://github.com/serenity-rs/serenity", branch = "current" }

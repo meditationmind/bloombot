@@ -4,6 +4,7 @@ use std::time::Instant;
 use anyhow::{Error, Result};
 use poise::Context as PoiseContext;
 use rand::{SeedableRng, rngs::SmallRng};
+use reqwest::Client;
 use tokio::sync::Mutex;
 
 use crate::database::DatabaseHandler;
@@ -15,6 +16,7 @@ pub struct Data {
   pub embeddings: Arc<OpenAIHandler>,
   pub bloom_start_time: Instant,
   pub term_names: Arc<RwLock<Vec<String>>>,
+  pub http: Client,
 }
 
 pub type Context<'a> = PoiseContext<'a, Data, Error>;
@@ -27,6 +29,7 @@ impl Data {
       embeddings: Arc::new(OpenAIHandler::new()?),
       bloom_start_time: Instant::now(),
       term_names: Arc::new(RwLock::new(term_names)),
+      http: Client::new(),
     })
   }
 }
