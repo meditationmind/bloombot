@@ -49,7 +49,7 @@ pub async fn report_message(
     .send_message(
       &ctx,
       CreateMessage::new()
-        .content(format!("<@&{}> Message Reported", ROLES.staff))
+        .content(format!("{} Message Reported", ROLES.staff))
         .embed(embed),
     )
     .await?;

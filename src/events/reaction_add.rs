@@ -55,7 +55,7 @@ async fn check_report(ctx: &Context, reaction: &Reaction) -> Result<()> {
         .send_message(
           &ctx,
           CreateMessage::new()
-            .content(format!("<@&{}> Message Reported", ROLES.staff))
+            .content(format!("{} Message Reported", ROLES.staff))
             .embed(
               BloomBotEmbed::new()
                 .author(CreateEmbedAuthor::new(&message_user.name).icon_url(message_user.face()))

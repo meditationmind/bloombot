@@ -41,7 +41,7 @@ pub async fn guild_member_update(
     UpdateType::StoppedPending => {
       let welcome_channel = ChannelId::new(CHANNELS.welcome);
       let msg = format!(
-        "Please give <@{}> a warm welcome, <@&{}>!",
+        "Please give <@{}> a warm welcome, {}!",
         new.user.id, ROLES.welcome_team
       );
       let embed = BloomBotEmbed::new()
