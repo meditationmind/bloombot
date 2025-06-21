@@ -251,11 +251,7 @@ async fn update_recipient(
   else {
     if let Some(total_keys) = total_keys {
       let recipient = Recipient::new(
-        guild_id,
-        recipient.id,
-        challenge_prize,
-        donator_perk,
-        total_keys,
+        guild_id, recipient.id, challenge_prize, donator_perk, total_keys,
       );
       DatabaseHandler::add_steamkey_recipient(&mut transaction, &recipient).await?;
 
@@ -360,11 +356,7 @@ async fn update_recipient(
   let total_keys = total_keys.unwrap_or(steamkey_recipient.total_keys);
 
   let recipient = Recipient::new(
-    guild_id,
-    recipient.id,
-    challenge_prize,
-    donator_perk,
-    total_keys,
+    guild_id, recipient.id, challenge_prize, donator_perk, total_keys,
   );
 
   DatabaseHandler::update_steamkey_recipient(&mut transaction, &recipient).await?;

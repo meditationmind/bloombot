@@ -123,13 +123,7 @@ pub async fn add(
 
   if minutes > 300 {
     let result = large_add(
-      ctx,
-      transaction,
-      minutes,
-      seconds,
-      user_sum,
-      privacy,
-      &response,
+      ctx, transaction, minutes, seconds, user_sum, privacy, &response,
     )
     .await?;
     if matches!(result, LargeAdd::Cancelled) {
