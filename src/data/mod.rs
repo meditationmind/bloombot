@@ -9,5 +9,6 @@ pub mod quote;
 pub mod star_message;
 pub mod stats;
 pub mod steam_key;
+pub mod sutta;
 pub mod term;
 pub mod tracking_profile;
