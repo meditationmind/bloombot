@@ -6,6 +6,7 @@ use poise::serenity_prelude::{RoleId, builder::*};
 use poise::{ChoiceParameter, CreateReply};
 
 use crate::Context;
+use crate::commands::helpers::common;
 use crate::commands::helpers::time::ChallengeTimeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::stats::User;
@@ -248,9 +249,10 @@ async fn stats(
 
   if !member.roles.contains(role) {
     let msg = format!(
-      "{} You're not currently participating in the {}. If you want to join, use </challenge join:1187466829547978904>.",
+      "{} You're not currently participating in the {}. If you want to join, use {}.",
       EMOJI.mminfo,
-      timeframe.name().to_ascii_lowercase()
+      timeframe.name().to_ascii_lowercase(),
+      common::print_command(ctx, guild_id, "challenge join").await?
     );
     ctx
       .send(CreateReply::default().content(msg).ephemeral(true))

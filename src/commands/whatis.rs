@@ -7,7 +7,7 @@ use poise::serenity_prelude::CreateEmbedFooter;
 
 use crate::Context;
 use crate::commands::helpers::terms;
-use crate::config::BloomBotEmbed;
+use crate::config::{BloomBotEmbed, COMMANDS};
 use crate::data::term::Term;
 use crate::database::DatabaseHandler;
 
@@ -51,8 +51,8 @@ fn one_liner(term_meaning: &str) -> String {
     .split_once('\n')
     .map_or(term_meaning.to_string(), |one_liner| {
       format!(
-        "{}\n\n*Use </glossary info:1135659962308243479> for more information.*",
-        one_liner.0
+        "{}\n\n*Use {} for more information.*",
+        one_liner.0, COMMANDS.glossary_info
       )
     })
 }
@@ -63,7 +63,8 @@ fn term_not_found(term: &str, possible_terms: &[Term]) -> Result<CreateReply> {
       let embed = BloomBotEmbed::new()
         .title("Term not found")
         .description(format!(
-          "The term `{term}` was not found in the glossary. If you believe it should be included, use </glossary suggest:1135659962308243479> to suggest it for addition."
+          "The term `{term}` was not found in the glossary. If you believe it should be included, use {} to suggest it for addition.",
+          COMMANDS.glossary_suggest
         ));
       Ok(CreateReply::default().embed(embed).ephemeral(true))
     }
@@ -95,7 +96,8 @@ fn term_not_found(term: &str, possible_terms: &[Term]) -> Result<CreateReply> {
         .field(
           "Did you mean one of these?",
           format!(
-            "{suggestions}\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search, or use </glossary suggest:1135659962308243479> to suggest the term for addition to the glossary.*"
+            "{suggestions}\n*Try using {} to take advantage of a more powerful search, or use {} to suggest the term for addition to the glossary.*",
+            COMMANDS.glossary_search, COMMANDS.glossary_suggest
           ),
           false,
         );

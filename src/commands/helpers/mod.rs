@@ -6,3 +6,5 @@ pub mod pagination;
 pub(super) mod terms;
 pub mod time;
 pub(super) mod tracking;
+
+pub use common::print_command;

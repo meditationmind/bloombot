@@ -97,6 +97,28 @@ pub const CHANNELS: Channels = Channels {
   private_thread_default: 501464482996944909,
 };
 
+#[derive(Debug, Copy, Clone)]
+pub struct Command<'a>(&'a str, u64);
+
+#[allow(clippy::struct_field_names)]
+pub struct Commands<'a> {
+  pub glossary_info: Command<'a>,
+  pub glossary_search: Command<'a>,
+  pub glossary_suggest: Command<'a>,
+}
+
+pub const COMMANDS: Commands = Commands {
+  glossary_info: Command("glossary info", 1135659962308243479),
+  glossary_search: Command("glossary search", 1135659962308243479),
+  glossary_suggest: Command("glossary suggest", 1135659962308243479),
+};
+
+impl Display for Command<'_> {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    write!(f, "</{}:{}>", self.0, self.1)
+  }
+}
+
 pub struct Emotes<'a> {
   pub star: &'a str,
   pub report: u64,

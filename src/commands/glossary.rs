@@ -7,7 +7,7 @@ use poise::CreateReply;
 use poise::serenity_prelude::{ChannelId, ComponentInteractionCollector, builder::*};
 
 use crate::Context;
-use crate::commands::helpers::terms;
+use crate::commands::helpers::{common, terms};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ENTRIES_PER_PAGE};
 use crate::data::term::Term;
 use crate::database::DatabaseHandler;
@@ -85,10 +85,12 @@ async fn list(
   let mut all_pages = vec![];
   let mut total_pages = 0;
 
+  let glossary_info = common::print_command(ctx, guild_id, "glossary info").await?;
+
   for page in pages {
     letter = &page[0].0;
     page_text = format!(
-      "-# Terms in parentheses are aliases for the preceding term. Use </glossary info:1135659962308243479> with any term or alias to read the full entry.\n\n-# {letter}\n"
+      "-# Terms in parentheses are aliases for the preceding term. Use {glossary_info} with any term or alias to read the full entry.\n\n-# {letter}\n"
     );
     for entry in &page {
       if entry.0 == letter {
@@ -227,14 +229,15 @@ async fn info(
     possible_term_embed(&term, possible_term)
   } else {
     let suggestions = format!(
-      "{}\n*Try using </glossary search:1135659962308243479> to take advantage of a more powerful search.*",
+      "{}\n*Try using {} to take advantage of a more powerful search.*",
       possible_terms
         .iter()
         .take(5)
         .fold(String::new(), |mut field, term| {
           let _ = writeln!(field, "`{}`", term.name);
           field
-        })
+        }),
+      common::print_command(ctx, guild_id, "glossary search").await?
     );
     BloomBotEmbed::new()
       .title("Term not found")

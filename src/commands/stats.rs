@@ -8,6 +8,7 @@ use poise::{ChoiceParameter, CreateReply};
 
 use crate::Context;
 use crate::charts::{Chart, LeaderboardOptions, StatsOptions};
+use crate::commands::helpers::common;
 use crate::commands::helpers::time::Timeframe;
 use crate::config::{BloomBotEmbed, EMOJI, ROLES};
 use crate::data::stats::BestsOptions;
@@ -506,8 +507,9 @@ async fn bests(
 
   let no_data_msg = if user.id == ctx.author().id {
     format!(
-      "{} No tracking data found. To start tracking, just use </add:1135659962031415376>.\n-# Learn more about [tracking features](<https://meditationmind.org/bloom/>), including [time zone and privacy](<https://meditationmind.org/bloom/#customize>) settings, [importing data](<https://meditationmind.org/bloom/#import>) from Insight Timer and other apps, and more.",
-      EMOJI.mminfo
+      "{} No tracking data found. To start tracking, just use {}.\n-# Learn more about [tracking features](<https://meditationmind.org/bloom/>), including [time zone and privacy](<https://meditationmind.org/bloom/#customize>) settings, [importing data](<https://meditationmind.org/bloom/#import>) from Insight Timer and other apps, and more.",
+      EMOJI.mminfo,
+      common::print_command(ctx, guild_id, "add").await?
     )
   } else {
     format!(

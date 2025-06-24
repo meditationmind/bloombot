@@ -3,7 +3,7 @@ use poise::CreateReply;
 use poise::serenity_prelude::{ChannelId, CreateEmbedFooter, CreateMessage};
 
 use crate::Context;
-use crate::commands::helpers::common::Visibility;
+use crate::commands::helpers::common::{self, Visibility};
 use crate::commands::helpers::database::{self, MessageType};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI};
 use crate::database::DatabaseHandler;
@@ -36,8 +36,9 @@ pub async fn remove_entry(
       .send(
         CreateReply::default()
           .content(format!(
-            "{} No entry found with that ID.\n-# Use </recent:1135659962580865128> to view a list of your entries and their IDs.",
-            EMOJI.mminfo
+            "{} No entry found with that ID.\n-# Use {} to view a list of your entries and their IDs.",
+            EMOJI.mminfo,
+            common::print_command(ctx, guild_id, "recent").await?
           ))
           .ephemeral(true),
       )
