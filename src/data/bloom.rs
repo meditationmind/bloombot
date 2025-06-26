@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
@@ -17,6 +18,7 @@ pub struct Data {
   pub bloom_start_time: Instant,
   pub term_names: Arc<RwLock<Vec<String>>>,
   pub http: Client,
+  pub voice_state: Arc<Mutex<HashMap<u64, Instant>>>,
 }
 
 pub type Context<'a> = PoiseContext<'a, Data, Error>;
@@ -30,6 +32,7 @@ impl Data {
       bloom_start_time: Instant::now(),
       term_names: Arc::new(RwLock::new(term_names)),
       http: Client::new(),
+      voice_state: Arc::new(Mutex::new(HashMap::new())),
     })
   }
 }

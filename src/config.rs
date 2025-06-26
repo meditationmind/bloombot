@@ -82,6 +82,10 @@ pub struct Channels {
   pub suggestion: u64,
   pub tracking: u64,
   pub private_thread_default: u64,
+  pub group_meditation: u64,
+  pub meditate_with_me_1: u64,
+  pub meditate_with_me_2: u64,
+  pub meditation_hall: u64,
 }
 
 pub const CHANNELS: Channels = Channels {
@@ -95,6 +99,10 @@ pub const CHANNELS: Channels = Channels {
   suggestion: 553676378621476887,
   tracking: 440556997364940801,
   private_thread_default: 501464482996944909,
+  group_meditation: 462964692856602624,
+  meditate_with_me_1: 1062108971558776872,
+  meditate_with_me_2: 1143607063226875984,
+  meditation_hall: 909856372378722324,
 };
 
 #[derive(Debug, Copy, Clone)]

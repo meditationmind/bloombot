@@ -42,6 +42,9 @@ pub async fn listen(ctx: &SerenityContext, event: &Event, data: &Data) -> Result
       );
       ctx.set_activity(Some(ActivityData::custom(default_activity_text)));
     }
+    Event::VoiceStateUpdate { old, new } => {
+      events::voice_state_update(ctx, data, old.as_ref(), new).await?;
+    }
     _ => {}
   }
   Ok(())

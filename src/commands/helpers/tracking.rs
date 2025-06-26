@@ -112,20 +112,20 @@ pub fn format_time(minutes: i32, seconds: i32) -> String {
   format!("{hours}{minutes}{seconds}").trim_end().to_string()
 }
 
-/// Displays confirmation of time added via [`add`][add] or [`import`][import] and attempts to
-/// include a random quote from the database. If a quote could not be fetched, the notification
-/// is posted with the quote omitted.
+/// Displays confirmation of time added via [`add`][add], [`import`][import], or VC tracking
+/// and attempts to include a random quote from the database. If a quote could not be fetched,
+/// the notification is posted with the quote omitted.
 ///
 /// When called from [`add`][add], the notification is formatted for use as a reply to the slash
-/// command. When called from elsewhere ([`import`][import]), the notification is formatted for
-/// independent posting, directly to a channel, e.g., [`CHANNELS.tracking`][tracking].
+/// command. When called from elsewhere ([`import`][import], event handler), the notification is
+/// formatted for independent posting, directly to a channel, e.g., [`CHANNELS.tracking`][tracking]
 /// When `privacy` is set to `true`, notifications are anonymized.
 ///
 /// [add]: crate::commands::add::add()
 /// [import]: crate::commands::import::import()
 /// [tracking]: crate::config::CHANNELS
 pub async fn show_add_with_quote(
-  ctx: &Context<'_>,
+  source: &str,
   transaction: &mut Transaction<'_, Postgres>,
   guild_id: &GuildId,
   user_id: &UserId,
@@ -142,7 +142,7 @@ pub async fn show_add_with_quote(
       Ok(format!(
         "Someone just added **{time}** to their meditation time! :tada:\n*{quote}*"
       ))
-    } else if ctx.command().name == "add" {
+    } else if source == "add" {
       Ok(format!(
         "Added **{time}** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
       ))
@@ -155,7 +155,7 @@ pub async fn show_add_with_quote(
     Ok(format!(
       "Someone just added **{time}** to their meditation time! :tada:"
     ))
-  } else if ctx.command().name == "add" {
+  } else if source == "add" {
     Ok(format!(
       "Added **{time}** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
     ))

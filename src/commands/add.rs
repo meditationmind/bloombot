@@ -99,7 +99,7 @@ pub async fn add(
     DatabaseHandler::get_user_meditation_sum(&mut transaction, &guild_id, &user_id).await?;
 
   let response = tracking::show_add_with_quote(
-    &ctx,
+    ctx.command().name.as_str(),
     &mut transaction,
     &guild_id,
     &user_id,

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5, vc_tracking = $6, notifications = $7, thread_id = $8 WHERE user_id = $9 AND guild_id = $10",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int2",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e7803ad00e3671f6609716cdeb6bde9e162f5c9c20275cfb6e5a96d60c2b9bbf"
+}

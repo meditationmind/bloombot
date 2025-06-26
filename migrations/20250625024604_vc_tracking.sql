@@ -1,0 +1,4 @@
+ALTER TABLE IF EXISTS tracking_profile
+  ADD COLUMN IF NOT EXISTS vc_tracking BOOLEAN NULL,
+  ADD COLUMN IF NOT EXISTS notifications TEXT DEFAULT 'thread',
+  ADD COLUMN IF NOT EXISTS thread_id TEXT;

@@ -10,7 +10,7 @@ use crate::commands::helpers::common::Visibility;
 use crate::commands::helpers::database::{self, MessageType};
 use crate::commands::helpers::time::{self, MinusOffsetChoice, PlusOffsetChoice};
 use crate::config::{BloomBotEmbed, EMOJI, StreakRoles};
-use crate::data::tracking_profile::{Privacy, Status, TrackingProfile};
+use crate::data::tracking_profile::{Privacy, PrivateNotifications, Status, TrackingProfile};
 use crate::database::DatabaseHandler;
 
 #[derive(ChoiceParameter)]
@@ -28,7 +28,7 @@ enum OnOff {
 /// Set a UTC offset, make your stats or streak private, turn streak reporting off, or enable anonymous tracking.
 #[poise::command(
   slash_command,
-  subcommands("show", "offset", "tracking", "streak", "stats"),
+  subcommands("show", "offset", "tracking", "streak", "stats", "vc"),
   category = "Meditation Tracking",
   guild_only
 )]
@@ -55,19 +55,31 @@ async fn show(ctx: Context<'_>) -> Result<()> {
       .unwrap_or_default();
 
   ctx
-    .send(CreateReply::default()
-    .embed(BloomBotEmbed::new()
-      .author(CreateEmbedAuthor::new("Meditation Tracking Customization Settings").icon_url(ctx.author().face()))
-      .description(format!(
-        "```UTC Offset:           {}\nAnonymous Tracking:   {}\nStreak Reporting:     {}\nStreak Visibility:    {}\nStats Visibility:     {}```",
-        time::name_from_offset(tracking_profile.utc_offset)?,
-        if matches!(tracking_profile.tracking.privacy, Privacy::Private) { "On" } else { "Off" },
-        if matches!(tracking_profile.streak.status, Status::Enabled) { "Enabled" } else { "Disabled" },
-        if matches!(tracking_profile.streak.privacy, Privacy::Private) { "Private" } else { "Public" },
-        if matches!(tracking_profile.stats.privacy, Privacy::Private) { "Private" } else { "Public" },
-      ))
+    .send(
+      CreateReply::default()
+        .embed(
+          BloomBotEmbed::new()
+            .author(
+              CreateEmbedAuthor::new("Meditation Tracking Customization Settings")
+                .icon_url(ctx.author().face()),
+            )
+            .description(format!(
+              "```UTC Offset:          {}\nAnonymous Tracking:  {}\nStreak Reporting:    {}\nStreak Visibility:   {}\nStats Visibility:    {}\n\nVC Tracking:         {}\n → Notifications:    {}```",
+              time::name_from_offset(tracking_profile.utc_offset)?,
+              if matches!(tracking_profile.tracking.privacy, Privacy::Private) { "On" } else { "Off" },
+              if matches!(tracking_profile.streak.status, Status::Enabled) { "Enabled" } else { "Disabled" },
+              if matches!(tracking_profile.streak.privacy, Privacy::Private) { "Private" } else { "Public" },
+              if matches!(tracking_profile.stats.privacy, Privacy::Private) { "Private" } else { "Public" },
+              if let Some(vc_tracking) = tracking_profile.vc_tracking { if matches!(vc_tracking, Status::Enabled) { "Enabled" } else { "Disabled" } } else { "***" },
+              match tracking_profile.notifications {
+                PrivateNotifications::DirectMessage => "DM",
+                PrivateNotifications::PrivateThread => "Thread",
+                PrivateNotifications::Disabled => "Disabled",
+              },
+            )),
+        )
+        .ephemeral(true),
     )
-    .ephemeral(true))
     .await?;
 
   Ok(())
@@ -407,6 +419,103 @@ async fn stats(
       "{} Stats successfully set to **{}**.",
       EMOJI.mmcheck,
       privacy.name()
+    )),
+    Visibility::Ephemeral,
+  )
+  .await?;
+
+  Ok(())
+}
+
+/// Enable/disable automatic VC tracking
+///
+/// Enable/disable automatic tracking of time spent in meditation voice channels.
+///
+/// When enabled, any amount of time greater than or equal to five minutes will automatically be added to your tracked time upon leaving the VC.
+///
+/// Privacy settings are honored, and private stats updates are sent via private thread, by default. Optionally, choose to receive them via DM, or disable them.
+///
+/// Disabling VC tracking will prevent Bloom from asking if you would like to track eligible times spent in meditation VCs.
+#[poise::command(slash_command)]
+async fn vc(
+  ctx: Context<'_>,
+  #[description = "Turn VC tracking on or off"] tracking: Status,
+  #[description = "Private notifications for VC tracking (Defaults to private thread)"]
+  notifications: Option<PrivateNotifications>,
+) -> Result<()> {
+  let guild_id = ctx
+    .guild_id()
+    .with_context(|| "Failed to retrieve guild ID from context")?;
+  let user_id = ctx.author().id;
+
+  let mut transaction = ctx.data().db.start_transaction_with_retry(5).await?;
+
+  if let Some(existing_profile) =
+    DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?
+  {
+    if existing_profile
+      .vc_tracking
+      .is_some_and(|vc_tracking| vc_tracking == tracking)
+      && notifications.is_none_or(|n| n == existing_profile.notifications)
+    {
+      let msg = "Current settings already match specified settings. No changes made.";
+      ctx
+        .send(CreateReply::default().content(msg).ephemeral(true))
+        .await?;
+      return Ok(());
+    } else if existing_profile
+      .vc_tracking
+      .is_some_and(|vc_tracking| vc_tracking != tracking)
+      && notifications.is_some_and(|n| n != existing_profile.notifications)
+    {
+      DatabaseHandler::update_tracking_profile(
+        &mut transaction,
+        &existing_profile
+          .with_vc_tracking(tracking)
+          .with_notifications(
+            notifications.with_context(|| "Failed to unwrap after checking for is_some")?,
+          ),
+      )
+      .await?;
+    } else if existing_profile
+      .vc_tracking
+      .is_some_and(|vc_tracking| vc_tracking != tracking)
+      && notifications.is_none_or(|n| n == existing_profile.notifications)
+    {
+      DatabaseHandler::update_tracking_profile(
+        &mut transaction,
+        &existing_profile.with_vc_tracking(tracking),
+      )
+      .await?;
+    } else if existing_profile
+      .vc_tracking
+      .is_some_and(|vc_tracking| vc_tracking == tracking)
+      && notifications.is_some_and(|n| n != existing_profile.notifications)
+    {
+      DatabaseHandler::update_tracking_profile(
+        &mut transaction,
+        &existing_profile.with_notifications(
+          notifications.with_context(|| "Failed to unwrap after checking for is_some")?,
+        ),
+      )
+      .await?;
+    }
+  } else {
+    DatabaseHandler::add_tracking_profile(
+      &mut transaction,
+      &TrackingProfile::new(guild_id, user_id)
+        .with_vc_tracking(tracking)
+        .with_notifications(notifications.unwrap_or(PrivateNotifications::PrivateThread)),
+    )
+    .await?;
+  }
+
+  database::commit_and_say(
+    ctx,
+    transaction,
+    MessageType::TextOnly(format!(
+      "{} VC tracking settings successfully updated.",
+      EMOJI.mmcheck
     )),
     Visibility::Ephemeral,
   )

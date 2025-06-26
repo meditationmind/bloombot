@@ -1,5 +1,5 @@
 use poise::ChoiceParameter;
-use poise::serenity_prelude::{GuildId, UserId};
+use poise::serenity_prelude::{ChannelId, GuildId, UserId};
 use sqlx::postgres::{PgArguments, PgRow};
 use sqlx::query::{Query, QueryAs};
 use sqlx::{Error as SqlxError, FromRow, Postgres, Result as SqlxResult, Row};
@@ -23,6 +23,17 @@ pub enum Status {
   #[default]
   #[name = "enabled"]
   Enabled,
+  #[name = "disabled"]
+  Disabled,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, ChoiceParameter)]
+pub enum PrivateNotifications {
+  #[name = "direct message"]
+  DirectMessage,
+  #[default]
+  #[name = "private thread"]
+  PrivateThread,
   #[name = "disabled"]
   Disabled,
 }
@@ -51,6 +62,9 @@ pub struct TrackingProfile {
   pub tracking: Tracking,
   pub streak: Streak,
   pub stats: Stats,
+  pub vc_tracking: Option<Status>,
+  pub notifications: PrivateNotifications,
+  pub thread_id: Option<ChannelId>,
 }
 
 impl TrackingProfile {
@@ -128,13 +142,36 @@ impl TrackingProfile {
     self
   }
 
-  /// Retrieves a [`TrackingProfile`] for a specified `user_id`.
+  /// Sets VC tracking [`Status`] for a [`TrackingProfile`]. Default is `None`, which
+  /// ensures the bot will offer to track individual sessions until a setting is chosen.
+  pub fn with_vc_tracking(mut self, vc_tracking: Status) -> Self {
+    self.vc_tracking = Some(vc_tracking);
+    self
+  }
+
+  /// Sets the [`PrivateNotifications`] option for a [`TrackingProfile`].
+  /// Default is [`PrivateNotifications::PrivateThread`].
+  pub fn with_notifications(mut self, notifications: PrivateNotifications) -> Self {
+    self.notifications = notifications;
+    self
+  }
+
+  /// Sets the [`ChannelId`] of the private thread associated with a [`TrackingProfile`].
+  /// Used for VC tracking, where ephemeral messages are not available. Primarily used with
+  /// anonymous tracking, but may also be used with public tracking when [`Streak`] notifications
+  /// are set to private.
+  pub fn with_thread_id(mut self, thread_id: Option<ChannelId>) -> Self {
+    self.thread_id = thread_id;
+    self
+  }
+
+  /// Retrieves a [`TrackingProfile`] for a specified [`UserId`].
   pub fn retrieve<'a>(
     guild_id: GuildId,
     user_id: UserId,
   ) -> QueryAs<'a, Postgres, Self, PgArguments> {
     sqlx::query_as(
-      "SELECT user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private FROM tracking_profile WHERE user_id = $1 AND guild_id = $2",
+      "SELECT user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private, vc_tracking, notifications, thread_id FROM tracking_profile WHERE user_id = $1 AND guild_id = $2",
     )
     .bind(user_id.to_string())
     .bind(guild_id.to_string())
@@ -144,7 +181,7 @@ impl TrackingProfile {
 impl InsertQuery for TrackingProfile {
   fn insert_query(&self) -> Query<Postgres, PgArguments> {
     query!(
-      "INSERT INTO tracking_profile (record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+      "INSERT INTO tracking_profile (record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private, vc_tracking, notifications, thread_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
       Ulid::new().to_string(),
       self.user_id.to_string(),
       self.guild_id.to_string(),
@@ -153,6 +190,13 @@ impl InsertQuery for TrackingProfile {
       matches!(self.streak.status, Status::Enabled),
       privacy!(self.streak.privacy),
       privacy!(self.stats.privacy),
+      self.vc_tracking.map(|vc_t| matches!(vc_t, Status::Enabled)),
+      match self.notifications {
+        PrivateNotifications::DirectMessage => "dm",
+        PrivateNotifications::PrivateThread => "thread",
+        PrivateNotifications::Disabled => "off",
+      },
+      self.thread_id.map(|id| id.to_string()),
     )
   }
 }
@@ -160,12 +204,19 @@ impl InsertQuery for TrackingProfile {
 impl UpdateQuery for TrackingProfile {
   fn update_query(&self) -> Query<Postgres, PgArguments> {
     query!(
-      "UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5 WHERE user_id = $6 AND guild_id = $7",
+      "UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5, vc_tracking = $6, notifications = $7, thread_id = $8 WHERE user_id = $9 AND guild_id = $10",
       self.utc_offset,
       privacy!(self.tracking.privacy),
       matches!(self.streak.status, Status::Enabled),
       privacy!(self.streak.privacy),
       privacy!(self.stats.privacy),
+      self.vc_tracking.map(|vc_t| matches!(vc_t, Status::Enabled)),
+      match self.notifications {
+        PrivateNotifications::DirectMessage => "dm",
+        PrivateNotifications::PrivateThread => "thread",
+        PrivateNotifications::Disabled => "off",
+      },
+      self.thread_id.map(|id| id.to_string()),
       self.user_id.to_string(),
       self.guild_id.to_string(),
     )
@@ -202,6 +253,9 @@ impl Default for TrackingProfile {
       stats: Stats {
         privacy: Privacy::Public,
       },
+      vc_tracking: None,
+      notifications: PrivateNotifications::PrivateThread,
+      thread_id: None,
     }
   }
 }
@@ -230,6 +284,25 @@ impl FromRow<'_, PgRow> for TrackingProfile {
     } else {
       Privacy::Public
     };
+    let vc_tracking = if let Some(vc_t) = row.try_get::<Option<bool>, &str>("vc_tracking")? {
+      if vc_t {
+        Some(Status::Enabled)
+      } else {
+        Some(Status::Disabled)
+      }
+    } else {
+      None
+    };
+    let notifications = {
+      let value = row.try_get::<String, &str>("notifications")?;
+      match value {
+        val if val == "dm" => PrivateNotifications::DirectMessage,
+        val if val == "thread" => PrivateNotifications::PrivateThread,
+        val if val == "off" => PrivateNotifications::Disabled,
+        _ => PrivateNotifications::PrivateThread,
+      }
+    };
+    let thread_id = common::decode_option_id_row(row, "thread_id")?.map(ChannelId::new);
 
     Ok(Self {
       user_id,
@@ -245,6 +318,9 @@ impl FromRow<'_, PgRow> for TrackingProfile {
       stats: Stats {
         privacy: stats_privacy,
       },
+      vc_tracking,
+      notifications,
+      thread_id,
     })
   }
 }

@@ -5,6 +5,7 @@ mod helpers;
 mod message_delete;
 mod reaction_add;
 mod reaction_remove;
+mod voice_state_update;
 
 pub use guild_create::guild_create;
 pub use guild_member_removal::guild_member_removal;
@@ -13,3 +14,4 @@ pub use helpers::leaderboards;
 pub use message_delete::message_delete;
 pub use reaction_add::reaction_add;
 pub use reaction_remove::reaction_remove;
+pub use voice_state_update::voice_state_update;

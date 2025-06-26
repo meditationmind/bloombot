@@ -47,7 +47,8 @@ async fn main() -> Result<()> {
     | GatewayIntents::GUILD_MESSAGES
     | GatewayIntents::GUILD_MESSAGE_REACTIONS
     | GatewayIntents::DIRECT_MESSAGES
-    | GatewayIntents::GUILD_MEMBERS;
+    | GatewayIntents::GUILD_MEMBERS
+    | GatewayIntents::GUILD_VOICE_STATES;
 
   let framework = Framework::builder()
     .options(FrameworkOptions {
