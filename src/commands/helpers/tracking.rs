@@ -87,7 +87,7 @@ pub fn minimize_markdown(text: &str) -> String {
 
 /// Takes `minutes` and `seconds` as input and outputs a [`String`] that displays hours,
 /// minutes, and seconds in a user-friendly format, omitting zero-value units and pluralizing
-/// as appropriate. Note that output includes a trailing space.
+/// as appropriate.
 pub fn format_time(minutes: i32, seconds: i32) -> String {
   let h = (minutes + (seconds / 60)) / 60;
   let m = (minutes + (seconds / 60)) % 60;
@@ -109,7 +109,7 @@ pub fn format_time(minutes: i32, seconds: i32) -> String {
     Ordering::Greater => format!("{s} seconds "),
   };
 
-  format!("{hours}{minutes}{seconds}")
+  format!("{hours}{minutes}{seconds}").trim_end().to_string()
 }
 
 /// Displays confirmation of time added via [`add`][add] or [`import`][import] and attempts to
@@ -140,28 +140,28 @@ pub async fn show_add_with_quote(
 
     if privacy {
       Ok(format!(
-        "Someone just added **{time}**to their meditation time! :tada:\n*{quote}*"
+        "Someone just added **{time}** to their meditation time! :tada:\n*{quote}*"
       ))
     } else if ctx.command().name == "add" {
       Ok(format!(
-        "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
+        "Added **{time}** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
       ))
     } else {
       Ok(format!(
-        "<@{user_id}> added **{time}**to their meditation time! Their total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
+        "<@{user_id}> added **{time}** to their meditation time! Their total meditation time is now {user_sum} minutes :tada:\n*{quote}*"
       ))
     }
   } else if privacy {
     Ok(format!(
-      "Someone just added **{time}**to their meditation time! :tada:"
+      "Someone just added **{time}** to their meditation time! :tada:"
     ))
   } else if ctx.command().name == "add" {
     Ok(format!(
-      "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+      "Added **{time}** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
     ))
   } else {
     Ok(format!(
-      "<@{user_id}> added **{time}**to their meditation time! Their total meditation time is now {user_sum} minutes :tada:"
+      "<@{user_id}> added **{time}** to their meditation time! Their total meditation time is now {user_sum} minutes :tada:"
     ))
   }
 }

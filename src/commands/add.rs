@@ -131,7 +131,7 @@ pub async fn add(
     }
   } else if privacy {
     let private_response = format!(
-      "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+      "Added **{time}** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
     );
     database::commit_and_say(
       ctx,
@@ -196,7 +196,7 @@ async fn large_add(
     .send(
       CreateReply::default()
         .content(format!(
-          "Are you sure you want to add **{}**to your meditation time?",
+          "Are you sure you want to add **{}** to your meditation time?",
           time.as_str()
         ))
         .ephemeral(privacy)
@@ -233,7 +233,7 @@ async fn large_add(
             if privacy {
               CreateInteractionResponseMessage::new()
                 .content(format!(
-                  "Added **{time}**to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
+                  "Added **{time}** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
                 ))
                 .ephemeral(privacy)
                 .components(Vec::new())

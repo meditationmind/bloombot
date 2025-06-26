@@ -259,7 +259,7 @@ async fn process_import(
   let guild_time_in_hours = tracking::get_guild_hours(&mut transaction, &guild_id).await?;
 
   let success_response = format!(
-    "{} Successfully added a total of {time}from {result} {} imported from {}.",
+    "{} Successfully added a total of {time} from {result} {} imported from {}.",
     EMOJI.mmcheck,
     if result == 1 { "entry" } else { "entries" },
     import.source
