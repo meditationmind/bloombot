@@ -463,43 +463,15 @@ async fn vc(
         .send(CreateReply::default().content(msg).ephemeral(true))
         .await?;
       return Ok(());
-    } else if existing_profile
-      .vc_tracking
-      .is_some_and(|vc_tracking| vc_tracking != tracking)
-      && notifications.is_some_and(|n| n != existing_profile.notifications)
-    {
-      DatabaseHandler::update_tracking_profile(
-        &mut transaction,
-        &existing_profile
-          .with_vc_tracking(tracking)
-          .with_notifications(
-            notifications.with_context(|| "Failed to unwrap after checking for is_some")?,
-          ),
-      )
-      .await?;
-    } else if existing_profile
-      .vc_tracking
-      .is_some_and(|vc_tracking| vc_tracking != tracking)
-      && notifications.is_none_or(|n| n == existing_profile.notifications)
-    {
-      DatabaseHandler::update_tracking_profile(
-        &mut transaction,
-        &existing_profile.with_vc_tracking(tracking),
-      )
-      .await?;
-    } else if existing_profile
-      .vc_tracking
-      .is_some_and(|vc_tracking| vc_tracking == tracking)
-      && notifications.is_some_and(|n| n != existing_profile.notifications)
-    {
-      DatabaseHandler::update_tracking_profile(
-        &mut transaction,
-        &existing_profile.with_notifications(
-          notifications.with_context(|| "Failed to unwrap after checking for is_some")?,
-        ),
-      )
-      .await?;
     }
+    let notifications = notifications.unwrap_or(existing_profile.notifications);
+    DatabaseHandler::update_tracking_profile(
+      &mut transaction,
+      &existing_profile
+        .with_vc_tracking(tracking)
+        .with_notifications(notifications),
+    )
+    .await?;
   } else {
     DatabaseHandler::add_tracking_profile(
       &mut transaction,
