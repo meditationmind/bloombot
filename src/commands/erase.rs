@@ -51,6 +51,8 @@ enum DefaultReasons {
   UnwholesomeMeme,
   #[name = "Excessive venting"]
   ExcessiveVenting,
+  #[name = "Lounge misuse"]
+  LoungeMisuse,
   #[name = "None"]
   None,
 }
@@ -143,6 +145,13 @@ impl DefaultReasons {
         <#1020856801115246702>. Thank you!"
           .to_string()
       }
+      DefaultReasons::LoungeMisuse => {
+        "<#501464482996944909> is meant to be a space for friendly and light-hearted social chat. \
+        Please use appropriate on-topic channels for serious discussion of server themes. This \
+        helps preserve the space for those who wish to use it for its intended purpose. You can \
+        view a list of channels and their descriptions here: <id:browse>. Thank you!"
+          .to_string()
+      }
       DefaultReasons::None => "No reason provided.".to_string(),
     }
   }
@@ -186,6 +195,7 @@ pub async fn erase_message(
       CreateSelectMenuOption::new(DefaultReasons::NonDiscussionChannel.name(), "NonDiscussionChannel"),
       CreateSelectMenuOption::new(DefaultReasons::UnwholesomeMeme.name(), "UnwholesomeMeme"),
       CreateSelectMenuOption::new(DefaultReasons::ExcessiveVenting.name(), "ExcessiveVenting"),
+      CreateSelectMenuOption::new(DefaultReasons::LoungeMisuse.name(), "LoungeMisuse"),
       CreateSelectMenuOption::new(DefaultReasons::None.name(), "None"),
       CreateSelectMenuOption::new("Cancel erase", "cancel"),
     ];
@@ -288,6 +298,7 @@ pub async fn erase_message(
         "NonDiscussionChannel" => &DefaultReasons::NonDiscussionChannel.response(),
         "UnwholesomeMeme" => &DefaultReasons::UnwholesomeMeme.response(),
         "ExcessiveVenting" => &DefaultReasons::ExcessiveVenting.response(),
+        "LoungeMisuse" => &DefaultReasons::LoungeMisuse.response(),
         _ => &DefaultReasons::None.response(),
       }
     };
@@ -558,7 +569,7 @@ async fn erase_and_log(
     .title("A message you sent has been deleted.")
     .description(format!("**Reason**: {reason}"))
     .footer(CreateEmbedFooter::new(
-      "If you have any questions or concerns regarding this action, please contact a moderator. Replies sent to Bloom are not viewable by staff.",
+      "If you have any questions or concerns regarding this action, please open a ticket in the server. Replies sent to Bloom are not viewable by staff.",
     ));
 
   let log_channel = ChannelId::new(CHANNELS.logs);
