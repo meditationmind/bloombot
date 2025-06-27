@@ -509,7 +509,7 @@ async fn bests(
     format!(
       "{} No tracking data found. To start tracking, just use {}.\n-# Learn more about [tracking features](<https://meditationmind.org/bloom/>), including [time zone and privacy](<https://meditationmind.org/bloom/#customize>) settings, [importing data](<https://meditationmind.org/bloom/#import>) from Insight Timer and other apps, and more.",
       EMOJI.mminfo,
-      common::print_command(ctx, guild_id, "add").await?
+      common::print_command(ctx, guild_id, "add").await
     )
   } else {
     format!(

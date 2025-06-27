@@ -1,6 +1,7 @@
 use anyhow::Result;
 use poise::CreateReply;
 use poise::serenity_prelude::{CreateAllowedMentions, GuildId, Http};
+use tracing::debug;
 
 use crate::Context;
 use crate::config::{EMOJI, ROLES, Role};
@@ -80,19 +81,20 @@ pub async fn print_command(
   http: impl AsRef<Http>,
   guild_id: GuildId,
   command_name: &str,
-) -> Result<String> {
-  let mut result = String::new();
-  let parent = command_name
-    .split_whitespace()
-    .next()
-    .unwrap_or(command_name);
-  let commands = guild_id.get_commands(http).await?;
-  for command in commands {
-    if command.name == parent {
-      result = format!("</{}:{}>", command_name, command.id);
-      break;
+) -> String {
+  let mut result = format!("`/{command_name}`");
+  if let Ok(commands) = guild_id.get_commands(http).await {
+    let parent = command_name
+      .split_whitespace()
+      .next()
+      .unwrap_or(command_name);
+    for command in commands {
+      if command.name == parent {
+        result = format!("</{}:{}>", command_name, command.id.get());
+        break;
+      }
     }
-    result = format!("/{command_name}");
   }
-  Ok(result)
+  debug!("{result:?}");
+  result
 }

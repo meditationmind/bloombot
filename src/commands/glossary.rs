@@ -85,7 +85,7 @@ async fn list(
   let mut all_pages = vec![];
   let mut total_pages = 0;
 
-  let glossary_info = common::print_command(ctx, guild_id, "glossary info").await?;
+  let glossary_info = common::print_command(ctx, guild_id, "glossary info").await;
 
   for page in pages {
     letter = &page[0].0;
@@ -237,7 +237,7 @@ async fn info(
           let _ = writeln!(field, "`{}`", term.name);
           field
         }),
-      common::print_command(ctx, guild_id, "glossary search").await?
+      common::print_command(ctx, guild_id, "glossary search").await
     );
     BloomBotEmbed::new()
       .title("Term not found")

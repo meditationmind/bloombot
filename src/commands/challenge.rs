@@ -252,7 +252,7 @@ async fn stats(
       "{} You're not currently participating in the {}. If you want to join, use {}.",
       EMOJI.mminfo,
       timeframe.name().to_ascii_lowercase(),
-      common::print_command(ctx, guild_id, "challenge join").await?
+      common::print_command(ctx, guild_id, "challenge join").await
     );
     ctx
       .send(CreateReply::default().content(msg).ephemeral(true))

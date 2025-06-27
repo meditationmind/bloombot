@@ -38,7 +38,7 @@ pub async fn remove_entry(
           .content(format!(
             "{} No entry found with that ID.\n-# Use {} to view a list of your entries and their IDs.",
             EMOJI.mminfo,
-            common::print_command(ctx, guild_id, "recent").await?
+            common::print_command(ctx, guild_id, "recent").await
           ))
           .ephemeral(true),
       )
