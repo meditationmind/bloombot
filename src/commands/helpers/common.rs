@@ -1,10 +1,10 @@
 use anyhow::Result;
 use poise::CreateReply;
-use poise::serenity_prelude::{CreateAllowedMentions, GuildId, Http};
-use tracing::debug;
+use poise::serenity_prelude::CreateAllowedMentions;
 
 use crate::Context;
 use crate::config::{EMOJI, ROLES, Role};
+use crate::data::bloom::MinimalCommand;
 use crate::data::tracking_profile::Privacy;
 
 pub enum Visibility {
@@ -77,24 +77,17 @@ pub async fn role_check(ctx: Context<'_>, role: Role) -> Result<bool> {
   Ok(has_role)
 }
 
-pub async fn print_command(
-  http: impl AsRef<Http>,
-  guild_id: GuildId,
-  command_name: &str,
-) -> String {
+pub fn print_command(commands: &Vec<MinimalCommand>, command_name: &str) -> String {
   let mut result = format!("`/{command_name}`");
-  if let Ok(commands) = guild_id.get_commands(http).await {
-    let parent = command_name
-      .split_whitespace()
-      .next()
-      .unwrap_or(command_name);
-    for command in commands {
-      if command.name == parent {
-        result = format!("</{}:{}>", command_name, command.id.get());
-        break;
-      }
+  let parent = command_name
+    .split_whitespace()
+    .next()
+    .unwrap_or(command_name);
+  for command in commands {
+    if command.name == parent {
+      result = format!("</{}:{}>", command_name, command.id);
+      break;
     }
   }
-  debug!("{result:?}");
   result
 }

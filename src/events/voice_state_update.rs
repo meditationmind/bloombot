@@ -342,7 +342,7 @@ pub async fn voice_state_update(
       )
     };
 
-    let customize_vc = helpers::print_command(ctx, guild_id, "customize vc").await;
+    let customize_vc = helpers::print_command(&data.commands, "customize vc");
 
     while let Some(press) = ComponentInteractionCollector::new(ctx)
       .message_id(message.id)
@@ -536,7 +536,7 @@ pub async fn voice_state_update(
     }
 
     // Edit initial message since collector timed out with no response.
-    let add = helpers::print_command(ctx, guild_id, "add").await;
+    let add = helpers::print_command(&data.commands, "add");
     if matches!(destination, Destination::PublicChannel) {
       message
         .edit(

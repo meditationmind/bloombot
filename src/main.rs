@@ -19,7 +19,7 @@ use crate::commands::{
   stats, streak, suggest, sutta, terms, uptime, whatis,
 };
 use crate::config::MEDITATION_MIND;
-use crate::data::bloom::{Context, Data};
+use crate::data::bloom::{Context, Data, MinimalCommand};
 use crate::data::term::Term;
 use crate::database::DatabaseHandler;
 use crate::handlers::{database, errors, events as Events};
@@ -95,14 +95,16 @@ async fn main() -> Result<()> {
     })
     .setup(|ctx, _ready, framework| {
       Box::pin(async move {
-        if let Ok(test_guild) = test_guild {
+        let commands = if let Ok(test_guild) = test_guild {
           info!("Registering commands in test guild {test_guild}");
           let guild_id = GuildId::new(test_guild.parse::<u64>()?);
           builtins::register_in_guild(ctx, &framework.options().commands, guild_id).await?;
+          ctx.http.as_ref().get_guild_commands(guild_id).await?
         } else {
           info!("Registering commands globally");
           builtins::register_globally(ctx, &framework.options().commands).await?;
-        }
+          ctx.http.as_ref().get_global_commands().await?
+        };
 
         let db = DatabaseHandler::new().await?;
         let term_names = if let Ok(mut transaction) = db.start_transaction_with_retry(5).await {
@@ -113,8 +115,15 @@ async fn main() -> Result<()> {
         } else {
           vec![String::new()]
         };
+        let commands: Vec<MinimalCommand> = commands
+          .iter()
+          .map(|c| MinimalCommand {
+            name: c.name.clone(),
+            id: c.id.get(),
+          })
+          .collect();
 
-        Data::new(db, term_names)
+        Data::new(db, term_names, commands)
       })
     })
     .build();

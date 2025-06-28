@@ -11,6 +11,11 @@ use tokio::sync::Mutex;
 use crate::database::DatabaseHandler;
 use crate::handlers::embeddings::OpenAIHandler;
 
+pub struct MinimalCommand {
+  pub name: String,
+  pub id: u64,
+}
+
 pub struct Data {
   pub db: Arc<DatabaseHandler>,
   pub rng: Arc<Mutex<SmallRng>>,
@@ -19,12 +24,17 @@ pub struct Data {
   pub term_names: Arc<RwLock<Vec<String>>>,
   pub http: Client,
   pub voice_state: Arc<Mutex<HashMap<u64, Instant>>>,
+  pub commands: Arc<Vec<MinimalCommand>>,
 }
 
 pub type Context<'a> = PoiseContext<'a, Data, Error>;
 
 impl Data {
-  pub fn new(db: DatabaseHandler, term_names: Vec<String>) -> Result<Self> {
+  pub fn new(
+    db: DatabaseHandler,
+    term_names: Vec<String>,
+    commands: Vec<MinimalCommand>,
+  ) -> Result<Self> {
     Ok(Self {
       db: Arc::new(db),
       rng: Arc::new(Mutex::new(SmallRng::from_os_rng())),
@@ -33,6 +43,7 @@ impl Data {
       term_names: Arc::new(RwLock::new(term_names)),
       http: Client::new(),
       voice_state: Arc::new(Mutex::new(HashMap::new())),
+      commands: Arc::new(commands),
     })
   }
 }
