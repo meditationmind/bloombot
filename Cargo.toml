@@ -7,7 +7,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.86"
-async-openai = "0.28"
+async-openai = "0.29"
 futures = "0.3.30"
 log = "0.4.21"
 poise = {version = "0.6.1", features = ["cache"]}
