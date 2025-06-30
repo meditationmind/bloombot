@@ -8,7 +8,7 @@ use poise::serenity_prelude::{FormattedTimestamp, FormattedTimestampStyle};
 use poise::serenity_prelude::{Mentionable, ScheduledEventStatus};
 
 use crate::Context;
-use crate::commands::helpers::common;
+use crate::commands::helpers::{common, events};
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 
 async fn is_host(ctx: Context<'_>) -> Result<bool> {
@@ -101,6 +101,10 @@ async fn start(ctx: Context<'_>) -> Result<()> {
         let confirmed = press.data.custom_id == confirm_id;
 
         if confirmed {
+          if events::not_present(ctx, guild_id, event.channel_id, &press).await? {
+            continue;
+          }
+
           match press
             .create_response(
               ctx,
