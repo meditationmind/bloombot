@@ -158,10 +158,10 @@ pub async fn add(
   tracking::post_guild_hours(&ctx, guild_hours).await?;
 
   let member = guild_id.member(ctx, user_id).await?;
-  tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
+  tracking::update_time_roles(&ctx, &member, user_sum, privacy, None).await?;
   if tracking_profile.streak.status == Status::Enabled {
     let privacy = privacy!(tracking_profile.streak.privacy);
-    tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
+    tracking::update_streak_roles(&ctx, &member, user_streak, privacy, None).await?;
   }
 
   // Spawn a Tokio task to update leaderboards every 10th add

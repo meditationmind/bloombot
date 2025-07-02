@@ -2,8 +2,9 @@ use std::cmp::Ordering;
 
 use anyhow::Result;
 use poise::CreateReply;
-use poise::serenity_prelude::{ChannelId, CreateAllowedMentions, CreateMessage, GuildId};
-use poise::serenity_prelude::{Member, Mentionable, UserId};
+use poise::serenity_prelude::UserId;
+use poise::serenity_prelude::{ChannelId, CreateAllowedMentions, CreateMessage, GuildId, Member};
+use poise::serenity_prelude::{Mentionable, MessageId, MessageReference, MessageReferenceKind};
 use sqlx::{Postgres, Transaction};
 use tracing::error;
 
@@ -184,6 +185,7 @@ pub async fn update_time_roles(
   member: &Member,
   sum: i64,
   privacy: bool,
+  reference: Option<(ChannelId, MessageId)>,
 ) -> Result<()> {
   let Some(updated_time_role) = TimeSumRoles::from_sum(sum) else {
     return Ok(());
@@ -269,12 +271,18 @@ pub async fn update_time_roles(
         )
         .await?;
     } else {
+      let reference = reference.unwrap_or_default();
       ChannelId::new(CHANNELS.tracking)
         .send_message(
           &ctx,
           CreateMessage::new()
             .content(congrats)
-            .allowed_mentions(CreateAllowedMentions::new()),
+            .allowed_mentions(CreateAllowedMentions::new())
+            .reference_message(
+              MessageReference::new(MessageReferenceKind::Default, reference.0)
+                .message_id(reference.1)
+                .fail_if_not_exists(false),
+            ),
         )
         .await?;
     }
@@ -301,6 +309,7 @@ pub async fn update_streak_roles(
   member: &Member,
   streak: i32,
   privacy: bool,
+  reference: Option<(ChannelId, MessageId)>,
 ) -> Result<()> {
   let Some(updated_streak_role) = StreakRoles::from_streak(streak.cast_unsigned().into()) else {
     return Ok(());
@@ -391,12 +400,18 @@ pub async fn update_streak_roles(
         )
         .await?;
     } else {
+      let reference = reference.unwrap_or_default();
       ChannelId::new(CHANNELS.tracking)
         .send_message(
           &ctx,
           CreateMessage::new()
             .content(congrats)
-            .allowed_mentions(CreateAllowedMentions::new()),
+            .allowed_mentions(CreateAllowedMentions::new())
+            .reference_message(
+              MessageReference::new(MessageReferenceKind::Default, reference.0)
+                .message_id(reference.1)
+                .fail_if_not_exists(false),
+            ),
         )
         .await?;
     }

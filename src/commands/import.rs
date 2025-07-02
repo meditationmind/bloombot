@@ -273,7 +273,13 @@ async fn process_import(
   )
   .await?;
 
-  ChannelId::new(CHANNELS.tracking)
+  let member = if user_id == ctx.author().id && ctx.guild_id().is_some() {
+    ctx.author_member().await
+  } else {
+    guild_id.member(ctx, user_id).await.ok().map(Cow::Owned)
+  };
+
+  let notify = ChannelId::new(CHANNELS.tracking)
     .send_message(
       &ctx,
       CreateMessage::new()
@@ -282,17 +288,15 @@ async fn process_import(
     )
     .await?;
 
+  let reference = (notify.channel_id, notify.id);
+
   tracking::post_guild_hours(&ctx, guild_time_in_hours).await?;
 
-  if let Some(member) = if user_id == ctx.author().id && ctx.guild_id().is_some() {
-    ctx.author_member().await
-  } else {
-    guild_id.member(ctx, user_id).await.ok().map(Cow::Owned)
-  } {
-    tracking::update_time_roles(&ctx, &member, user_sum, privacy).await?;
+  if let Some(member) = member {
+    tracking::update_time_roles(&ctx, &member, user_sum, privacy, Some(reference)).await?;
     if tracking_profile.streak.status == Status::Enabled {
       let privacy = privacy!(tracking_profile.streak.privacy);
-      tracking::update_streak_roles(&ctx, &member, user_streak, privacy).await?;
+      tracking::update_streak_roles(&ctx, &member, user_streak, privacy, Some(reference)).await?;
     }
   } else {
     warn!("Unable to update roles for user: {user_id}");
