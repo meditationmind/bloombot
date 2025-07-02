@@ -16,7 +16,7 @@ use tracing::info;
 use ulid::Ulid;
 
 use crate::commands::helpers::{self, tracking};
-use crate::config::{CHANNELS, MEDITATION_MIND, StreakRoles, TimeSumRoles};
+use crate::config::{CHANNELS, MEDITATION_MIND, ROLES, StreakRoles, TimeSumRoles};
 use crate::data::bloom::Data;
 use crate::data::meditation::Meditation;
 use crate::data::tracking_profile::privacy;
@@ -125,7 +125,7 @@ pub async fn voice_state_update(
           DatabaseHandler::commit_transaction(transaction).await?;
 
           let public_handle =
-            notify_add(ctx, tracking_channel, add_with_quote, guild_hours).await?;
+            notify_add(ctx, member, tracking_channel, add_with_quote, guild_hours).await?;
 
           if privacy {
             let message_builder = CreateMessage::default()
@@ -477,7 +477,8 @@ pub async fn voice_state_update(
           )
           .await?;
 
-        let public_handle = notify_add(ctx, tracking_channel, add_with_quote, guild_hours).await?;
+        let public_handle =
+          notify_add(ctx, member, tracking_channel, add_with_quote, guild_hours).await?;
         let handle = if matches!(destination, Destination::PrivateThread) {
           (notify_channel, message.id)
         } else {
@@ -652,16 +653,22 @@ async fn add_time(
 /// be used to create a reply [`MessageReference`].
 async fn notify_add(
   ctx: &Context,
+  member: &Member,
   tracking_channel: ChannelId,
   add_with_quote: String,
   guild_hours: Option<i64>,
 ) -> Result<(ChannelId, MessageId)> {
+  let mentions = if member.roles.contains(&ROLES.no_pings.into()) {
+    CreateAllowedMentions::new()
+  } else {
+    CreateAllowedMentions::new().users([member.user.id])
+  };
   let message = tracking_channel
     .send_message(
       &ctx,
       CreateMessage::new()
         .content(add_with_quote)
-        .allowed_mentions(CreateAllowedMentions::new()),
+        .allowed_mentions(mentions),
     )
     .await?;
 

@@ -279,12 +279,20 @@ async fn process_import(
     guild_id.member(ctx, user_id).await.ok().map(Cow::Owned)
   };
 
+  let mentions = if let Some(member) = &member
+    && member.roles.contains(&ROLES.no_pings.into())
+  {
+    CreateAllowedMentions::new()
+  } else {
+    CreateAllowedMentions::new().users([user_id])
+  };
+
   let notify = ChannelId::new(CHANNELS.tracking)
     .send_message(
       &ctx,
       CreateMessage::new()
         .content(response)
-        .allowed_mentions(CreateAllowedMentions::new()),
+        .allowed_mentions(mentions),
     )
     .await?;
 

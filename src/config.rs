@@ -58,6 +58,7 @@ pub struct Roles {
   pub staff: Role,
   pub community_sit_helper: Role,
   pub community_book_club_host: Role,
+  pub no_pings: Role,
 }
 
 pub const ROLES: Roles = Roles {
@@ -69,6 +70,7 @@ pub const ROLES: Roles = Roles {
   staff: Role(788760128010059786),
   community_sit_helper: Role(1285275266549158050),
   community_book_club_host: Role(1355086929229647990),
+  no_pings: Role(1128156466273058906),
 };
 
 pub struct Channels {
