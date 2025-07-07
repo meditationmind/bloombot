@@ -3,7 +3,8 @@
 use std::fmt::Write as _;
 
 use anyhow::{Context as AnyhowContext, Result, anyhow};
-use poise::serenity_prelude::{Colour, Mentionable, User, builder::*};
+use poise::serenity_prelude::{Colour, CreateAllowedMentions, CreateAttachment, CreateEmbedAuthor};
+use poise::serenity_prelude::{CreateEmbedFooter, Mentionable, User};
 use poise::{ChoiceParameter, CreateReply};
 
 use crate::Context;

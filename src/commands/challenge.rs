@@ -2,7 +2,7 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{Datelike, Timelike, Utc};
-use poise::serenity_prelude::{RoleId, builder::*};
+use poise::serenity_prelude::{CreateEmbedAuthor, CreateEmbedFooter, RoleId};
 use poise::{ChoiceParameter, CreateReply};
 
 use crate::Context;

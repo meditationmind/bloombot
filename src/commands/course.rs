@@ -1,6 +1,6 @@
 use anyhow::{Context as AnyhowContext, Result, anyhow};
 use poise::CreateReply;
-use poise::serenity_prelude::{ChannelId, builder::*};
+use poise::serenity_prelude::{ChannelId, CreateMessage};
 
 use crate::Context;
 use crate::commands::helpers::courses;

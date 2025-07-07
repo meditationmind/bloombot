@@ -1,5 +1,6 @@
 use anyhow::Result;
-use poise::serenity_prelude::{ChannelId, Context, builder::*};
+use poise::serenity_prelude::{ChannelId, Context, CreateAttachment, CreateEmbed};
+use poise::serenity_prelude::{CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, EditMessage};
 use poise::serenity_prelude::{MessageFlags, Reaction, ReactionType};
 use sqlx::{Postgres, Transaction};
 

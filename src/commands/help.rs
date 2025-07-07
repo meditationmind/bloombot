@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use poise::serenity_prelude::builder::*;
+use poise::serenity_prelude::{AutocompleteChoice, CreateEmbed, CreateEmbedFooter};
 use poise::{Command, Context as PoiseContext, ContextMenuCommandAction, CreateReply};
 
 use crate::Context;
@@ -272,7 +272,7 @@ impl<'a> Help<'a> {
   }
 }
 
-pub async fn autocomplete_command<'a>(
+async fn autocomplete_command<'a>(
   ctx: Context<'a>,
   partial: &'a str,
 ) -> impl Iterator<Item = AutocompleteChoice> + 'a {

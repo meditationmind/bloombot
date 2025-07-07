@@ -4,7 +4,10 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as AnyhowContext, Result};
 use pgvector::Vector;
 use poise::CreateReply;
-use poise::serenity_prelude::{ChannelId, ComponentInteractionCollector, builder::*};
+use poise::serenity_prelude::ChannelId;
+use poise::serenity_prelude::{ComponentInteractionCollector, CreateActionRow, CreateButton};
+use poise::serenity_prelude::{CreateEmbed, CreateEmbedFooter, CreateInteractionResponse};
+use poise::serenity_prelude::{CreateInteractionResponseMessage, CreateMessage, EditMessage};
 
 use crate::Context;
 use crate::commands::helpers::{common, terms};

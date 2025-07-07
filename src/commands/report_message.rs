@@ -1,6 +1,7 @@
 use anyhow::Result;
 use poise::CreateReply;
-use poise::serenity_prelude::{ChannelId, Message, builder::*};
+use poise::serenity_prelude::ChannelId;
+use poise::serenity_prelude::{CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, Message};
 
 use crate::Context;
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};

@@ -1,5 +1,6 @@
 use anyhow::{Context as AnyhowContext, Result};
-use poise::serenity_prelude::{ChannelId, Context, Reaction, ReactionType, builder::*};
+use poise::serenity_prelude::{ChannelId, Context, CreateEmbedAuthor, CreateEmbedFooter};
+use poise::serenity_prelude::{CreateMessage, Reaction, ReactionType};
 
 use crate::config::{BloomBotEmbed, CHANNELS, EMOTES, ROLES};
 use crate::database::DatabaseHandler;

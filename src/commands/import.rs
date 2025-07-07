@@ -2,7 +2,8 @@ use std::borrow::Cow;
 
 use anyhow::{Result, anyhow};
 use csv::ReaderBuilder;
-use poise::serenity_prelude::{Attachment, ChannelId, Message, User, UserId, builder::*};
+use poise::serenity_prelude::{Attachment, ChannelId, CreateAllowedMentions, CreateAttachment};
+use poise::serenity_prelude::{CreateEmbedFooter, CreateMessage, Message, User, UserId};
 use poise::{ChoiceParameter, CreateReply};
 use tokio::{fs, fs::File, io::AsyncWriteExt};
 use tracing::{error, warn};
