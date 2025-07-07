@@ -141,8 +141,7 @@ pub async fn add(
     )
     .await?;
 
-    ctx
-      .channel_id()
+    ChannelId::new(CHANNELS.tracking)
       .send_message(ctx, CreateMessage::new().content(response))
       .await?;
   } else {
@@ -223,29 +222,25 @@ async fn large_add(
       continue;
     }
 
-    let confirm = press.data.custom_id == confirm_id;
+    if press.data.custom_id == cancel_id {
+      break;
+    }
 
     match press
       .create_response(
         ctx,
         CreateInteractionResponse::UpdateMessage({
-          if confirm {
-            if privacy {
-              CreateInteractionResponseMessage::new()
-                .content(format!(
-                  "Added **{time}** to your meditation time! Your total meditation time is now {user_sum} minutes :tada:"
-                ))
-                .ephemeral(privacy)
-                .components(Vec::new())
-            } else {
-              CreateInteractionResponseMessage::new()
-                .content(response)
-                .ephemeral(privacy)
-                .components(Vec::new())
-            }
+          if privacy {
+            CreateInteractionResponseMessage::new()
+              .content(format!(
+                "Added **{time}** to your meditation time! \
+                  Your total meditation time is now {user_sum} minutes :tada:"
+              ))
+              .ephemeral(privacy)
+              .components(Vec::new())
           } else {
             CreateInteractionResponseMessage::new()
-              .content("Cancelled.")
+              .content(response)
               .ephemeral(privacy)
               .components(Vec::new())
           }
@@ -254,14 +249,58 @@ async fn large_add(
       .await
     {
       Ok(()) => {
-        if !confirm {
-          return Ok(LargeAdd::Cancelled);
+        if let Err(e) = DatabaseHandler::commit_transaction(transaction).await {
+          let msg = format!(
+            "{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.",
+            EMOJI.mminfo
+          );
+          check
+            .edit(ctx, CreateReply::default().content(msg).ephemeral(privacy))
+            .await?;
+          return Err(anyhow!("Failed to commit add: {e}"));
         }
-        break;
+
+        if privacy {
+          ChannelId::new(CHANNELS.tracking)
+            .send_message(ctx, CreateMessage::new().content(response))
+            .await?;
+        }
+
+        // Log large add in Bloom logs channel
+        let description = if seconds > 0 {
+          format!(
+            "**User**: {}\n**Time**: {} minutes {} second(s)",
+            ctx.author(),
+            minutes,
+            seconds,
+          )
+        } else {
+          format!("**User**: {}\n**Time**: {} minutes", ctx.author(), minutes,)
+        };
+        let log_embed = BloomBotEmbed::new()
+          .title("Large Meditation Entry Added")
+          .description(description)
+          .footer(
+            CreateEmbedFooter::new(format!(
+              "Added by {} ({})",
+              ctx.author().name,
+              ctx.author().id
+            ))
+            .icon_url(ctx.author().avatar_url().unwrap_or_default()),
+          );
+
+        let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+
+        log_channel
+          .send_message(ctx, CreateMessage::new().embed(log_embed))
+          .await?;
+
+        return Ok(LargeAdd::Confirmed);
       }
       Err(e) => {
         let msg = format!(
-          "{} An error may have occurred. If your command failed, please contact staff for assistance.",
+          "{} An error may have occurred. If your command failed, \
+          please contact staff for assistance.",
           EMOJI.mminfo
         );
         check
@@ -272,52 +311,16 @@ async fn large_add(
     }
   }
 
-  if let Err(e) = DatabaseHandler::commit_transaction(transaction).await {
-    let msg = format!(
-      "{} A fatal error occurred while trying to save your changes. Please contact staff for assistance.",
-      EMOJI.mminfo
-    );
-    check
-      .edit(ctx, CreateReply::default().content(msg).ephemeral(privacy))
-      .await?;
-    return Err(anyhow!("Failed to commit add: {e}"));
-  }
-
-  if privacy {
-    ctx
-      .channel_id()
-      .send_message(ctx, CreateMessage::new().content(response))
-      .await?;
-  }
-
-  // Log large add in Bloom logs channel
-  let description = if seconds > 0 {
-    format!(
-      "**User**: {}\n**Time**: {} minutes {} second(s)",
-      ctx.author(),
-      minutes,
-      seconds,
+  // If collector times out, default to cancel.
+  check
+    .edit(
+      ctx,
+      CreateReply::default()
+        .content("Cancelled.")
+        .ephemeral(privacy)
+        .components(Vec::new()),
     )
-  } else {
-    format!("**User**: {}\n**Time**: {} minutes", ctx.author(), minutes,)
-  };
-  let log_embed = BloomBotEmbed::new()
-    .title("Large Meditation Entry Added")
-    .description(description)
-    .footer(
-      CreateEmbedFooter::new(format!(
-        "Added by {} ({})",
-        ctx.author().name,
-        ctx.author().id
-      ))
-      .icon_url(ctx.author().avatar_url().unwrap_or_default()),
-    );
-
-  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
-
-  log_channel
-    .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;
 
-  Ok(LargeAdd::Confirmed)
+  Ok(LargeAdd::Cancelled)
 }
