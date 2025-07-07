@@ -90,7 +90,7 @@ impl DefaultReasons {
         "Advertising, recruitment, solicitation, and self-promo require approval. This server is \
         meant to be a safe space, where community members can feel confident they're interacting \
         with fellow members who care about the community, and self-promo can violate that sense \
-        of safety. While exceptions are rare, you may submit a ticket to request authorization."
+        of safety. While exceptions are rare, you may open a ticket to request authorization."
           .to_string()
       }
       DefaultReasons::Rule8IPRights => {
@@ -569,7 +569,8 @@ async fn erase_and_log(
     .title("A message you sent has been deleted.")
     .description(format!("**Reason**: {reason}"))
     .footer(CreateEmbedFooter::new(
-      "If you have any questions or concerns regarding this action, please open a ticket in the server. Replies sent to Bloom are not viewable by staff.",
+      "If you have any questions or concerns regarding this action, please open a ticket \
+      in the server. Replies sent to Bloom are not viewable by staff.",
     ));
 
   let log_channel = ChannelId::new(CHANNELS.logs);
