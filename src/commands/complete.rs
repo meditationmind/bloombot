@@ -103,7 +103,7 @@ pub async fn complete(
     .title("New Course Graduate")
     .description(format!("**User**: {member}\n**Course**: {course_name}"));
 
-  let log_channel = ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::from(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))

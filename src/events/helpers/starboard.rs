@@ -75,7 +75,7 @@ async fn create_star_message(
     }
   }
 
-  let starboard_channel = ChannelId::new(CHANNELS.starchannel);
+  let starboard_channel = ChannelId::from(CHANNELS.starchannel);
 
   let starboard_message = match starred_message.attachments.first() {
     // Multi-image embed
@@ -200,7 +200,7 @@ pub async fn add_star(
       return Ok(());
     };
 
-    let starboard_channel = ChannelId::new(CHANNELS.starchannel);
+    let starboard_channel = ChannelId::from(CHANNELS.starchannel);
 
     // Get the existing starboard message from the starboard channel.
     let mut starboard_message = starboard_channel
@@ -268,7 +268,7 @@ pub async fn remove_star(
       .find(|r| r.reaction_type == ReactionType::Unicode(EMOTES.star.to_owned()))
       .map_or(0, |r| r.count);
 
-    let starboard_channel = ChannelId::new(CHANNELS.starchannel);
+    let starboard_channel = ChannelId::from(CHANNELS.starchannel);
 
     if star_count < MIN_STARS {
       starboard_channel

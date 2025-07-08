@@ -144,7 +144,7 @@ async fn create(
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     );
 
-  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::from(CHANNELS.bloomlogs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -318,7 +318,7 @@ async fn update(
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     );
 
-  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::from(CHANNELS.bloomlogs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -393,7 +393,7 @@ async fn delete(
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     );
 
-  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::from(CHANNELS.bloomlogs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -503,7 +503,7 @@ async fn reset(
           .icon_url(ctx.author().avatar_url().unwrap_or_default()),
         );
 
-      let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+      let log_channel = ChannelId::from(CHANNELS.bloomlogs);
 
       log_channel
         .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -641,7 +641,7 @@ async fn migrate(
           .icon_url(ctx.author().avatar_url().unwrap_or_default()),
         );
 
-      let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+      let log_channel = ChannelId::from(CHANNELS.bloomlogs);
 
       log_channel
         .send_message(ctx, CreateMessage::new().embed(log_embed))

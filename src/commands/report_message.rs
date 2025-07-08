@@ -22,7 +22,7 @@ pub async fn report_message(
   #[description = "Message to report"] message: Message,
 ) -> Result<()> {
   let reporting_user = ctx.author();
-  let report_channel_id = ChannelId::new(CHANNELS.reportchannel);
+  let report_channel_id = ChannelId::from(CHANNELS.reportchannel);
   let message_link = message.link();
   let message_user = message.author;
   let message_channel_name = message.channel_id.name(ctx).await?;

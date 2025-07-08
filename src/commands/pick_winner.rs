@@ -69,9 +69,9 @@ async fn finalize_winner(
       "From {guild_name} | If you need any assistance, please contact server staff."
     )));
 
-  let announcement_channel = ChannelId::new(CHANNELS.announcement);
+  let announcement_channel = ChannelId::from(CHANNELS.announcement);
   let dm_channel = winner.user.create_dm_channel(ctx).await?;
-  let log_channel = ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::from(CHANNELS.logs);
 
   announcement_channel
     .send_message(ctx, CreateMessage::new().embed(announcement_embed))

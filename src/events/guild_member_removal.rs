@@ -4,7 +4,7 @@ use poise::serenity_prelude::{ChannelId, Context, CreateMessage, User};
 use crate::config::{BloomBotEmbed, CHANNELS};
 
 pub async fn guild_member_removal(ctx: &Context, user: &User) -> Result<()> {
-  let welcome_channel = ChannelId::new(CHANNELS.welcome);
+  let welcome_channel = ChannelId::from(CHANNELS.welcome);
   let username = user
     .name
     .chars()

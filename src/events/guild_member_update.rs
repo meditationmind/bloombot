@@ -39,7 +39,7 @@ pub async fn guild_member_update(
 
   match update_type {
     UpdateType::StoppedPending => {
-      let welcome_channel = ChannelId::new(CHANNELS.welcome);
+      let welcome_channel = ChannelId::from(CHANNELS.welcome);
       let msg = format!(
         "Please give <@{}> a warm welcome, {}!",
         new.user.id, ROLES.welcome_team
@@ -59,7 +59,7 @@ pub async fn guild_member_update(
         .await?;
     }
     UpdateType::BecamePatreonDonator => {
-      let donator_channel = ChannelId::new(CHANNELS.donators);
+      let donator_channel = ChannelId::from(CHANNELS.donators);
       let embed = BloomBotEmbed::new()
         .title(":tada: New Donator :tada:")
         .description(format!(
@@ -72,7 +72,7 @@ pub async fn guild_member_update(
         .await?;
     }
     UpdateType::BecameKofiDonator => {
-      let donator_channel = ChannelId::new(CHANNELS.donators);
+      let donator_channel = ChannelId::from(CHANNELS.donators);
       let embed = BloomBotEmbed::new()
         .title(":tada: New Donator :tada:")
         .description(format!(

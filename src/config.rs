@@ -1,7 +1,7 @@
 #![allow(clippy::unreadable_literal)]
 use std::fmt::{Display, Formatter, Result, Write};
 
-use poise::serenity_prelude::{CreateEmbed, Embed, GuildId, RoleId};
+use poise::serenity_prelude::{ChannelId, CreateEmbed, Embed, GuildId, RoleId};
 
 pub const MEDITATION_MIND: GuildId = GuildId::new(244917432383176705);
 pub const SECRET_CATEGORY: &str = "Secret";
@@ -73,38 +73,65 @@ pub const ROLES: Roles = Roles {
   no_pings: Role(1128156466273058906),
 };
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Channel(u64);
+
+impl Channel {
+  pub fn id(self) -> u64 {
+    self.0
+  }
+}
+
+impl PartialEq<Channel> for ChannelId {
+  fn eq(&self, other: &Channel) -> bool {
+    self.get() == other.0
+  }
+}
+
+impl From<Channel> for ChannelId {
+  fn from(val: Channel) -> Self {
+    ChannelId::new(val.0)
+  }
+}
+
+impl Display for Channel {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    write!(f, "<#{}>", self.0)
+  }
+}
+
 pub struct Channels {
-  pub welcome: u64,
-  pub announcement: u64,
-  pub logs: u64,
-  pub bloomlogs: u64,
-  pub starchannel: u64,
-  pub reportchannel: u64,
-  pub donators: u64,
-  pub suggestion: u64,
-  pub tracking: u64,
-  pub private_thread_default: u64,
-  pub group_meditation: u64,
-  pub meditate_with_me_1: u64,
-  pub meditate_with_me_2: u64,
-  pub meditation_hall: u64,
+  pub welcome: Channel,
+  pub announcement: Channel,
+  pub logs: Channel,
+  pub bloomlogs: Channel,
+  pub starchannel: Channel,
+  pub reportchannel: Channel,
+  pub donators: Channel,
+  pub suggestion: Channel,
+  pub tracking: Channel,
+  pub private_thread_default: Channel,
+  pub group_meditation: Channel,
+  pub meditate_with_me_1: Channel,
+  pub meditate_with_me_2: Channel,
+  pub meditation_hall: Channel,
 }
 
 pub const CHANNELS: Channels = Channels {
-  welcome: 493402917001494539,
-  announcement: 244917519477899264,
-  logs: 441207765357035541,
-  bloomlogs: 1161911290915209297,
-  starchannel: 856865368098078720,
-  reportchannel: 855894610001395743,
-  donators: 551895169532952578,
-  suggestion: 553676378621476887,
-  tracking: 440556997364940801,
-  private_thread_default: 501464482996944909,
-  group_meditation: 462964692856602624,
-  meditate_with_me_1: 1062108971558776872,
-  meditate_with_me_2: 1143607063226875984,
-  meditation_hall: 909856372378722324,
+  welcome: Channel(493402917001494539),
+  announcement: Channel(244917519477899264),
+  logs: Channel(441207765357035541),
+  bloomlogs: Channel(1161911290915209297),
+  starchannel: Channel(856865368098078720),
+  reportchannel: Channel(855894610001395743),
+  donators: Channel(551895169532952578),
+  suggestion: Channel(553676378621476887),
+  tracking: Channel(440556997364940801),
+  private_thread_default: Channel(501464482996944909),
+  group_meditation: Channel(462964692856602624),
+  meditate_with_me_1: Channel(1062108971558776872),
+  meditate_with_me_2: Channel(1143607063226875984),
+  meditation_hall: Channel(909856372378722324),
 };
 
 #[derive(Debug, Copy, Clone)]

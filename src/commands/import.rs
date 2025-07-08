@@ -288,7 +288,7 @@ async fn process_import(
     CreateAllowedMentions::new().users([user_id])
   };
 
-  let notify = ChannelId::new(CHANNELS.tracking)
+  let notify = ChannelId::from(CHANNELS.tracking)
     .send_message(
       &ctx,
       CreateMessage::new()
@@ -333,7 +333,7 @@ async fn process_import(
       .icon_url(ctx.author().avatar_url().unwrap_or_default()),
     );
 
-  let log_channel = ChannelId::new(CHANNELS.bloomlogs);
+  let log_channel = ChannelId::from(CHANNELS.bloomlogs);
   log_channel
     .send_files(&ctx, return_file, CreateMessage::new().embed(log_embed))
     .await?;

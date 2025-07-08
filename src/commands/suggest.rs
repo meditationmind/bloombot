@@ -31,14 +31,14 @@ pub async fn suggest(
       &ctx.author().id
     )));
 
-  let log_channel = ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::from(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;
 
   // Post suggestion and reactions
-  let channel_id = ChannelId::new(CHANNELS.suggestion);
+  let channel_id = ChannelId::from(CHANNELS.suggestion);
 
   let suggestion_message = channel_id
     .send_message(

@@ -578,7 +578,7 @@ async fn erase_and_log(
       in the server. Replies sent to Bloom are not viewable by staff.",
     ));
 
-  let log_channel = ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::from(CHANNELS.logs);
   let log_message = log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
     .await?;

@@ -45,10 +45,10 @@ pub async fn voice_state_update(
   let key = user_id.get();
 
   let meditation_vcs = [
-    CHANNELS.group_meditation,
-    CHANNELS.meditate_with_me_1,
-    CHANNELS.meditate_with_me_2,
-    CHANNELS.meditation_hall,
+    CHANNELS.group_meditation.id(),
+    CHANNELS.meditate_with_me_1.id(),
+    CHANNELS.meditate_with_me_2.id(),
+    CHANNELS.meditation_hall.id(),
   ];
 
   if !meditation_vcs.contains(&old_channel_id) && !meditation_vcs.contains(&new_channel_id)
@@ -91,7 +91,7 @@ pub async fn voice_state_update(
 
   if elapsed >= Duration::from_secs(60 * 5) {
     let guild_id = new.guild_id.unwrap_or(MEDITATION_MIND);
-    let tracking_channel = ChannelId::new(CHANNELS.tracking);
+    let tracking_channel = ChannelId::from(CHANNELS.tracking);
     let mut transaction = data.db.start_transaction_with_retry(5).await?;
     let tracking_profile = if let Some(existing_profile) =
       DatabaseHandler::get_tracking_profile(&mut transaction, &guild_id, &user_id).await?
@@ -558,7 +558,7 @@ pub async fn voice_state_update(
             .content(format!(
               "**Request timed out. No action taken.**\n\n\
               You were in a meditation VC for **{time_elapsed}**. This was an attempt to \
-              automatically log that time. You can manually log using {add} in <#{}>.\n\n\
+              automatically log that time. You can manually log using {add} in {}.\n\n\
               Use {customize_vc} to enable fully automated tracking for meditation VCs, or \
               disable to prevent automatic tracking and suppress these messages. You can \
               also customize if and how you receive related private notifications.",

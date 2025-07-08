@@ -129,7 +129,7 @@ async fn join(
       ctx.author().id
     ));
 
-  let log_channel = ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::from(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))
@@ -224,7 +224,7 @@ async fn leave(
       ctx.author().id
     ));
 
-  let log_channel = ChannelId::new(CHANNELS.logs);
+  let log_channel = ChannelId::from(CHANNELS.logs);
 
   log_channel
     .send_message(ctx, CreateMessage::new().embed(log_embed))

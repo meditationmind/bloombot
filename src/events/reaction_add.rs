@@ -36,7 +36,7 @@ async fn check_report(ctx: &Context, reaction: &Reaction) -> Result<()> {
         .await
         .with_context(|| "Failed to remove report reaction from message")?;
 
-      let report_channel_id = ChannelId::new(CHANNELS.reportchannel);
+      let report_channel_id = ChannelId::from(CHANNELS.reportchannel);
       let message = reaction.message(&ctx).await?;
       let message_link = message.link();
       let message_user = message.author;

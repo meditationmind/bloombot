@@ -43,7 +43,7 @@ pub async fn post_guild_hours(ctx: &Context<'_>, guild_hours: Option<i64>) -> Re
         ))
         .await?;
     } else {
-      ChannelId::new(CHANNELS.tracking)
+      ChannelId::from(CHANNELS.tracking)
         .send_message(
           &ctx,
           CreateMessage::new()
@@ -272,7 +272,7 @@ pub async fn update_time_roles(
         .await?;
     } else {
       let reference = reference.unwrap_or_default();
-      ChannelId::new(CHANNELS.tracking)
+      ChannelId::from(CHANNELS.tracking)
         .send_message(
           &ctx,
           CreateMessage::new()
@@ -401,7 +401,7 @@ pub async fn update_streak_roles(
         .await?;
     } else {
       let reference = reference.unwrap_or_default();
-      ChannelId::new(CHANNELS.tracking)
+      ChannelId::from(CHANNELS.tracking)
         .send_message(
           &ctx,
           CreateMessage::new()
