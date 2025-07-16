@@ -166,7 +166,7 @@ impl DefaultReasons {
 ///
 /// Deletes a message and notifies the user via DM or private thread with an optional reason.
 ///
-/// To use, right-click the message that you want to bookmark, then go to "Apps" > "Erase Message".
+/// To use, right-click the message that you want to erase, then go to "Apps" > "Erase Message".
 #[poise::command(
   ephemeral,
   required_permissions = "MANAGE_MESSAGES",
