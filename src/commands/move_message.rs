@@ -67,7 +67,7 @@ pub async fn move_message(
   if let Some(mci) = ComponentInteractionCollector::new(ctx)
     .author_id(ctx.author().id)
     .channel_id(ctx.channel_id())
-    .timeout(Duration::from_secs(20))
+    .timeout(Duration::from_secs(300))
     .custom_ids(vec![ctx_id])
     .await
   {
