@@ -234,7 +234,7 @@ pub async fn move_messages(
   let mut num_moved = 0;
 
   for message in messages {
-    if message.kind != MessageType::Regular {
+    if message.kind != MessageType::Regular && message.kind != MessageType::InlineReply {
       let msg = format!(
         "{} Unable to move message. Skipping: {}",
         EMOJI.mminfo,
