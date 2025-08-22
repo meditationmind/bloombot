@@ -76,7 +76,7 @@ impl Course {
 
 impl InsertQuery for Course {
   /// Adds a [`Course`] to the database.
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO course (record_id, course_name, participant_role, graduate_role, guild_id) VALUES ($1, $2, $3, $4, $5)",
       Ulid::new().to_string(),
@@ -90,7 +90,7 @@ impl InsertQuery for Course {
 
 impl UpdateQuery for Course {
   /// Updates a [`Course`] in the database.
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "UPDATE course SET participant_role = $1, graduate_role = $2 WHERE LOWER(course_name) = LOWER($3)",
       self.participant_role.to_string(),

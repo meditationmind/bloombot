@@ -38,7 +38,7 @@ impl StarMessage {
 }
 
 impl InsertQuery for StarMessage {
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO star (record_id, starred_message_id, board_message_id, starred_channel_id) VALUES ($1, $2, $3, $4) ON CONFLICT (starred_message_id) DO UPDATE SET board_message_id = $3",
       self.id,

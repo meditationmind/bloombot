@@ -179,7 +179,7 @@ impl TrackingProfile {
 }
 
 impl InsertQuery for TrackingProfile {
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO tracking_profile (record_id, user_id, guild_id, utc_offset, anonymous_tracking, streaks_active, streaks_private, stats_private, vc_tracking, notifications, thread_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
       Ulid::new().to_string(),
@@ -202,7 +202,7 @@ impl InsertQuery for TrackingProfile {
 }
 
 impl UpdateQuery for TrackingProfile {
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "UPDATE tracking_profile SET utc_offset = $1, anonymous_tracking = $2, streaks_active = $3, streaks_private = $4, stats_private = $5, vc_tracking = $6, notifications = $7, thread_id = $8 WHERE user_id = $9 AND guild_id = $10",
       self.utc_offset,

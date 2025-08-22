@@ -56,7 +56,7 @@ impl Migration {
 }
 
 impl UpdateQuery for Migration {
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     match self.kind {
       MigrationType::TrackingProfile => {
         query!(

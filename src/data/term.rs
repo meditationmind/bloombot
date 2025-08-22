@@ -89,11 +89,11 @@ impl Term {
       .collect::<Vec<String>>();
     let mut aliases = vec![];
     for term in terms {
-      if let Some(term_aliases) = term.aliases {
-        if !term_aliases.is_empty() {
-          for alias in term_aliases {
-            aliases.push(alias);
-          }
+      if let Some(term_aliases) = term.aliases
+        && !term_aliases.is_empty()
+      {
+        for alias in term_aliases {
+          aliases.push(alias);
         }
       }
     }
@@ -174,7 +174,7 @@ impl Term {
 
 impl InsertQuery for Term {
   /// Adds a [`Term`] to the database.
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     sqlx::query(
       "
         INSERT INTO term (record_id, term_name, meaning, usage, links, category, aliases, guild_id, embedding) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -194,7 +194,7 @@ impl InsertQuery for Term {
 
 impl UpdateQuery for Term {
   /// Updates a [`Term`] in the database.
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     sqlx::query(
       "UPDATE term SET meaning = $1, usage = $2, links = $3, category = $4, aliases = $5, embedding = COALESCE($6, embedding) WHERE LOWER(term_name) = LOWER($7)",
     )

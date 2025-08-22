@@ -69,10 +69,10 @@ async fn create_star_message(
       "⭐ Times starred: {star_count}"
     )));
 
-  if let Some(sticker) = starred_message.sticker_items.first() {
-    if let Some(sticker_url) = sticker.image_url() {
-      embed = embed.image(sticker_url);
-    }
+  if let Some(sticker) = starred_message.sticker_items.first()
+    && let Some(sticker_url) = sticker.image_url()
+  {
+    embed = embed.image(sticker_url);
   }
 
   let starboard_channel = ChannelId::from(CHANNELS.starchannel);

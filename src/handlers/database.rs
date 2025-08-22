@@ -37,11 +37,11 @@ pub struct DatabaseHandler {
 }
 
 pub(crate) trait InsertQuery {
-  fn insert_query(&self) -> Query<Postgres, PgArguments>;
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments>;
 }
 
 pub(crate) trait UpdateQuery {
-  fn update_query(&self) -> Query<Postgres, PgArguments>;
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments>;
 }
 
 pub(crate) trait DeleteQuery {

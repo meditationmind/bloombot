@@ -52,18 +52,18 @@ async fn list(
   for term in term_names {
     let first_char = term.name.chars().next().unwrap_or_default().to_string();
     let mut full_term = term.name;
-    if let Some(aliases) = term.aliases {
-      if !aliases.is_empty() {
-        full_term.push_str(" (");
-        let alias_count = aliases.len();
-        for (i, alias) in aliases.iter().enumerate() {
-          full_term.push_str(alias);
-          if i < (alias_count - 1) {
-            full_term.push_str(", ");
-          }
+    if let Some(aliases) = term.aliases
+      && !aliases.is_empty()
+    {
+      full_term.push_str(" (");
+      let alias_count = aliases.len();
+      for (i, alias) in aliases.iter().enumerate() {
+        full_term.push_str(alias);
+        if i < (alias_count - 1) {
+          full_term.push_str(", ");
         }
-        full_term.push(')');
       }
+      full_term.push(')');
     }
     sorted_terms.push((first_char, full_term));
   }
@@ -384,41 +384,41 @@ fn term_embed(term: &Term) -> CreateEmbed {
   if let Some(usage) = &term.usage {
     embed = embed.field("Example of Usage:", usage, false);
   }
-  if let Some(links) = &term.links {
-    if !links.is_empty() {
-      embed = embed.field(
-        "Related Resources:",
-        links
+  if let Some(links) = &term.links
+    && !links.is_empty()
+  {
+    embed = embed.field(
+      "Related Resources:",
+      links
+        .iter()
+        .enumerate()
+        .fold(String::new(), |mut field, (count, link)| {
+          let _ = writeln!(field, "{count}. {link}");
+          field
+        }),
+      false,
+    );
+  }
+  if let Some(aliases) = &term.aliases
+    && !aliases.is_empty()
+  {
+    embed = embed.field(
+      "Aliases:",
+      {
+        let alias_count = aliases.len();
+        aliases
           .iter()
           .enumerate()
-          .fold(String::new(), |mut field, (count, link)| {
-            let _ = writeln!(field, "{count}. {link}");
+          .fold(String::new(), |mut field, (i, alias)| {
+            let _ = write!(field, "{alias}");
+            if i < (alias_count - 1) {
+              let _ = write!(field, ", ");
+            }
             field
-          }),
-        false,
-      );
-    }
-  }
-  if let Some(aliases) = &term.aliases {
-    if !aliases.is_empty() {
-      embed = embed.field(
-        "Aliases:",
-        {
-          let alias_count = aliases.len();
-          aliases
-            .iter()
-            .enumerate()
-            .fold(String::new(), |mut field, (i, alias)| {
-              let _ = write!(field, "{alias}");
-              if i < (alias_count - 1) {
-                let _ = write!(field, ", ");
-              }
-              field
-            })
-        },
-        false,
-      );
-    }
+          })
+      },
+      false,
+    );
   }
   if let Some(category) = &term.category {
     embed = embed.footer(CreateEmbedFooter::new(format!("Categories: {category}")));

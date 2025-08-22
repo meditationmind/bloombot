@@ -105,7 +105,7 @@ impl Streak {
 }
 
 impl UpdateQuery for Streak {
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO streak (record_id, user_id, guild_id, current_streak, longest_streak) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id) DO UPDATE SET current_streak = $4, longest_streak = $5",
       Ulid::new().to_string(),

@@ -182,31 +182,30 @@ impl Import {
     let mut import_source = String::new();
 
     'result: for result in rdr.deserialize::<FinchBreathingSessionRecord>().flatten() {
-      if !result.completed_time.is_empty() {
-        if let Ok(valid_starttime) =
+      if !result.completed_time.is_empty()
+        && let Ok(valid_starttime) =
           NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
-        {
-          let datetime_utc = valid_starttime.and_utc();
-          if matches!(import_type, Type::NewEntries) && datetime_utc.le(&latest_time) {
-            continue;
-          }
-          let minutes = result.duration / 60;
-          if minutes < 1 {
-            continue;
-          }
-          for entry in current_data {
-            if time_overlaps(entry, datetime_utc, minutes) {
-              continue 'result;
-            }
-          }
-          total_minutes += minutes;
-          total_seconds += result.duration % 60;
-          user_data.push(BloomRecord {
-            occurred_at: datetime_utc,
-            meditation_minutes: minutes,
-            meditation_seconds: result.duration % 60,
-          });
+      {
+        let datetime_utc = valid_starttime.and_utc();
+        if matches!(import_type, Type::NewEntries) && datetime_utc.le(&latest_time) {
+          continue;
         }
+        let minutes = result.duration / 60;
+        if minutes < 1 {
+          continue;
+        }
+        for entry in current_data {
+          if time_overlaps(entry, datetime_utc, minutes) {
+            continue 'result;
+          }
+        }
+        total_minutes += minutes;
+        total_seconds += result.duration % 60;
+        user_data.push(BloomRecord {
+          occurred_at: datetime_utc,
+          meditation_minutes: minutes,
+          meditation_seconds: result.duration % 60,
+        });
       }
     }
     import_source.push_str("Finch Breathing Sessions");
@@ -231,39 +230,38 @@ impl Import {
     let mut import_source = String::new();
 
     'result: for result in rdr.deserialize::<FinchTimerSessionRecord>().flatten() {
-      if result.timer_type == 0 {
-        if let Ok(valid_starttime) =
+      if result.timer_type == 0
+        && let Ok(valid_starttime) =
           NaiveDateTime::parse_from_str(&result.start_time, "%a, %d %b %Y %H:%M:%S")
-        {
-          let datetime_utc = valid_starttime.and_utc();
-          if matches!(import_type, Type::NewEntries) && datetime_utc.le(&latest_time) {
-            continue;
-          }
-          #[allow(clippy::cast_possible_truncation)]
-          let (minutes, seconds) = if let Ok(valid_endtime) =
-            NaiveDateTime::parse_from_str(&result.completed_time, "%a, %d %b %Y %H:%M:%S")
-          {
-            let num_seconds = (valid_endtime - valid_starttime).num_seconds() as i32;
-            (num_seconds / 60, num_seconds % 60)
-          } else {
-            (result.selected_duration / 60, result.selected_duration % 60)
-          };
-          if minutes < 1 {
-            continue;
-          }
-          for entry in current_data {
-            if time_overlaps(entry, datetime_utc, minutes) {
-              continue 'result;
-            }
-          }
-          total_minutes += minutes;
-          total_seconds += seconds;
-          user_data.push(BloomRecord {
-            occurred_at: datetime_utc,
-            meditation_minutes: minutes,
-            meditation_seconds: seconds,
-          });
+      {
+        let datetime_utc = valid_starttime.and_utc();
+        if matches!(import_type, Type::NewEntries) && datetime_utc.le(&latest_time) {
+          continue;
         }
+        #[allow(clippy::cast_possible_truncation)]
+        let (minutes, seconds) = if let Ok(valid_endtime) =
+          NaiveDateTime::parse_from_str(&result.completed_time, "%a, %d %b %Y %H:%M:%S")
+        {
+          let num_seconds = (valid_endtime - valid_starttime).num_seconds() as i32;
+          (num_seconds / 60, num_seconds % 60)
+        } else {
+          (result.selected_duration / 60, result.selected_duration % 60)
+        };
+        if minutes < 1 {
+          continue;
+        }
+        for entry in current_data {
+          if time_overlaps(entry, datetime_utc, minutes) {
+            continue 'result;
+          }
+        }
+        total_minutes += minutes;
+        total_seconds += seconds;
+        user_data.push(BloomRecord {
+          occurred_at: datetime_utc,
+          meditation_minutes: minutes,
+          meditation_seconds: seconds,
+        });
       }
     }
     import_source.push_str("Finch Meditation Sessions");
@@ -288,37 +286,35 @@ impl Import {
     let mut import_source = String::new();
 
     'result: for result in rdr.deserialize::<InsightTimerRecord>().flatten() {
-      if result.activity == "PracticeType.Meditation"
+      if (result.activity == "PracticeType.Meditation"
         || result.activity == "Meditation"
-        || result.activity == "瞑想"
-      {
-        if let Ok(valid_datetime) =
+        || result.activity == "瞑想")
+        && let Ok(valid_datetime) =
           NaiveDateTime::parse_from_str(&result.start_time, "%m/%d/%Y %H:%M:%S")
-        {
-          let datetime_utc = valid_datetime.and_utc();
-          if matches!(import_type, Type::NewEntries) && datetime_utc.le(&latest_time) {
-            continue;
-          }
-          let (minutes, seconds) = {
-            let h_m_s: Vec<&str> = result.duration.split(':').collect();
-            let hours = <i32 as FromStr>::from_str(h_m_s[0])?;
-            let minutes = <i32 as FromStr>::from_str(h_m_s[1])?;
-            let seconds = <i32 as FromStr>::from_str(h_m_s[2])?;
-            ((hours * 60) + minutes, seconds)
-          };
-          for entry in current_data {
-            if time_overlaps(entry, datetime_utc, minutes) {
-              continue 'result;
-            }
-          }
-          total_minutes += minutes;
-          total_seconds += seconds;
-          user_data.push(BloomRecord {
-            occurred_at: datetime_utc,
-            meditation_minutes: minutes,
-            meditation_seconds: seconds,
-          });
+      {
+        let datetime_utc = valid_datetime.and_utc();
+        if matches!(import_type, Type::NewEntries) && datetime_utc.le(&latest_time) {
+          continue;
         }
+        let (minutes, seconds) = {
+          let h_m_s: Vec<&str> = result.duration.split(':').collect();
+          let hours = <i32 as FromStr>::from_str(h_m_s[0])?;
+          let minutes = <i32 as FromStr>::from_str(h_m_s[1])?;
+          let seconds = <i32 as FromStr>::from_str(h_m_s[2])?;
+          ((hours * 60) + minutes, seconds)
+        };
+        for entry in current_data {
+          if time_overlaps(entry, datetime_utc, minutes) {
+            continue 'result;
+          }
+        }
+        total_minutes += minutes;
+        total_seconds += seconds;
+        user_data.push(BloomRecord {
+          occurred_at: datetime_utc,
+          meditation_minutes: minutes,
+          meditation_seconds: seconds,
+        });
       }
     }
     import_source.push_str("Insight Timer");

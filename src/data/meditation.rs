@@ -140,7 +140,7 @@ impl Meditation {
 }
 
 impl InsertQuery for Meditation {
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO meditation (record_id, user_id, meditation_minutes, meditation_seconds, guild_id, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)",
       self.id,
@@ -154,7 +154,7 @@ impl InsertQuery for Meditation {
 }
 
 impl UpdateQuery for Meditation {
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "UPDATE meditation SET meditation_minutes = $1, meditation_seconds = $2, occurred_at = $3 WHERE record_id = $4",
       self.minutes,

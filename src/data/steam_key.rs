@@ -78,7 +78,7 @@ impl SteamKey {
 
 impl InsertQuery for SteamKey {
   /// Adds a [`SteamKey`] to the database.
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO steamkey (record_id, steam_key, guild_id, used) VALUES ($1, $2, $3, $4)",
       Ulid::new().to_string(),
@@ -221,7 +221,7 @@ impl Recipient {
 
 impl InsertQuery for Recipient {
   /// Adds a Steam key [`Recipient`] to the database.
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO steamkey_recipients (record_id, user_id, guild_id, challenge_prize, donator_perk, total_keys) VALUES ($1, $2, $3, $4, $5, $6)",
       Ulid::new().to_string(),
@@ -236,7 +236,7 @@ impl InsertQuery for Recipient {
 
 impl UpdateQuery for Recipient {
   /// Updates Steam key [`Recipient`] details in the database.
-  fn update_query(&self) -> Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "UPDATE steamkey_recipients SET challenge_prize = $1, donator_perk = $2, total_keys = $3 WHERE user_id = $4 AND guild_id = $5",
       self.challenge_prize,

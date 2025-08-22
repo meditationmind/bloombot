@@ -89,7 +89,7 @@ impl Bookmark {
 
 impl InsertQuery for Bookmark {
   /// Adds a [`Bookmark`] to the database.
-  fn insert_query(&self) -> Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO bookmarks (record_id, user_id, guild_id, message_link, user_desc) VALUES ($1, $2, $3, $4, $5)",
       self.id,

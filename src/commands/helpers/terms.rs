@@ -48,11 +48,11 @@ pub async fn update_names(term_list: Vec<Term>, term_names: Arc<RwLock<Vec<Strin
     .collect::<Vec<String>>();
   let mut aliases = vec![];
   for term in term_list {
-    if let Some(term_aliases) = term.aliases {
-      if !term_aliases.is_empty() {
-        for alias in term_aliases {
-          aliases.push(alias);
-        }
+    if let Some(term_aliases) = term.aliases
+      && !term_aliases.is_empty()
+    {
+      for alias in term_aliases {
+        aliases.push(alias);
       }
     }
   }

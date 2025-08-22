@@ -105,7 +105,7 @@ impl Quote {
 
 impl InsertQuery for Quote {
   /// Adds a new [`Quote`] to the database.
-  fn insert_query(&self) -> sqlx::query::Query<Postgres, PgArguments> {
+  fn insert_query(&'_ self) -> sqlx::query::Query<'_, Postgres, PgArguments> {
     query!(
       "INSERT INTO quote (record_id, quote, author, guild_id) VALUES ($1, $2, $3, $4)",
       self.id,
@@ -118,7 +118,7 @@ impl InsertQuery for Quote {
 
 impl UpdateQuery for Quote {
   /// Updates a [`Quote`] in the database.
-  fn update_query(&self) -> sqlx::query::Query<Postgres, PgArguments> {
+  fn update_query(&'_ self) -> sqlx::query::Query<'_, Postgres, PgArguments> {
     query!(
       "UPDATE quote SET quote = $1, author = $2 WHERE record_id = $3",
       self.quote,

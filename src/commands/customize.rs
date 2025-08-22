@@ -310,19 +310,18 @@ async fn streak(
       let current_streak_roles = StreakRoles::current(&member.roles);
       let earned_streak_role = StreakRoles::from_streak(user_streak.current.unsigned_abs().into());
 
-      if let Some(earned_streak_role) = earned_streak_role {
-        if !current_streak_roles.contains(&earned_streak_role.to_role_id()) {
-          if let Err(err) = member.add_role(ctx, earned_streak_role.to_role_id()).await {
-            error!("Error adding role: {err}");
-            let msg = format!(
-              "{} An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.",
-              EMOJI.mminfo
-            );
-            ctx
-              .send(CreateReply::default().content(msg).ephemeral(true))
-              .await?;
-          }
-        }
+      if let Some(earned_streak_role) = earned_streak_role
+        && !current_streak_roles.contains(&earned_streak_role.to_role_id())
+        && let Err(err) = member.add_role(ctx, earned_streak_role.to_role_id()).await
+      {
+        error!("Error adding role: {err}");
+        let msg = format!(
+          "{} An error occured while adding your streak role. Your settings have been saved, but your roles have not been updated. Please contact a moderator.",
+          EMOJI.mminfo
+        );
+        ctx
+          .send(CreateReply::default().content(msg).ephemeral(true))
+          .await?;
       }
     }
   } else {

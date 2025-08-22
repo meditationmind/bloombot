@@ -83,7 +83,7 @@ impl<'a> Paginator<'a> {
     self.page_count - 1
   }
 
-  pub fn get_page(&self, page: usize) -> Option<&PaginationPage> {
+  pub fn get_page(&'_ self, page: usize) -> Option<&'_ PaginationPage<'_>> {
     self.page_data.get(page)
   }
 
