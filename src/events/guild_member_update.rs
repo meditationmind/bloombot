@@ -1,25 +1,16 @@
 use anyhow::Result;
-use poise::serenity_prelude::{ChannelId, Context, CreateMessage, Member, RoleId};
+use poise::serenity_prelude::{ChannelId, Context, CreateMessage, Member};
 
 use crate::config::{BloomBotEmbed, CHANNELS, EMOJI, ROLES};
 
 enum UpdateType {
-  BecamePatreonDonator,
-  BecameKofiDonator,
   StoppedPending,
 }
 
 impl UpdateType {
   fn get_type(old: &Member, new: &Member) -> Option<Self> {
-    let patreon_role = RoleId::from(ROLES.patreon);
-    let kofi_role = RoleId::from(ROLES.kofi);
-
     if old.pending && !new.pending {
       Some(Self::StoppedPending)
-    } else if !old.roles.contains(&patreon_role) && new.roles.contains(&patreon_role) {
-      Some(Self::BecamePatreonDonator)
-    } else if !old.roles.contains(&kofi_role) && new.roles.contains(&kofi_role) {
-      Some(Self::BecameKofiDonator)
     } else {
       None
     }
@@ -56,32 +47,6 @@ pub async fn guild_member_update(
 
       welcome_channel
         .send_message(&ctx, CreateMessage::new().content(msg).embed(embed))
-        .await?;
-    }
-    UpdateType::BecamePatreonDonator => {
-      let donator_channel = ChannelId::from(CHANNELS.donators);
-      let embed = BloomBotEmbed::new()
-        .title(":tada: New Donator :tada:")
-        .description(format!(
-          "Please welcome <@{}> as a new donator on Patreon.\n\nThank you for your generosity! It helps keep this community alive {}",
-          new.user.id, EMOJI.loveit
-        ));
-
-      donator_channel
-        .send_message(&ctx, CreateMessage::new().embed(embed))
-        .await?;
-    }
-    UpdateType::BecameKofiDonator => {
-      let donator_channel = ChannelId::from(CHANNELS.donators);
-      let embed = BloomBotEmbed::new()
-        .title(":tada: New Donator :tada:")
-        .description(format!(
-          "Please welcome <@{}> as a new donator on Ko-fi.\n\nThank you for your generosity! It helps keep this community alive {}",
-          new.user.id, EMOJI.loveit,
-        ));
-
-      donator_channel
-        .send_message(&ctx, CreateMessage::new().embed(embed))
         .await?;
     }
   }

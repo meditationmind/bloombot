@@ -1,3 +1,4 @@
+mod guild_audit_log_entry_create;
 mod guild_create;
 mod guild_member_removal;
 mod guild_member_update;
@@ -7,6 +8,7 @@ mod reaction_add;
 mod reaction_remove;
 mod voice_state_update;
 
+pub use guild_audit_log_entry_create::guild_audit_log_entry_create;
 pub use guild_create::guild_create;
 pub use guild_member_removal::guild_member_removal;
 pub use guild_member_update::guild_member_update;

@@ -8,6 +8,9 @@ pub async fn listen(ctx: &SerenityContext, event: &Event, data: &Data) -> Result
   let database = &data.db;
 
   match event {
+    Event::GuildAuditLogEntryCreate { entry, .. } => {
+      events::guild_audit_log_entry_create(ctx, entry).await?;
+    }
     Event::GuildCreate { .. } => {
       events::guild_create(database).await?;
     }
