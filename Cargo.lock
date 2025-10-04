@@ -2678,9 +2678,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.17"
+version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5407465600fb0548f1442edf71dd20683c6ed326200ace4b1ef0763521bb3b77"
+checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
  "bitflags 2.9.4",
 ]
@@ -3147,7 +3147,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.4"
-source = "git+https://github.com/serenity-rs/serenity?branch=current#78d738ad7d740425d42925a2cdc01f61a2326f7d"
+source = "git+https://github.com/serenity-rs/serenity?branch=current#2b098afab917f9815b1f5b99d0dd64178854c020"
 dependencies = [
  "arrayvec",
  "async-trait",
