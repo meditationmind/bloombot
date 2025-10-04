@@ -50,7 +50,7 @@ impl<'a> Paginator<'a> {
 
     let entries_count = entries.len();
     let page_count = ((entries_count / entries_per_page)
-      + usize::from(entries_count % entries_per_page > 0))
+      + usize::from(!entries_count.is_multiple_of(entries_per_page)))
     .max(1);
 
     let page_data = if entries_count < 1 {
