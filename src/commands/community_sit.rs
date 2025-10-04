@@ -103,11 +103,11 @@ async fn start(ctx: Context<'_>) -> Result<()> {
 
         let confirmed = press.data.custom_id == confirm_id;
 
-        if confirmed {
-          if events::not_present(ctx, guild_id, event.channel_id, &press).await? {
-            continue;
-          }
+        if confirmed && events::not_present(ctx, guild_id, event.channel_id, &press).await? {
+          continue;
+        }
 
+        if confirmed {
           match press
             .create_response(
               ctx,
